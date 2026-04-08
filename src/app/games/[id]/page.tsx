@@ -174,6 +174,7 @@ export default async function GameDetailPage({ params }: Props) {
               key={`${section.title}|${section.markets.map((m) => m.marketKey).join("|")}`}
               title={section.title}
               markets={section.markets}
+              gameTitle={names}
             />
           ))}
         </div>

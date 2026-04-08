@@ -5,17 +5,20 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 import { useAccount } from "wagmi";
 import { zeroAddress } from "viem";
+import { BetReceipt } from "@/components/BetReceipt";
+import { useToast } from "@/components/Toast";
 
 export type BetslipSelection = {
   id: string;
   gameId: string;
+  /** Match / event title shown on the receipt (e.g. Team A vs Team B). */
+  gameTitle: string;
   outcomeName: string;
   odds: string;
   conditionId: string;
@@ -26,11 +29,13 @@ type BetslipContextValue = {
   selections: BetslipSelection[];
   addSelection: (item: {
     gameId: string;
+    gameTitle: string;
     outcomeName: string;
     odds: string;
     conditionId: string;
     outcomeId: string;
   }) => void;
+  clearSelections: () => void;
   removeSelection: (id: string) => void;
 };
 
@@ -61,6 +66,7 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
   const addSelection = useCallback(
     (item: {
       gameId: string;
+      gameTitle: string;
       outcomeName: string;
       odds: string;
       conditionId: string;
@@ -72,6 +78,7 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
         next.push({
           id,
           gameId: item.gameId,
+          gameTitle: item.gameTitle,
           outcomeName: item.outcomeName,
           odds: item.odds,
           conditionId: item.conditionId,
@@ -87,9 +94,13 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
     setSelections((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
+  const clearSelections = useCallback(() => {
+    setSelections([]);
+  }, []);
+
   const value = useMemo(
-    () => ({ selections, addSelection, removeSelection }),
-    [selections, addSelection, removeSelection],
+    () => ({ selections, addSelection, removeSelection, clearSelections }),
+    [selections, addSelection, removeSelection, clearSelections],
   );
 
   return (
@@ -143,14 +154,30 @@ function hasDuplicateGameInCombo(sel: BetslipSelection[]): boolean {
 
 function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }) {
   const { betToken } = useChain();
+  const { showToast } = useToast();
+  const { clearSelections } = useBetslip();
   const { address, isConnected } = useAccount();
   const [stake, setStake] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptSnapshot, setReceiptSnapshot] = useState<{
+    selections: BetslipSelection[];
+    stakeLabel: string;
+    totalOdds: number;
+    potentialWin: number | null;
+    txHash: `0x${string}` | undefined;
+    /** Whether to empty the slip when the receipt closes (captures leg index at bet time). */
+    clearSlipOnClose: boolean;
+  } | null>(null);
   const [mode, setMode] = useState<BetslipMode>("combo");
   const [singleLegIndex, setSingleLegIndex] = useState(0);
 
   const multiPick = selections.length > 1;
+  const maxLegIndex = Math.max(0, selections.length - 1);
+  const effectiveLegIndex =
+    multiPick && mode === "single"
+      ? Math.min(singleLegIndex, maxLegIndex)
+      : 0;
   const comboInvalidSameGame =
     mode === "combo" && multiPick && hasDuplicateGameInCombo(selections);
 
@@ -158,22 +185,9 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     if (!multiPick || mode === "combo") {
       return selections;
     }
-    const leg = selections[singleLegIndex];
+    const leg = selections[effectiveLegIndex];
     return leg ? [leg] : selections;
-  }, [selections, multiPick, mode, singleLegIndex]);
-
-  useEffect(() => {
-    setSingleLegIndex(0);
-  }, [selections]);
-
-  useEffect(() => {
-    if (!multiPick) {
-      return;
-    }
-    if (singleLegIndex >= selections.length) {
-      setSingleLegIndex(0);
-    }
-  }, [multiPick, selections.length, singleLegIndex]);
+  }, [selections, multiPick, mode, effectiveLegIndex]);
 
   const sdkSelections = useMemo(
     () =>
@@ -201,8 +215,8 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const stakeValid = Number.isFinite(stakeNum) && stakeNum > 0;
 
   const singleLegOdds =
-    multiPick && mode === "single" && selections[singleLegIndex]
-      ? parseDecimalOdds(selections[singleLegIndex].odds)
+    multiPick && mode === "single" && selections[effectiveLegIndex]
+      ? parseDecimalOdds(selections[effectiveLegIndex].odds)
       : NaN;
   const potentialWinSingleLeg =
     stakeValid && Number.isFinite(singleLegOdds) && singleLegOdds > 0
@@ -215,6 +229,18 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const potentialWinDisplay =
     mode === "combo" ? potentialWinCombo : potentialWinSingleLeg;
 
+  const receiptTotalOdds = useMemo(() => {
+    if (mode === "combo") {
+      return totalOdds;
+    }
+    const one = activeSelections[0];
+    if (!one) {
+      return 0;
+    }
+    const v = parseDecimalOdds(one.odds);
+    return Number.isFinite(v) ? v : 0;
+  }, [mode, totalOdds, activeSelections]);
+
   const { submit, approveTx, betTx, isApproveRequired, isWalletReadyToSubmit } =
     useBet({
       betAmount: stakeValid ? stakeAmount : "0",
@@ -223,9 +249,30 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       selections: sdkSelections,
       odds: oddsRecord ?? {},
       totalOdds,
-      onSuccess: () => {
-        setSuccess(true);
+      onSuccess: (receipt) => {
         setErrorMessage(null);
+        const placedSelections = activeSelections.map((s) => ({ ...s }));
+        const win =
+          mode === "combo"
+            ? potentialWinCombo
+            : potentialWinSingleLeg;
+        const legJustPlaced = effectiveLegIndex;
+        const clearSlipOnClose =
+          mode === "combo" ||
+          !multiPick ||
+          (mode === "single" &&
+            multiPick &&
+            legJustPlaced >= selections.length - 1);
+        setReceiptSnapshot({
+          selections: placedSelections,
+          stakeLabel: stakeAmount,
+          totalOdds: receiptTotalOdds,
+          potentialWin: win,
+          txHash: receipt?.transactionHash,
+          clearSlipOnClose,
+        });
+        setReceiptOpen(true);
+        showToast("Bet placed successfully.", "success");
         if (mode === "single" && multiPick) {
           setSingleLegIndex((i) =>
             i < selections.length - 1 ? i + 1 : i,
@@ -233,7 +280,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
         }
       },
       onError: (err) => {
-        setSuccess(false);
         setErrorMessage(err?.message ?? "Could not place bet.");
       },
     });
@@ -257,7 +303,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const placeBetLabel = isApproveRequired
     ? "Approve token"
     : mode === "single" && multiPick
-      ? `Place bet (leg ${singleLegIndex + 1}/${selections.length})`
+      ? `Place bet (leg ${effectiveLegIndex + 1}/${selections.length})`
       : "Place Bet";
 
   return (
@@ -271,7 +317,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
               onClick={() => {
                 setMode("single");
                 setSingleLegIndex(0);
-                setSuccess(false);
                 setErrorMessage(null);
               }}
               className={`flex-1 rounded px-2 py-1.5 text-xs font-medium transition ${
@@ -286,7 +331,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
               type="button"
               onClick={() => {
                 setMode("combo");
-                setSuccess(false);
                 setErrorMessage(null);
               }}
               className={`flex-1 rounded px-2 py-1.5 text-xs font-medium transition ${
@@ -323,7 +367,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           value={stake}
           onChange={(e) => {
             setStake(e.target.value);
-            setSuccess(false);
             setErrorMessage(null);
           }}
           className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
@@ -363,20 +406,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       {!isConnected ? (
         <p className="text-xs text-zinc-500">Connect a wallet to place a bet.</p>
       ) : null}
-      {success ? (
-        <p className="rounded-md border border-emerald-800/80 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
-          Bet placed successfully.
-          {betTx.receipt?.transactionHash ? (
-            <>
-              {" "}
-              Transaction{" "}
-              <span className="font-mono text-xs">
-                {betTx.receipt.transactionHash.slice(0, 10)}…
-              </span>
-            </>
-          ) : null}
-        </p>
-      ) : null}
       {errorMessage ? (
         <p
           className="rounded-md border border-red-900/80 bg-red-950/40 px-3 py-2 text-sm text-red-200"
@@ -393,6 +422,24 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       >
         {isBusy ? "Working…" : placeBetLabel}
       </button>
+      {receiptSnapshot ? (
+        <BetReceipt
+          open={receiptOpen}
+          onClose={() => {
+            setReceiptOpen(false);
+            if (receiptSnapshot.clearSlipOnClose) {
+              clearSelections();
+            }
+            setReceiptSnapshot(null);
+          }}
+          selections={receiptSnapshot.selections}
+          stakeLabel={receiptSnapshot.stakeLabel}
+          tokenSymbol={betToken.symbol}
+          totalOdds={receiptSnapshot.totalOdds}
+          potentialWin={receiptSnapshot.potentialWin}
+          transactionHash={receiptSnapshot.txHash}
+        />
+      ) : null}
     </div>
   );
 }
@@ -416,7 +463,8 @@ export function BetslipPanel() {
                 className="flex items-start justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900/80 px-2 py-2"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-zinc-100">{s.outcomeName}</p>
+                  <p className="text-xs text-zinc-500">{s.gameTitle}</p>
+                  <p className="mt-0.5 text-sm text-zinc-100">{s.outcomeName}</p>
                   <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-300">
                     {s.odds}
                   </p>

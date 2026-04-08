@@ -119,6 +119,7 @@ export function GameCard({ game, topOdds, meta }: GameCardProps) {
                 onClick={() =>
                   addSelection({
                     gameId: game.gameId,
+                    gameTitle: names,
                     outcomeName: line.label,
                     odds:
                       Number.isFinite(line.odds) && line.odds > 0
