@@ -8,7 +8,7 @@ import {
   type GameMarkets,
   type Market,
 } from "@azuro-org/toolkit";
-import { MarketGroup } from "@/components/MarketGroup";
+import { GameDetailMarkets } from "@/components/GameDetailMarkets";
 
 export const dynamic = "force-dynamic";
 
@@ -129,10 +129,12 @@ export default async function GameDetailPage({ params }: Props) {
   }
 
   let conditions: Awaited<ReturnType<typeof getConditionsByGameIds>> = [];
+  let marketsError: string | null = null;
   try {
     conditions = await getConditionsByGameIds({ chainId: CHAIN_ID, gameIds: id });
-  } catch {
-    conditions = [];
+  } catch (e) {
+    marketsError =
+      e instanceof Error ? e.message : "Failed to load markets for this game.";
   }
 
   const markets = groupConditionsByMarket(conditions);
@@ -165,20 +167,11 @@ export default async function GameDetailPage({ params }: Props) {
       <h1 className="mt-2 text-2xl font-semibold text-zinc-50">{names}</h1>
       <p className="mt-1 text-sm tabular-nums text-zinc-500">{when}</p>
 
-      {sections.length === 0 ? (
-        <p className="mt-8 text-sm text-zinc-500">No markets available.</p>
-      ) : (
-        <div className="mt-8 flex flex-col gap-3">
-          {sections.map((section) => (
-            <MarketGroup
-              key={`${section.title}|${section.markets.map((m) => m.marketKey).join("|")}`}
-              title={section.title}
-              markets={section.markets}
-              gameTitle={names}
-            />
-          ))}
-        </div>
-      )}
+      <GameDetailMarkets
+        sections={sections}
+        gameTitle={names}
+        marketsError={marketsError}
+      />
     </div>
   );
 }

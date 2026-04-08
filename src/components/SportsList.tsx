@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useSports } from "@azuro-org/sdk";
 import type { SportData } from "@azuro-org/toolkit";
+import { RetryCallout } from "@/components/RetryCallout";
+import { SportsListSkeleton } from "@/components/Skeleton";
 
 function countGames(sport: SportData): number {
   return sport.countries.reduce(
@@ -16,22 +18,6 @@ function countGames(sport: SportData): number {
 
 function countCountryGames(country: SportData["countries"][number]): number {
   return country.leagues.reduce((sum, league) => sum + league.games.length, 0);
-}
-
-function SportsListSkeleton() {
-  return (
-    <div className="flex flex-col gap-0.5 px-2" aria-hidden>
-      {Array.from({ length: 7 }).map((_, i) => (
-        <div
-          key={i}
-          className="flex items-center justify-between gap-2 rounded-lg px-3 py-2"
-        >
-          <div className="h-4 w-24 animate-pulse rounded bg-zinc-800" />
-          <div className="h-5 w-8 shrink-0 animate-pulse rounded-full bg-zinc-800" />
-        </div>
-      ))}
-    </div>
-  );
 }
 
 function Chevron({ open }: { open: boolean }) {
@@ -48,7 +34,7 @@ function Chevron({ open }: { open: boolean }) {
 }
 
 export function SportsList() {
-  const { data: sports, isLoading, isError } = useSports({
+  const { data: sports, isLoading, isError, refetch } = useSports({
     isLive: false,
     filter: { maxGamesPerLeague: 10 },
     sortLeaguesAndCountriesByName: true,
@@ -70,9 +56,14 @@ export function SportsList() {
 
   if (isError) {
     return (
-      <p className="px-4 text-xs text-red-400" role="alert">
-        Could not load sports.
-      </p>
+      <div className="px-2">
+        <RetryCallout
+          title="Could not load sports"
+          description="Check your connection and try again."
+          onRetry={() => void refetch()}
+          className="text-left"
+        />
+      </div>
     );
   }
 

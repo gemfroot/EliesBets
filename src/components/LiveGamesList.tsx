@@ -3,6 +3,7 @@
 import type { GameData } from "@azuro-org/toolkit";
 import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { LiveGameCard } from "@/components/LiveGameCard";
+import { RetryCallout } from "@/components/RetryCallout";
 
 type LeagueGroup = { leagueKey: string; leagueName: string; games: GameData[] };
 
@@ -35,15 +36,23 @@ export function LiveGamesList({
 }) {
   if (loadError) {
     return (
-      <p className="mt-6 text-sm text-red-400" role="alert">
-        {loadError}
-      </p>
+      <RetryCallout
+        className="mt-6"
+        title="Could not load live games"
+        description={loadError}
+      />
     );
   }
 
   if (!games.length) {
     return (
-      <p className="mt-6 text-sm text-zinc-500">No live games right now.</p>
+      <div className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-6 text-center">
+        <p className="text-sm font-medium text-zinc-200">No games</p>
+        <p className="mt-1 text-sm text-zinc-500">
+          There are no live fixtures at the moment. Check back soon or browse upcoming
+          markets from the home page.
+        </p>
+      </div>
     );
   }
 

@@ -10,6 +10,7 @@ import {
 } from "@azuro-org/toolkit";
 import { GameCard, extractMainLineOdds } from "@/components/GameCard";
 import { LiveGameCard } from "@/components/LiveGameCard";
+import { RetryCallout } from "@/components/RetryCallout";
 import { CHAIN_ID, chunk } from "@/lib/sportGames";
 import { sportEmoji } from "@/lib/sportEmoji";
 
@@ -176,11 +177,19 @@ export default async function Home() {
         </div>
 
         {heroError ? (
-          <p className="mt-6 text-sm text-red-400" role="alert">
-            {heroError}
-          </p>
+          <RetryCallout
+            className="mt-6"
+            title="Could not load live games"
+            description={heroError}
+          />
         ) : heroGames.length === 0 ? (
-          <p className="mt-6 text-sm text-zinc-500">No live games right now.</p>
+          <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-5">
+            <p className="text-sm font-medium text-zinc-200">No games</p>
+            <p className="mt-1 text-sm text-zinc-500">
+              No live fixtures right now. Try popular or upcoming below, or open the live
+              page later.
+            </p>
+          </div>
         ) : (
           <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {heroGames.map((game) => (
@@ -193,9 +202,12 @@ export default async function Home() {
       </section>
 
       {sportsError ? (
-        <p className="mb-10 text-sm text-red-400" role="alert">
-          {sportsError}
-        </p>
+        <div className="mb-10">
+          <RetryCallout
+            title="Could not load sports"
+            description={sportsError}
+          />
+        </div>
       ) : sportLinks.length > 0 ? (
         <nav
           className="mb-10"
@@ -235,11 +247,19 @@ export default async function Home() {
           High-volume markets by turnover.
         </p>
         {popularError ? (
-          <p className="mt-6 text-sm text-red-400" role="alert">
-            {popularError}
-          </p>
+          <RetryCallout
+            className="mt-6"
+            title="Could not load popular games"
+            description={popularError}
+          />
         ) : popularGames.length === 0 ? (
-          <p className="mt-6 text-sm text-zinc-500">No prematch games available.</p>
+          <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-5">
+            <p className="text-sm font-medium text-zinc-200">No games</p>
+            <p className="mt-1 text-sm text-zinc-500">
+              No prematch fixtures are listed yet. Refresh later or explore other sports
+              in the sidebar.
+            </p>
+          </div>
         ) : (
           <ul className="mt-6 flex flex-col gap-3">
             {popularGames.map((game) => (
@@ -265,11 +285,19 @@ export default async function Home() {
           Next upcoming fixtures.
         </p>
         {upcomingError ? (
-          <p className="mt-6 text-sm text-red-400" role="alert">
-            {upcomingError}
-          </p>
+          <RetryCallout
+            className="mt-6"
+            title="Could not load upcoming games"
+            description={upcomingError}
+          />
         ) : upcomingGames.length === 0 ? (
-          <p className="mt-6 text-sm text-zinc-500">No upcoming games scheduled.</p>
+          <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-5">
+            <p className="text-sm font-medium text-zinc-200">No games</p>
+            <p className="mt-1 text-sm text-zinc-500">
+              Nothing scheduled in this feed yet. Check other dates or sports from the
+              navigation.
+            </p>
+          </div>
         ) : (
           <ul className="mt-6 flex flex-col gap-3">
             {upcomingGames.map((game) => (
