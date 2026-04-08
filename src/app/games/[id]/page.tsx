@@ -148,7 +148,19 @@ export default async function GameDetailPage({ params }: Props) {
           {game.sport.name}
         </Link>
         <span className="text-zinc-600"> · </span>
-        <span>{game.league.name}</span>
+        <Link
+          href={`/sports/${game.sport.slug}/${game.country.slug}`}
+          className="hover:text-zinc-300"
+        >
+          {game.country.name}
+        </Link>
+        <span className="text-zinc-600"> · </span>
+        <Link
+          href={`/sports/${game.sport.slug}/${game.country.slug}/${game.league.slug}`}
+          className="hover:text-zinc-300"
+        >
+          {game.league.name}
+        </Link>
       </p>
       <h1 className="mt-2 text-2xl font-semibold text-zinc-50">{names}</h1>
       <p className="mt-1 text-sm tabular-nums text-zinc-500">{when}</p>
