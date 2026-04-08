@@ -1,6 +1,12 @@
 "use client";
 
-import { useBet, useChain } from "@azuro-org/sdk";
+import {
+  BetslipDisableReason,
+  useBaseBetslip,
+  useBet,
+  useChain,
+  useDetailedBetslip,
+} from "@azuro-org/sdk";
 import {
   createContext,
   useCallback,
@@ -35,6 +41,7 @@ type BetslipContextValue = {
     odds: string;
     conditionId: string;
     outcomeId: string;
+    isExpressForbidden?: boolean;
   }) => void;
   clearSelections: () => void;
   removeSelection: (id: string) => void;
@@ -79,10 +86,45 @@ export function selectionId(
 }
 
 export function BetslipProvider({ children }: { children: ReactNode }) {
-  const [selections, setSelections] = useState<BetslipSelection[]>([]);
+  const { items, addItem, removeItem, clear } = useBaseBetslip();
+  const [metaById, setMetaById] = useState<Record<string, BetslipSelection>>({});
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const openDrawer = useCallback(() => setMobileDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setMobileDrawerOpen(false), []);
+
+  const selections = useMemo((): BetslipSelection[] => {
+    return items.map((item) => {
+      const id = selectionId(item.gameId, "", item.outcomeId);
+      return (
+        metaById[id] ?? {
+          id,
+          gameId: item.gameId,
+          gameTitle: "—",
+          outcomeName: "—",
+          odds: "—",
+          conditionId: item.conditionId,
+          outcomeId: item.outcomeId,
+        }
+      );
+    });
+  }, [items, metaById]);
+
+  useEffect(() => {
+    const validIds = new Set(
+      items.map((item) => selectionId(item.gameId, "", item.outcomeId)),
+    );
+    setMetaById((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        if (!validIds.has(key)) {
+          delete next[key];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [items]);
 
   const addSelection = useCallback(
     (item: {
@@ -92,32 +134,52 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
       odds: string;
       conditionId: string;
       outcomeId: string;
+      isExpressForbidden?: boolean;
     }) => {
       const id = selectionId(item.gameId, item.outcomeName, item.outcomeId);
-      setSelections((prev) => {
-        const next = prev.filter((s) => s.id !== id);
-        next.push({
-          id,
-          gameId: item.gameId,
-          gameTitle: item.gameTitle,
-          outcomeName: item.outcomeName,
-          odds: item.odds,
-          conditionId: item.conditionId,
-          outcomeId: item.outcomeId,
-        });
-        return next;
+      const row: BetslipSelection = {
+        id,
+        gameId: item.gameId,
+        gameTitle: item.gameTitle,
+        outcomeName: item.outcomeName,
+        odds: item.odds,
+        conditionId: item.conditionId,
+        outcomeId: item.outcomeId,
+      };
+      setMetaById((prev) => ({ ...prev, [id]: row }));
+      addItem({
+        gameId: item.gameId,
+        conditionId: item.conditionId,
+        outcomeId: item.outcomeId,
+        isExpressForbidden: item.isExpressForbidden ?? false,
       });
     },
-    [],
+    [addItem],
   );
 
-  const removeSelection = useCallback((id: string) => {
-    setSelections((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+  const removeSelection = useCallback(
+    (id: string) => {
+      const row =
+        metaById[id] ??
+        items.find(
+          (item) => selectionId(item.gameId, "", item.outcomeId) === id,
+        );
+      if (row) {
+        removeItem({ conditionId: row.conditionId, outcomeId: row.outcomeId });
+        setMetaById((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+    },
+    [metaById, items, removeItem],
+  );
 
   const clearSelections = useCallback(() => {
-    setSelections([]);
-  }, []);
+    clear();
+    setMetaById({});
+  }, [clear]);
 
   const value = useMemo(
     () => ({ selections, addSelection, removeSelection, clearSelections }),
@@ -222,52 +284,51 @@ const SLIPPAGE_PERCENT = 5;
 
 type BetslipMode = "single" | "combo";
 
-function parseDecimalOdds(oddsStr: string): number {
-  const n = Number.parseFloat(oddsStr);
-  return Number.isFinite(n) && n > 0 ? n : NaN;
-}
-
-function oddsRecordForSelections(sel: BetslipSelection[]): Record<string, number> | null {
-  const o: Record<string, number> = {};
-  for (const s of sel) {
-    const v = parseDecimalOdds(s.odds);
-    if (!Number.isFinite(v)) {
-      return null;
-    }
-    o[`${s.conditionId}-${s.outcomeId}`] = v;
+function messageForBetslipDisableReason(
+  reason: BetslipDisableReason | undefined,
+): string | null {
+  if (reason == null) {
+    return null;
   }
-  return o;
-}
-
-function combinedDecimalOdds(sel: BetslipSelection[]): number {
-  let product = 1;
-  for (const s of sel) {
-    const v = parseDecimalOdds(s.odds);
-    if (!Number.isFinite(v)) {
-      return 0;
-    }
-    product *= v;
+  switch (reason) {
+    case BetslipDisableReason.ConditionState:
+      return "One or more selections are no longer active. Remove or replace them.";
+    case BetslipDisableReason.BetAmountGreaterThanMaxBet:
+      return "Stake is above the maximum allowed for this bet.";
+    case BetslipDisableReason.BetAmountLowerThanMinBet:
+      return "Stake is below the minimum for this bet.";
+    case BetslipDisableReason.ComboWithForbiddenItem:
+      return "This combo includes a selection that cannot be combined. Remove a leg or bet singles.";
+    case BetslipDisableReason.ComboWithSameGame:
+      return "Combo cannot include more than one outcome from the same game.";
+    case BetslipDisableReason.SelectedOutcomesTemporarySuspended:
+      return "One or more selections are temporarily unavailable.";
+    case BetslipDisableReason.TotalOddsTooLow:
+      return "Total odds are too low for this bet.";
+    case BetslipDisableReason.FreeBetExpired:
+      return "The selected free bet has expired.";
+    case BetslipDisableReason.PrematchConditionInStartedGame:
+      return "A prematch selection is invalid for a game that has already started.";
+    default:
+      return "This bet cannot be placed right now.";
   }
-  return product;
-}
-
-function hasDuplicateGameInCombo(sel: BetslipSelection[]): boolean {
-  const seen = new Set<string>();
-  for (const s of sel) {
-    if (seen.has(s.gameId)) {
-      return true;
-    }
-    seen.add(s.gameId);
-  }
-  return false;
 }
 
 function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }) {
   const { betToken } = useChain();
+  const {
+    betAmount,
+    changeBetAmount,
+    odds: sdkOdds,
+    totalOdds: sdkTotalOdds,
+    disableReason,
+    isBetAllowed,
+    isOddsFetching,
+    isBetCalculationFetching,
+  } = useDetailedBetslip();
   const { showToast } = useToast();
   const { clearSelections } = useBetslip();
   const { address, isConnected } = useAccount();
-  const [stake, setStake] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptSnapshot, setReceiptSnapshot] = useState<{
@@ -288,8 +349,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     multiPick && mode === "single"
       ? Math.min(singleLegIndex, maxLegIndex)
       : 0;
-  const comboInvalidSameGame =
-    mode === "combo" && multiPick && hasDuplicateGameInCombo(selections);
 
   const activeSelections = useMemo(() => {
     if (!multiPick || mode === "combo") {
@@ -308,48 +367,68 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     [activeSelections],
   );
 
-  const oddsRecord = useMemo(
-    () => oddsRecordForSelections(activeSelections),
-    [activeSelections],
-  );
+  const oddsRecord = useMemo(() => {
+    const o: Record<string, number> = {};
+    for (const s of activeSelections) {
+      const key = `${s.conditionId}-${s.outcomeId}`;
+      const v = sdkOdds[key];
+      if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) {
+        return null;
+      }
+      o[key] = v;
+    }
+    return o;
+  }, [activeSelections, sdkOdds]);
 
-  const totalOdds = useMemo(() => {
-    if (!oddsRecord) {
+  const totalOddsForBet = useMemo(() => {
+    if (!activeSelections.length) {
       return 0;
     }
-    return combinedDecimalOdds(activeSelections);
-  }, [activeSelections, oddsRecord]);
+    if (mode === "single" && multiPick) {
+      const s = activeSelections[0]!;
+      const v = sdkOdds[`${s.conditionId}-${s.outcomeId}`];
+      return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
+    }
+    return typeof sdkTotalOdds === "number" &&
+      Number.isFinite(sdkTotalOdds) &&
+      sdkTotalOdds > 0
+      ? sdkTotalOdds
+      : 0;
+  }, [activeSelections, mode, multiPick, sdkOdds, sdkTotalOdds]);
 
-  const stakeAmount = stake.trim();
+  /** Combined odds for display when in combo mode (matches SDK total). */
+  const totalOddsDisplay =
+    mode === "combo" && multiPick ? sdkTotalOdds : totalOddsForBet;
+
+  const stakeAmount = betAmount.trim();
   const stakeNum = Number.parseFloat(stakeAmount);
   const stakeValid = Number.isFinite(stakeNum) && stakeNum > 0;
 
   const singleLegOdds =
-    multiPick && mode === "single" && selections[effectiveLegIndex]
-      ? parseDecimalOdds(selections[effectiveLegIndex].odds)
+    multiPick && mode === "single" && activeSelections[0]
+      ? sdkOdds[
+          `${activeSelections[0].conditionId}-${activeSelections[0].outcomeId}`
+        ]
       : NaN;
   const potentialWinSingleLeg =
-    stakeValid && Number.isFinite(singleLegOdds) && singleLegOdds > 0
+    stakeValid &&
+    typeof singleLegOdds === "number" &&
+    Number.isFinite(singleLegOdds) &&
+    singleLegOdds > 0
       ? stakeNum * singleLegOdds
       : null;
 
   const potentialWinCombo =
-    mode === "combo" && stakeValid && totalOdds > 0 ? stakeNum * totalOdds : null;
+    mode === "combo" && stakeValid && sdkTotalOdds > 0
+      ? stakeNum * sdkTotalOdds
+      : null;
 
   const potentialWinDisplay =
     mode === "combo" ? potentialWinCombo : potentialWinSingleLeg;
 
-  const receiptTotalOdds = useMemo(() => {
-    if (mode === "combo") {
-      return totalOdds;
-    }
-    const one = activeSelections[0];
-    if (!one) {
-      return 0;
-    }
-    const v = parseDecimalOdds(one.odds);
-    return Number.isFinite(v) ? v : 0;
-  }, [mode, totalOdds, activeSelections]);
+  const receiptTotalOdds = totalOddsForBet;
+
+  const sdkDisableMessage = messageForBetslipDisableReason(disableReason);
 
   const { submit, approveTx, betTx, isApproveRequired, isWalletReadyToSubmit } =
     useBet({
@@ -358,7 +437,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       affiliate: zeroAddress,
       selections: sdkSelections,
       odds: oddsRecord ?? {},
-      totalOdds,
+      totalOdds: totalOddsForBet,
       onSuccess: (receipt) => {
         setErrorMessage(null);
         const placedSelections = activeSelections.map((s) => ({ ...s }));
@@ -403,12 +482,14 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const canSubmit =
     stakeValid &&
     oddsRecord !== null &&
-    totalOdds > 0 &&
+    totalOddsForBet > 0 &&
     isConnected &&
     Boolean(address) &&
     isWalletReadyToSubmit &&
     !isBusy &&
-    !comboInvalidSameGame;
+    !isOddsFetching &&
+    !isBetCalculationFetching &&
+    isBetAllowed;
 
   const placeBetLabel = isApproveRequired
     ? "Approve token"
@@ -454,15 +535,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           </div>
         </div>
       ) : null}
-      {comboInvalidSameGame ? (
-        <p
-          className="rounded-md border border-amber-800/80 bg-amber-950/40 px-3 py-2 text-xs text-amber-200"
-          role="status"
-        >
-          Combo bets cannot include more than one outcome from the same game.
-          Remove a selection or switch to Single to bet each leg separately.
-        </p>
-      ) : null}
       <label className="text-xs font-medium text-zinc-400" htmlFor="betslip-stake">
         Stake ({betToken.symbol})
       </label>
@@ -474,9 +546,9 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           min={0}
           step="any"
           placeholder="0"
-          value={stake}
+          value={betAmount}
           onChange={(e) => {
-            setStake(e.target.value);
+            changeBetAmount(e.target.value);
             setErrorMessage(null);
           }}
           className="min-h-11 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-base tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 md:min-h-0 md:text-sm"
@@ -486,7 +558,11 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
         <p className="text-xs text-zinc-500">
           Combined odds:{" "}
           <span className="font-mono font-semibold tabular-nums text-zinc-300">
-            {totalOdds > 0 ? totalOdds.toFixed(2) : "—"}
+            {isOddsFetching
+              ? "…"
+              : totalOddsDisplay > 0
+                ? totalOddsDisplay.toFixed(2)
+                : "—"}
           </span>
         </p>
       ) : null}
@@ -515,6 +591,14 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       ) : null}
       {!isConnected ? (
         <p className="text-xs text-zinc-500">Connect a wallet to place a bet.</p>
+      ) : null}
+      {isConnected && sdkDisableMessage && !isBetAllowed ? (
+        <p
+          className="rounded-md border border-amber-800/80 bg-amber-950/40 px-3 py-2 text-xs text-amber-200"
+          role="status"
+        >
+          {sdkDisableMessage}
+        </p>
       ) : null}
       {errorMessage ? (
         <p
@@ -590,10 +674,7 @@ export function BetslipPanel() {
               </li>
             ))}
           </ul>
-          <BetslipStakeAndPlace
-            key={selections.map((s) => s.id).join("|")}
-            selections={selections}
-          />
+          <BetslipStakeAndPlace selections={selections} />
         </>
       )}
     </>

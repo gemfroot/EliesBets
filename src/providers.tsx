@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, type State } from "wagmi";
-import { AzuroSDKProvider } from "@azuro-org/sdk";
+import { AzuroSDKProvider, BetslipProvider as AzuroBetslipProvider } from "@azuro-org/sdk";
 import { useState, type ReactNode } from "react";
 import { BetslipProvider } from "@/components/Betslip";
 import { FavoritesProvider } from "@/components/FavoritesProvider";
@@ -33,14 +33,16 @@ export function Providers({
     <WagmiProvider config={wagmiConfig} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
         <AzuroSDKProvider initialChainId={CHAIN_ID}>
-          <FavoritesProvider>
-            <ToastProvider>
-              <BetslipProvider>
-                <BetSettlementToasts />
-                {children}
-              </BetslipProvider>
-            </ToastProvider>
-          </FavoritesProvider>
+          <AzuroBetslipProvider>
+            <FavoritesProvider>
+              <ToastProvider>
+                <BetslipProvider>
+                  <BetSettlementToasts />
+                  {children}
+                </BetslipProvider>
+              </ToastProvider>
+            </FavoritesProvider>
+          </AzuroBetslipProvider>
         </AzuroSDKProvider>
       </QueryClientProvider>
     </WagmiProvider>

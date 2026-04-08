@@ -16,6 +16,7 @@ export type TopOddsLine = {
   odds: number;
   outcomeId: string;
   conditionId: string;
+  isExpressForbidden: boolean;
 };
 
 function formatStartTime(startsAt: string): string {
@@ -65,6 +66,7 @@ export function extractMainLineOdds(
       odds: o.odds,
       outcomeId: o.outcomeId,
       conditionId: firstCondition.conditionId,
+      isExpressForbidden: o.isExpressForbidden,
     }));
   } catch {
     return null;
@@ -127,6 +129,7 @@ export function GameCard({ game, topOdds, meta }: GameCardProps) {
                         : "—",
                     outcomeId: line.outcomeId,
                     conditionId: line.conditionId,
+                    isExpressForbidden: line.isExpressForbidden,
                   })
                 }
               />
