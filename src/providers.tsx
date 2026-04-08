@@ -8,6 +8,7 @@ import { BetslipProvider } from "@/components/Betslip";
 import { FavoritesProvider } from "@/components/FavoritesProvider";
 import { BetSettlementToasts } from "@/components/BetSettlementToasts";
 import { ToastProvider } from "@/components/Toast";
+import { CHAIN_ID } from "@/lib/constants";
 import { wagmiConfig } from "./wagmi";
 
 export function Providers({
@@ -31,7 +32,7 @@ export function Providers({
   return (
     <WagmiProvider config={wagmiConfig} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
-        <AzuroSDKProvider initialChainId={137}>
+        <AzuroSDKProvider initialChainId={CHAIN_ID}>
           <FavoritesProvider>
             <ToastProvider>
               <BetslipProvider>

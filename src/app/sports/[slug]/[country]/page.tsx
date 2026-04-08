@@ -3,11 +3,8 @@ import Link from "next/link";
 import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { GameCard, extractMainLineOdds } from "@/components/GameCard";
 import { RetryCallout } from "@/components/RetryCallout";
-import {
-  CHAIN_ID,
-  chunk,
-  fetchGamesForSport,
-} from "@/lib/sportGames";
+import { CHAIN_ID } from "@/lib/constants";
+import { chunk, fetchGamesForSport } from "@/lib/sportGames";
 
 export const dynamic = "force-dynamic";
 

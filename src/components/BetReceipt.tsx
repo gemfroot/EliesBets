@@ -2,6 +2,7 @@
 
 import { useChain } from "@azuro-org/sdk";
 import type { BetslipSelection } from "@/components/Betslip";
+import { CHAIN_ID } from "@/lib/constants";
 
 export type BetReceiptProps = {
   open: boolean;
@@ -16,7 +17,7 @@ export type BetReceiptProps = {
 
 function txExplorerUrl(chainId: number, hash: `0x${string}`): string | null {
   const base =
-    chainId === 137
+    chainId === CHAIN_ID
       ? "https://polygonscan.com"
       : chainId === 80002
         ? "https://amoy.polygonscan.com"

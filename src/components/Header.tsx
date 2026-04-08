@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useBalance,
-  useChainId,
-  useChains,
-  useConnection,
-  useDisconnect,
-  useSwitchChain,
-} from "wagmi";
+import { useBalance, useConnection, useDisconnect } from "wagmi";
 import { useState } from "react";
 import { formatUnits } from "viem";
 import { ConnectModal } from "@/components/ConnectModal";
@@ -37,10 +30,7 @@ function formatNativeBalance(
 export function Header() {
   const [modalOpen, setModalOpen] = useState(false);
   const { address, isConnected, status } = useConnection();
-  const chainId = useChainId();
-  const chains = useChains();
   const { disconnect } = useDisconnect();
-  const { mutate: switchChain, isPending: isSwitchingChain } = useSwitchChain();
 
   const { data: balance, isLoading: balanceLoading } = useBalance({
     address,
@@ -60,28 +50,6 @@ export function Header() {
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {isConnected && address ? (
           <>
-            <label className="flex items-center gap-2 text-sm text-zinc-400">
-              <span className="hidden sm:inline">Network</span>
-              <select
-                value={chainId}
-                onChange={(e) => {
-                  const next = chains.find(
-                    (c) => String(c.id) === e.target.value,
-                  )?.id;
-                  if (next !== undefined) switchChain({ chainId: next });
-                }}
-                disabled={isSwitchingChain}
-                className="max-w-[10rem] rounded-lg border border-zinc-600 bg-zinc-900 px-2 py-1.5 font-medium text-zinc-100 disabled:opacity-60 sm:max-w-none"
-                aria-label="Switch network"
-              >
-                {chains.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
             <span className="font-mono text-sm text-zinc-300">
               {formatAddress(address)}
             </span>

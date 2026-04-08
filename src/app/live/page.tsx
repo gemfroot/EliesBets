@@ -6,10 +6,9 @@ import {
   type GameData,
 } from "@azuro-org/toolkit";
 import { LiveGamesList } from "@/components/LiveGamesList";
+import { CHAIN_ID } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
-
-const CHAIN_ID = 137 as const;
 const GAMES_PER_PAGE = 100;
 
 async function fetchAllLiveGames(): Promise<GameData[]> {
