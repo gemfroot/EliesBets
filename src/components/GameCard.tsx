@@ -6,9 +6,14 @@ import {
   type ConditionDetailedData,
   type GameData,
 } from "@azuro-org/toolkit";
+import { OddsButton } from "@/components/OddsButton";
 import { useBetslip } from "@/components/Betslip";
 
-export type TopOddsLine = { label: string; odds: string };
+export type TopOddsLine = {
+  label: string;
+  odds: number;
+  outcomeId: string;
+};
 
 function formatStartTime(startsAt: string): string {
   const ms = +startsAt < 32_503_680_000 ? +startsAt * 1000 : +startsAt;
@@ -54,8 +59,8 @@ export function extractMainLineOdds(
     }
     return firstCondition.outcomes.map((o) => ({
       label: o.selectionName,
-      odds:
-        Number.isFinite(o.odds) && o.odds > 0 ? o.odds.toFixed(2) : "—",
+      odds: o.odds,
+      outcomeId: o.outcomeId,
     }));
   } catch {
     return null;
@@ -92,25 +97,26 @@ export function GameCard({ game, topOdds }: GameCardProps) {
             aria-label="Main odds"
           >
             {topOdds.map((line) => (
-              <button
-                key={`${line.label}-${line.odds}`}
-                type="button"
+              <OddsButton
+                key={line.outcomeId}
+                gameId={game.gameId}
+                outcomeName={line.label}
+                outcomeId={line.outcomeId}
+                odds={line.odds}
+                label={line.label}
+                className="py-1.5 text-left"
                 onClick={() =>
                   addSelection({
                     gameId: game.gameId,
                     outcomeName: line.label,
-                    odds: line.odds,
+                    odds:
+                      Number.isFinite(line.odds) && line.odds > 0
+                        ? line.odds.toFixed(2)
+                        : "—",
+                    outcomeId: line.outcomeId,
                   })
                 }
-                className="flex min-w-0 flex-1 flex-col items-center justify-center rounded-md bg-zinc-800/80 px-2 py-1.5 text-left transition-colors hover:bg-zinc-700/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500"
-              >
-                <span className="max-w-full truncate text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-                  {line.label}
-                </span>
-                <span className="text-sm font-semibold tabular-nums text-zinc-100">
-                  {line.odds}
-                </span>
-              </button>
+              />
             ))}
           </div>
         ) : (

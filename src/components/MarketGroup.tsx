@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import type { Market, MarketOutcome } from "@azuro-org/toolkit";
+import { ConditionState, type Market, type MarketOutcome } from "@azuro-org/toolkit";
+import { OddsButton } from "@/components/OddsButton";
 import { useBetslip } from "@/components/Betslip";
 
 function formatOdds(odds: number): string {
@@ -17,16 +18,24 @@ export type MarketGroupProps = {
 function OutcomeButton({
   gameId,
   outcome,
+  conditionState,
 }: {
   gameId: string;
   outcome: MarketOutcome;
+  conditionState: ConditionState;
 }) {
   const { addSelection } = useBetslip();
   const oddsStr = formatOdds(outcome.odds);
+  const suspended = conditionState !== ConditionState.Active;
 
   return (
-    <button
-      type="button"
+    <OddsButton
+      gameId={gameId}
+      outcomeName={outcome.selectionName}
+      outcomeId={outcome.outcomeId}
+      odds={outcome.odds}
+      disabled={suspended}
+      label={outcome.selectionName}
       onClick={() =>
         addSelection({
           gameId,
@@ -35,15 +44,7 @@ function OutcomeButton({
           outcomeId: outcome.outcomeId,
         })
       }
-      className="flex min-w-0 flex-1 flex-col items-center justify-center rounded-md bg-zinc-800/80 px-2 py-2 text-center transition-colors hover:bg-zinc-700/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500"
-    >
-      <span className="max-w-full truncate text-[10px] font-medium uppercase tracking-wide text-zinc-500">
-        {outcome.selectionName}
-      </span>
-      <span className="text-sm font-semibold tabular-nums text-zinc-100">
-        {oddsStr}
-      </span>
-    </button>
+    />
   );
 }
 
@@ -51,10 +52,12 @@ function ConditionBlock({
   gameId,
   label,
   outcomes,
+  conditionState,
 }: {
   gameId: string;
   label: ReactNode;
   outcomes: MarketOutcome[];
+  conditionState: ConditionState;
 }) {
   if (!outcomes.length) {
     return null;
@@ -71,7 +74,12 @@ function ConditionBlock({
         style={{ gridTemplateColumns: gridCols }}
       >
         {outcomes.map((o) => (
-          <OutcomeButton key={o.outcomeId} gameId={gameId} outcome={o} />
+          <OutcomeButton
+            key={o.outcomeId}
+            gameId={gameId}
+            outcome={o}
+            conditionState={conditionState}
+          />
         ))}
       </div>
     </div>
@@ -122,6 +130,7 @@ export function MarketGroup({
                   <ConditionBlock
                     key={cond.conditionId}
                     gameId={gameId}
+                    conditionState={cond.state}
                     label={
                       market.conditions.length > 1 && cond.margin ? (
                         <p className="text-xs text-zinc-400">{cond.margin}</p>

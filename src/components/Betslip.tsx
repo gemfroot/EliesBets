@@ -38,7 +38,7 @@ export function useBetslip() {
   return ctx;
 }
 
-function selectionId(
+export function selectionId(
   gameId: string,
   outcomeName: string,
   outcomeId?: string,
