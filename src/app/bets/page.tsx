@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { zeroAddress } from "viem";
 import { BetCard } from "@/components/BetCard";
+import { RetryCallout } from "@/components/RetryCallout";
+import { BetsListSkeleton } from "@/components/Skeleton";
 
 type FilterTab = "all" | "pending" | "won" | "lost";
 
@@ -54,11 +56,18 @@ export default function BetsPage() {
 
   const queryEnabled = Boolean(isConnected && address);
 
-  const { data, isFetching, isError, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useBets({
-      filter,
-      query: { enabled: queryEnabled },
-    });
+  const {
+    data,
+    isFetching,
+    isError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = useBets({
+    filter,
+    query: { enabled: queryEnabled },
+  });
 
   const allBets = useMemo(
     () => data?.pages.flatMap((p) => p.bets) ?? [],
@@ -104,15 +113,26 @@ export default function BetsPage() {
           Connect your wallet to see your bets.
         </p>
       ) : isError ? (
-        <p className="mt-8 text-sm text-red-400" role="alert">
-          Could not load bets. Try again later.
-        </p>
+        <RetryCallout
+          className="mt-8"
+          title="Could not load bets"
+          description="We could not reach your bet history. Check your connection and try again."
+          onRetry={() => void refetch()}
+        />
       ) : (
         <>
           {isFetching && !data ? (
-            <p className="mt-8 text-sm text-zinc-500">Loading bets…</p>
+            <div className="mt-6" aria-busy aria-label="Loading bets">
+              <BetsListSkeleton count={4} />
+            </div>
           ) : visibleBets.length === 0 ? (
-            <p className="mt-8 text-sm text-zinc-500">No bets in this view.</p>
+            <div className="mt-8 max-w-lg rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-6">
+              <p className="text-sm font-medium text-zinc-200">No bets yet</p>
+              <p className="mt-1 text-sm text-zinc-500">
+                When you place a bet with this wallet, it will show up here. Open a game,
+                add selections to the betslip, and confirm to get started.
+              </p>
+            </div>
           ) : (
             <ul className="mt-6 flex max-w-3xl flex-col gap-4">
               {visibleBets.map((bet) => (

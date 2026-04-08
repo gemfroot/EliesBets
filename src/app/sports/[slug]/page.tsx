@@ -1,6 +1,7 @@
 import { getConditionsByGameIds, type GameData } from "@azuro-org/toolkit";
 import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { GameCard, extractMainLineOdds } from "@/components/GameCard";
+import { RetryCallout } from "@/components/RetryCallout";
 import {
   CHAIN_ID,
   chunk,
@@ -93,11 +94,19 @@ export default async function SportPage({ params }: Props) {
       <p className="mt-1 text-sm text-zinc-500">Sport: {slug}</p>
 
       {loadError ? (
-        <p className="mt-6 text-sm text-red-400" role="alert">
-          {loadError}
-        </p>
+        <RetryCallout
+          className="mt-6"
+          title="Could not load games"
+          description={loadError}
+        />
       ) : games.length === 0 ? (
-        <p className="mt-6 text-sm text-zinc-500">No games scheduled.</p>
+        <div className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-6">
+          <p className="text-sm font-medium text-zinc-200">No games</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            No fixtures for this sport right now. Try another sport or check back when new
+            events are added.
+          </p>
+        </div>
       ) : (
         <div className="mt-8 flex flex-col gap-10">
           {byLeague.map((league) => (
