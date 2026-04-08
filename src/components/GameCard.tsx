@@ -13,6 +13,7 @@ export type TopOddsLine = {
   label: string;
   odds: number;
   outcomeId: string;
+  conditionId: string;
 };
 
 function formatStartTime(startsAt: string): string {
@@ -61,6 +62,7 @@ export function extractMainLineOdds(
       label: o.selectionName,
       odds: o.odds,
       outcomeId: o.outcomeId,
+      conditionId: firstCondition.conditionId,
     }));
   } catch {
     return null;
@@ -114,6 +116,7 @@ export function GameCard({ game, topOdds }: GameCardProps) {
                         ? line.odds.toFixed(2)
                         : "—",
                     outcomeId: line.outcomeId,
+                    conditionId: line.conditionId,
                   })
                 }
               />
