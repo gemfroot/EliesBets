@@ -42,6 +42,7 @@ function OutcomeButton({
           outcomeName: outcome.selectionName,
           odds: oddsStr,
           outcomeId: outcome.outcomeId,
+          conditionId: outcome.conditionId,
         })
       }
     />
