@@ -1,6 +1,7 @@
 "use client";
 
 import type { GameData } from "@azuro-org/toolkit";
+import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { LiveGameCard } from "@/components/LiveGameCard";
 
 type LeagueGroup = { leagueKey: string; leagueName: string; games: GameData[] };
@@ -55,12 +56,22 @@ export function LiveGamesList({
           key={league.leagueKey}
           aria-labelledby={`live-league-${league.leagueKey}`}
         >
-          <h2
-            id={`live-league-${league.leagueKey}`}
-            className="border-b border-zinc-800 pb-2 text-sm font-semibold uppercase tracking-wider text-zinc-400"
-          >
-            {league.leagueName}
-          </h2>
+          <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-2">
+            <h2
+              id={`live-league-${league.leagueKey}`}
+              className="text-sm font-semibold uppercase tracking-wider text-zinc-400"
+            >
+              {league.leagueName}
+            </h2>
+            {league.games[0] ? (
+              <LeagueFavoriteButton
+                sportSlug={league.games[0].sport.slug}
+                countrySlug={league.games[0].country.slug}
+                leagueSlug={league.leagueKey}
+                title={league.leagueName}
+              />
+            ) : null}
+          </div>
           <ul className="mt-4 flex flex-col gap-3">
             {league.games.map((game) => (
               <li key={game.gameId}>

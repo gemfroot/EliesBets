@@ -7,6 +7,7 @@ import {
   type ConditionDetailedData,
   type GameData,
 } from "@azuro-org/toolkit";
+import { FavoriteGameButton } from "@/components/FavoriteButton";
 import { OddsButton } from "@/components/OddsButton";
 import { useBetslip } from "@/components/Betslip";
 
@@ -86,14 +87,17 @@ export function GameCard({ game, topOdds, meta }: GameCardProps) {
     <article className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-medium text-zinc-100">
-            <Link
-              href={`/games/${game.gameId}`}
-              className="hover:text-zinc-50 hover:underline"
-            >
-              {names}
-            </Link>
-          </h2>
+          <div className="flex min-w-0 items-start gap-1">
+            <h2 className="min-w-0 flex-1 text-sm font-medium text-zinc-100">
+              <Link
+                href={`/games/${game.gameId}`}
+                className="hover:text-zinc-50 hover:underline"
+              >
+                {names}
+              </Link>
+            </h2>
+            <FavoriteGameButton gameId={game.gameId} title={names} />
+          </div>
           {meta ?? (
             <p className="mt-1 text-xs tabular-nums text-zinc-500">{when}</p>
           )}

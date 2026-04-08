@@ -1,3 +1,4 @@
+import { FavoritesNav } from "@/components/FavoritesNav";
 import { LiveCountLink } from "@/components/LiveCountLink";
 import { SportsList } from "@/components/SportsList";
 
@@ -7,6 +8,7 @@ export function Sidebar() {
       <div className="px-2 pb-3">
         <LiveCountLink />
       </div>
+      <FavoritesNav />
       <p className="px-4 pb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
         Sports
       </p>
