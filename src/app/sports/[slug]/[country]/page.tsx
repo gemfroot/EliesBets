@@ -1,4 +1,5 @@
 import { getConditionsByGameIds, type GameData } from "@azuro-org/toolkit";
+import Link from "next/link";
 import { GameCard, extractMainLineOdds } from "@/components/GameCard";
 import {
   CHAIN_ID,
@@ -9,10 +10,39 @@ import {
 export const dynamic = "force-dynamic";
 
 type Props = {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string; country: string }>;
 };
 
 const CONDITIONS_BATCH = 40;
+
+function titleFromSlug(slug: string): string {
+  return slug
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+type LeagueGroup = { leagueKey: string; leagueName: string; games: GameData[] };
+
+function groupGamesByLeague(games: GameData[]): LeagueGroup[] {
+  const map = new Map<string, LeagueGroup>();
+  for (const game of games) {
+    const leagueKey = game.league.slug;
+    const leagueName = game.league.name;
+    let group = map.get(leagueKey);
+    if (!group) {
+      group = { leagueKey, leagueName, games: [] };
+      map.set(leagueKey, group);
+    }
+    group.games.push(game);
+  }
+  const groups = [...map.values()];
+  groups.sort((a, b) => a.leagueName.localeCompare(b.leagueName));
+  for (const g of groups) {
+    g.games.sort((a, b) => +a.startsAt - +b.startsAt);
+  }
+  return groups;
+}
 
 async function fetchTopOddsByGameId(
   gameIds: string[],
@@ -43,42 +73,21 @@ async function fetchTopOddsByGameId(
   return result;
 }
 
-type LeagueGroup = { leagueKey: string; leagueName: string; games: GameData[] };
-
-function groupGamesByLeague(games: GameData[]): LeagueGroup[] {
-  const map = new Map<string, LeagueGroup>();
-  for (const game of games) {
-    const leagueKey = game.league.slug;
-    const leagueName = game.league.name;
-    let group = map.get(leagueKey);
-    if (!group) {
-      group = { leagueKey, leagueName, games: [] };
-      map.set(leagueKey, group);
-    }
-    group.games.push(game);
-  }
-  const groups = [...map.values()];
-  groups.sort((a, b) => a.leagueName.localeCompare(b.leagueName));
-  for (const g of groups) {
-    g.games.sort((a, b) => +a.startsAt - +b.startsAt);
-  }
-  return groups;
-}
-
-export default async function SportPage({ params }: Props) {
-  const { slug } = await params;
-  const title = slug
-    .split("-")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+export default async function SportCountryPage({ params }: Props) {
+  const { slug, country: countrySlug } = await params;
+  const sportTitle = titleFromSlug(slug);
 
   let games: GameData[] = [];
   let loadError: string | null = null;
   try {
-    games = await fetchGamesForSport(slug);
+    const all = await fetchGamesForSport(slug);
+    games = all.filter((g) => g.country.slug === countrySlug);
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Failed to load games.";
   }
+
+  const countryName =
+    games[0]?.country.name ?? titleFromSlug(countrySlug);
 
   const oddsByGameId = loadError
     ? new Map<string, ReturnType<typeof extractMainLineOdds>>()
@@ -88,8 +97,17 @@ export default async function SportPage({ params }: Props) {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold text-zinc-50">{title}</h1>
-      <p className="mt-1 text-sm text-zinc-500">Sport: {slug}</p>
+      <p className="text-sm text-zinc-500">
+        <Link href={`/sports/${slug}`} className="hover:text-zinc-300">
+          {sportTitle}
+        </Link>
+        <span className="text-zinc-600"> · </span>
+        <span className="text-zinc-400">{countryName}</span>
+      </p>
+      <h1 className="mt-2 text-2xl font-semibold text-zinc-50">{countryName}</h1>
+      <p className="mt-1 text-sm text-zinc-500">
+        {sportTitle} · {countrySlug}
+      </p>
 
       {loadError ? (
         <p className="mt-6 text-sm text-red-400" role="alert">
@@ -105,7 +123,12 @@ export default async function SportPage({ params }: Props) {
                 id={`league-${league.leagueKey}`}
                 className="border-b border-zinc-800 pb-2 text-sm font-semibold uppercase tracking-wider text-zinc-400"
               >
-                {league.leagueName}
+                <Link
+                  href={`/sports/${slug}/${countrySlug}/${league.leagueKey}`}
+                  className="hover:text-zinc-200"
+                >
+                  {league.leagueName}
+                </Link>
               </h2>
               <ul className="mt-4 flex flex-col gap-3">
                 {league.games.map((game) => (
