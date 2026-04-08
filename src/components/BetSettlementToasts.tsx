@@ -13,25 +13,41 @@ export function BetSettlementToasts() {
   const { address, isConnected } = useConnection();
   const { showToast } = useToast();
   const seen = useRef<Map<string, { win: boolean; lose: boolean }>>(new Map());
-  const seeded = useRef(false);
+  const hydrated = useRef(false);
 
-  const { data } = useBets({
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useBets({
     filter: { bettor: address ?? zeroAddress, type: BetType.Settled },
     query: { enabled: Boolean(isConnected && address) },
   });
 
   useEffect(() => {
-    seeded.current = false;
+    hydrated.current = false;
     seen.current = new Map();
   }, [address]);
 
   useEffect(() => {
-    if (!data?.pages) {
+    if (!hasNextPage || isFetchingNextPage) {
       return;
     }
+    void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  useEffect(() => {
+    if (!data?.pages?.length) {
+      return;
+    }
+    if (hasNextPage || isFetchingNextPage) {
+      return;
+    }
+
     const bets = data.pages.flatMap((p) => p.bets);
 
-    if (!seeded.current) {
+    if (!hydrated.current) {
       for (const bet of bets) {
         const id = bet.orderId;
         seen.current.set(id, {
@@ -39,7 +55,7 @@ export function BetSettlementToasts() {
           lose: bet.isLose && !bet.isCanceled,
         });
       }
-      seeded.current = true;
+      hydrated.current = true;
       return;
     }
 
@@ -66,7 +82,7 @@ export function BetSettlementToasts() {
       }
       seen.current.set(id, { win, lose });
     }
-  }, [data, showToast]);
+  }, [data, hasNextPage, isFetchingNextPage, showToast]);
 
   return null;
 }
