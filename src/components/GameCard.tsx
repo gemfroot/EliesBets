@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   groupConditionsByMarket,
   type ConditionDetailedData,
@@ -72,9 +73,11 @@ export function extractMainLineOdds(
 export type GameCardProps = {
   game: GameData;
   topOdds?: TopOddsLine[] | null;
+  /** When set, replaces the default formatted start time under the title. */
+  meta?: ReactNode;
 };
 
-export function GameCard({ game, topOdds }: GameCardProps) {
+export function GameCard({ game, topOdds, meta }: GameCardProps) {
   const { addSelection } = useBetslip();
   const names = participantLine(game);
   const when = formatStartTime(game.startsAt);
@@ -91,7 +94,9 @@ export function GameCard({ game, topOdds }: GameCardProps) {
               {names}
             </Link>
           </h2>
-          <p className="mt-1 text-xs tabular-nums text-zinc-500">{when}</p>
+          {meta ?? (
+            <p className="mt-1 text-xs tabular-nums text-zinc-500">{when}</p>
+          )}
         </div>
         {topOdds && topOdds.length > 0 ? (
           <div
