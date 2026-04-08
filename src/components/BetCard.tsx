@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useChain, type Bet } from "@azuro-org/sdk";
 import type { GameData } from "@azuro-org/toolkit";
 import { formatUnits } from "viem";
+import { CashoutButton } from "@/components/CashoutButton";
 
 function participantLine(game: GameData): string {
   const { participants, title } = game;
@@ -157,6 +158,8 @@ export function BetCard({ bet }: BetCardProps) {
           </dd>
         </div>
       </dl>
+
+      <CashoutButton bet={bet} />
     </article>
   );
 }
