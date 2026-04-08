@@ -107,7 +107,7 @@ export function OddsButton({
       : `${flashSurface} ${ringWhenSelected}`;
 
   const base =
-    "flex min-w-0 flex-1 flex-col items-center justify-center rounded-md px-2 py-2 text-center transition-colors duration-300 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500";
+    "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-md px-2 py-2 text-center transition-colors duration-300 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500 md:min-h-0";
 
   return (
     <button

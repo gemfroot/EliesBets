@@ -85,7 +85,7 @@ export function GameCard({ game, topOdds, meta }: GameCardProps) {
 
   return (
     <article className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start gap-1">
             <h2 className="min-w-0 flex-1 text-sm font-medium text-zinc-100">
@@ -104,7 +104,7 @@ export function GameCard({ game, topOdds, meta }: GameCardProps) {
         </div>
         {topOdds && topOdds.length > 0 ? (
           <div
-            className="flex shrink-0 gap-1.5 sm:max-w-[min(100%,22rem)]"
+            className="flex w-full min-w-0 shrink-0 flex-col gap-2 md:max-w-[min(100%,22rem)] md:flex-row md:gap-1.5"
             aria-label="Main odds"
           >
             {topOdds.map((line) => (
@@ -115,7 +115,7 @@ export function GameCard({ game, topOdds, meta }: GameCardProps) {
                 outcomeId={line.outcomeId}
                 odds={line.odds}
                 label={line.label}
-                className="py-1.5 text-left"
+                className="min-h-11 w-full py-2 text-left md:min-h-0 md:w-auto md:py-1.5"
                 onClick={() =>
                   addSelection({
                     gameId: game.gameId,

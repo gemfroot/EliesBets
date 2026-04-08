@@ -97,7 +97,7 @@ export default async function SportCountryPage({ params }: Props) {
   const byLeague = groupGamesByLeague(games);
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <p className="text-sm text-zinc-500">
         <Link href={`/sports/${slug}`} className="hover:text-zinc-300">
           {sportTitle}

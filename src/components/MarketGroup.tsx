@@ -71,16 +71,19 @@ function ConditionBlock({
     return null;
   }
   const n = outcomes.length;
-  const gridCols =
-    n <= 3 ? `repeat(${n}, minmax(0, 1fr))` : "repeat(auto-fill, minmax(7rem, 1fr))";
+  const mdGridClass =
+    n <= 3
+      ? n === 1
+        ? "md:grid-cols-1"
+        : n === 2
+          ? "md:grid-cols-2"
+          : "md:grid-cols-3"
+      : "md:grid-cols-[repeat(auto-fill,minmax(7rem,1fr))]";
 
   return (
     <div className="rounded-md border border-zinc-800/80 bg-zinc-950/40 p-3">
       {label}
-      <div
-        className="mt-2 grid gap-1.5"
-        style={{ gridTemplateColumns: gridCols }}
-      >
+      <div className={`mt-2 grid grid-cols-1 gap-2 md:gap-1.5 ${mdGridClass}`}>
         {outcomes.map((o) => (
           <OutcomeButton
             key={o.outcomeId}
