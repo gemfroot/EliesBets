@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   groupConditionsByMarket,
   type ConditionDetailedData,
@@ -75,7 +76,14 @@ export function GameCard({ game, topOdds }: GameCardProps) {
     <article className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-medium text-zinc-100">{names}</h2>
+          <h2 className="text-sm font-medium text-zinc-100">
+            <Link
+              href={`/games/${game.gameId}`}
+              className="hover:text-zinc-50 hover:underline"
+            >
+              {names}
+            </Link>
+          </h2>
           <p className="mt-1 text-xs tabular-nums text-zinc-500">{when}</p>
         </div>
         {topOdds && topOdds.length > 0 ? (
