@@ -1,10 +1,4 @@
-const SPORTS = [
-  "Football",
-  "Basketball",
-  "Tennis",
-  "Ice hockey",
-  "American football",
-];
+import { SportsList } from "@/components/SportsList";
 
 export function Sidebar() {
   return (
@@ -12,17 +6,7 @@ export function Sidebar() {
       <p className="px-4 pb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
         Sports
       </p>
-      <nav className="flex flex-col gap-0.5 px-2" aria-label="Sports">
-        {SPORTS.map((name) => (
-          <button
-            key={name}
-            type="button"
-            className="rounded-lg px-3 py-2 text-left text-sm text-zinc-300 transition hover:bg-zinc-900 hover:text-zinc-50"
-          >
-            {name}
-          </button>
-        ))}
-      </nav>
+      <SportsList />
     </aside>
   );
 }
