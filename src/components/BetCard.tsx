@@ -1,10 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useChain, type Bet } from "@azuro-org/sdk";
+import { useChain, useRedeemBet, type Bet } from "@azuro-org/sdk";
 import type { GameData } from "@azuro-org/toolkit";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
 import { formatUnits } from "viem";
+import { getBalanceQueryKey } from "wagmi/query";
+import { useChainId, useConnection } from "wagmi";
 import { CashoutButton } from "@/components/CashoutButton";
+import { useToast } from "@/components/Toast";
 
 function participantLine(game: GameData): string {
   const { participants, title } = game;
@@ -50,6 +55,29 @@ export type BetCardProps = {
 
 export function BetCard({ bet }: BetCardProps) {
   const { betToken } = useChain();
+  const { showToast } = useToast();
+  const { address } = useConnection();
+  const chainId = useChainId();
+  const queryClient = useQueryClient();
+  const { submit, isPending, isProcessing } = useRedeemBet();
+  const [claimError, setClaimError] = useState<string | null>(null);
+
+  const showClaim =
+    bet.isWin &&
+    !bet.isCanceled &&
+    bet.isRedeemable &&
+    !bet.isRedeemed;
+
+  const invalidateBalances = useCallback(() => {
+    if (address) {
+      void queryClient.invalidateQueries({
+        queryKey: getBalanceQueryKey({ chainId, address }),
+      });
+    }
+  }, [address, chainId, queryClient]);
+
+  const claimBusy = isPending || isProcessing;
+
   const stakeStr = formatUnits(BigInt(bet.amount), betToken.decimals);
   const stakeNum = Number.parseFloat(stakeStr);
   const stakeDisplay = Number.isFinite(stakeNum)
@@ -158,6 +186,35 @@ export function BetCard({ bet }: BetCardProps) {
           </dd>
         </div>
       </dl>
+
+      {showClaim ? (
+        <div className="mt-3 border-t border-zinc-800/80 pt-3">
+          {claimError ? (
+            <p className="mb-2 text-sm text-red-400" role="alert">
+              {claimError}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            disabled={claimBusy}
+            onClick={async () => {
+              setClaimError(null);
+              try {
+                await submit({ bets: [bet] });
+                invalidateBalances();
+                showToast("Winnings claimed.", "success");
+              } catch (e) {
+                setClaimError(
+                  e instanceof Error ? e.message : "Could not claim winnings",
+                );
+              }
+            }}
+            className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          >
+            {claimBusy ? "Claiming…" : "Claim"}
+          </button>
+        </div>
+      ) : null}
 
       <CashoutButton bet={bet} />
     </article>
