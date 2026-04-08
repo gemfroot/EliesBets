@@ -48,7 +48,7 @@ export function Header() {
   });
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4">
+    <header className="flex h-16 shrink-0 items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-4">
       <span className="shrink-0 text-lg font-semibold tracking-tight text-zinc-50">
         EliesBets
       </span>
@@ -57,7 +57,7 @@ export function Header() {
         <SearchBar />
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {isConnected && address ? (
           <>
             <label className="flex items-center gap-2 text-sm text-zinc-400">

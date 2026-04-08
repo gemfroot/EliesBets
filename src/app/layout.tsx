@@ -20,9 +20,41 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
-  title: "EliesBets",
-  description: "Sports betting",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "EliesBets",
+    template: "%s · EliesBets",
+  },
+  description:
+    "Sports betting on Polygon and Gnosis with live and prematch markets, wallet connect, and an in-app betslip.",
+  applicationName: "EliesBets",
+  icons: {
+    icon: [{ url: "/favicon.ico", sizes: "any" }],
+    shortcut: "/favicon.ico",
+  },
+  openGraph: {
+    type: "website",
+    locale: "en",
+    siteName: "EliesBets",
+    title: "EliesBets",
+    description:
+      "Sports betting with live and prematch markets. Connect your wallet and place bets on-chain.",
+    url: siteUrl,
+  },
+  twitter: {
+    card: "summary",
+    title: "EliesBets",
+    description:
+      "Sports betting with live and prematch markets. Connect your wallet and place bets on-chain.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default async function RootLayout({

@@ -485,14 +485,14 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       {mode === "combo" && multiPick ? (
         <p className="text-xs text-zinc-500">
           Combined odds:{" "}
-          <span className="font-semibold tabular-nums text-zinc-300">
+          <span className="font-mono font-semibold tabular-nums text-zinc-300">
             {totalOdds > 0 ? totalOdds.toFixed(2) : "—"}
           </span>
         </p>
       ) : null}
       <p className="text-xs text-zinc-500">
         Potential win:{" "}
-        <span className="font-semibold tabular-nums text-zinc-300">
+        <span className="font-mono font-semibold tabular-nums text-zinc-300">
           {potentialWinDisplay != null
             ? `${potentialWinDisplay.toFixed(2)} ${betToken.symbol}`
             : "—"}
@@ -575,7 +575,7 @@ export function BetslipPanel() {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-zinc-500">{s.gameTitle}</p>
                   <p className="mt-0.5 text-sm text-zinc-100">{s.outcomeName}</p>
-                  <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-300">
+                  <p className="type-odds mt-0.5 text-zinc-300">
                     {s.odds}
                   </p>
                 </div>

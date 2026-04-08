@@ -127,10 +127,10 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
 
   return (
     <>
-      <div className="mt-3 flex flex-wrap items-end justify-between gap-3 border-t border-zinc-800/80 pt-3">
+      <div className="mt-3 flex flex-wrap items-end justify-between gap-2 border-t border-zinc-800/80 pt-3">
         <div>
           <p className="text-xs text-zinc-500">Cash out value ({betToken.symbol})</p>
-          <p className="mt-0.5 font-semibold tabular-nums text-zinc-100">
+          <p className="mt-0.5 font-mono font-semibold tabular-nums text-zinc-100">
             {cashoutDisplay}
           </p>
         </div>
@@ -172,7 +172,7 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
             </h2>
             <p className="mt-2 text-sm text-zinc-400">
               You will receive approximately{" "}
-              <span className="font-semibold tabular-nums text-zinc-100">
+              <span className="font-mono font-semibold tabular-nums text-zinc-100">
                 {cashoutDisplay} {betToken.symbol}
               </span>{" "}
               for this bet (before network fees). This action cannot be undone.

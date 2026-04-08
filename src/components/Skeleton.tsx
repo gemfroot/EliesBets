@@ -44,7 +44,7 @@ export function GameCardSkeleton() {
       className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3"
       aria-hidden
     >
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex items-start gap-2">
             <Skeleton className="h-4 w-[min(100%,18rem)]" />
@@ -52,7 +52,7 @@ export function GameCardSkeleton() {
           </div>
           <Skeleton className="h-3 w-32" />
         </div>
-        <div className="flex w-full gap-1.5 md:max-w-[min(100%,22rem)]">
+        <div className="flex w-full gap-2 md:max-w-[min(100%,22rem)]">
           <Skeleton className="h-11 min-h-11 flex-1 rounded-md md:h-9 md:min-h-0" />
           <Skeleton className="h-11 min-h-11 flex-1 rounded-md md:h-9 md:min-h-0" />
           <Skeleton className="h-11 min-h-11 flex-1 rounded-md md:h-9 md:min-h-0" />
@@ -70,7 +70,7 @@ export function GameCardListSkeleton({
   className?: string;
 }) {
   return (
-    <ul className={`flex flex-col gap-3 ${className}`.trim()} aria-hidden>
+    <ul className={`flex flex-col gap-2 ${className}`.trim()} aria-hidden>
       {Array.from({ length: count }).map((_, i) => (
         <li key={i}>
           <GameCardSkeleton />
@@ -83,7 +83,7 @@ export function GameCardListSkeleton({
 export function LiveGameGridSkeleton({ count = 6 }: { count?: number }) {
   return (
     <ul
-      className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+      className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3"
       aria-hidden
     >
       {Array.from({ length: count }).map((_, i) => (
@@ -107,9 +107,9 @@ function SectionHeadingSkeleton() {
 /** Full home page while route segment loads */
 export function HomePageSkeleton() {
   return (
-    <div className="p-6 sm:p-8" aria-hidden>
-      <section className="mb-10">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="page-shell" aria-hidden>
+      <section className="mb-8">
+        <div className="flex flex-wrap items-end justify-between gap-2">
           <SectionHeadingSkeleton />
           <Skeleton className="h-5 w-28" />
         </div>
@@ -117,13 +117,13 @@ export function HomePageSkeleton() {
           <LiveGameGridSkeleton count={6} />
         </div>
       </section>
-      <div className="mb-10">
+      <div className="mb-8">
         <Skeleton className="h-3 w-16" />
         <div className="mt-3">
           <SportsNavSkeleton pills={10} />
         </div>
       </div>
-      <section className="mb-10">
+      <section className="mb-8">
         <SectionHeadingSkeleton />
         <div className="mt-6">
           <GameCardListSkeleton count={4} />
@@ -148,7 +148,7 @@ export function GamesListPageSkeleton({
   showBreadcrumb?: boolean;
 }) {
   return (
-    <div className="p-4 sm:p-6 md:p-8" aria-hidden>
+    <div className="page-shell" aria-hidden>
       {showBreadcrumb ? (
         <div className="mb-2 space-y-2">
           <Skeleton className="h-4 w-64 max-w-full" />
@@ -178,11 +178,11 @@ function MarketBlockSkeleton() {
 
 export function GameDetailPageSkeleton() {
   return (
-    <div className="p-4 sm:p-6 md:p-8" aria-hidden>
+    <div className="page-shell" aria-hidden>
       <Skeleton className="h-4 w-72 max-w-full" />
       <Skeleton className="mt-3 h-9 w-[min(100%,24rem)]" />
       <Skeleton className="mt-2 h-4 w-48" />
-      <div className="mt-8 flex flex-col gap-3">
+      <div className="mt-8 flex flex-col gap-2">
         {Array.from({ length: 5 }).map((_, i) => (
           <MarketBlockSkeleton key={i} />
         ))}
@@ -220,7 +220,7 @@ export function BetsListSkeleton({ count = 4 }: { count?: number }) {
 
 export function BetsPageSkeleton() {
   return (
-    <div className="p-4 md:p-6" aria-hidden>
+    <div className="page-shell" aria-hidden>
       <Skeleton className="h-7 w-32" />
       <Skeleton className="mt-2 h-4 w-80 max-w-full" />
       <div className="mt-6 flex flex-wrap gap-2 border-b border-zinc-800 pb-3">

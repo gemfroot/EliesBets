@@ -123,7 +123,7 @@ export function OddsButton({
           {label}
         </span>
       ) : null}
-      <span className="text-sm font-semibold tabular-nums text-zinc-100">
+      <span className="type-odds text-zinc-100">
         {oddsText}
       </span>
     </button>

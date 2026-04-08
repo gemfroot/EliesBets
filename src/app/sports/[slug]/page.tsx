@@ -89,9 +89,9 @@ export default async function SportPage({ params }: Props) {
   const byLeague = groupGamesByLeague(games);
 
   return (
-    <div className="p-4 sm:p-6 md:p-8">
-      <h1 className="text-2xl font-semibold text-zinc-50">{title}</h1>
-      <p className="mt-1 text-sm text-zinc-500">Sport: {slug}</p>
+    <div className="page-shell">
+      <h1 className="type-display">{title}</h1>
+      <p className="type-muted mt-1">Sport: {slug}</p>
 
       {loadError ? (
         <RetryCallout
@@ -108,13 +108,13 @@ export default async function SportPage({ params }: Props) {
           </p>
         </div>
       ) : (
-        <div className="mt-8 flex flex-col gap-10">
+        <div className="mt-8 flex flex-col gap-8">
           {byLeague.map((league) => (
             <section key={league.leagueKey} aria-labelledby={`league-${league.leagueKey}`}>
               <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-2">
                 <h2
                   id={`league-${league.leagueKey}`}
-                  className="text-sm font-semibold uppercase tracking-wider text-zinc-400"
+                  className="type-overline text-zinc-400"
                 >
                   {league.leagueName}
                 </h2>
@@ -127,7 +127,7 @@ export default async function SportPage({ params }: Props) {
                   />
                 ) : null}
               </div>
-              <ul className="mt-4 flex flex-col gap-3">
+              <ul className="mt-4 flex flex-col gap-2">
                 {league.games.map((game) => (
                   <li key={game.gameId}>
                     <GameCard

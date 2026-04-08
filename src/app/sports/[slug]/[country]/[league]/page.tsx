@@ -76,8 +76,8 @@ export default async function SportCountryLeaguePage({ params }: Props) {
   games = [...games].sort((a, b) => +a.startsAt - +b.startsAt);
 
   return (
-    <div className="p-4 sm:p-6 md:p-8">
-      <p className="text-sm text-zinc-500">
+    <div className="page-shell">
+      <p className="type-muted">
         <Link href={`/sports/${slug}`} className="hover:text-zinc-300">
           {sportTitle}
         </Link>
@@ -91,8 +91,8 @@ export default async function SportCountryLeaguePage({ params }: Props) {
         <span className="text-zinc-600"> · </span>
         <span className="text-zinc-400">{leagueName}</span>
       </p>
-      <div className="mt-2 flex items-start justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-zinc-50">{leagueName}</h1>
+      <div className="mt-2 flex items-start justify-between gap-2">
+        <h1 className="type-display">{leagueName}</h1>
         <LeagueFavoriteButton
           sportSlug={slug}
           countrySlug={countrySlug}
@@ -100,7 +100,7 @@ export default async function SportCountryLeaguePage({ params }: Props) {
           title={leagueName}
         />
       </div>
-      <p className="mt-1 text-sm text-zinc-500">
+      <p className="type-muted mt-1">
         {sportTitle} · {countryName}
       </p>
 
@@ -118,7 +118,7 @@ export default async function SportCountryLeaguePage({ params }: Props) {
           </p>
         </div>
       ) : (
-        <ul className="mt-8 flex flex-col gap-3">
+        <ul className="mt-8 flex flex-col gap-2">
           {games.map((game) => (
             <li key={game.gameId}>
               <GameCard

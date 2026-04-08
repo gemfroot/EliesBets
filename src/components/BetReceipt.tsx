@@ -75,12 +75,12 @@ export function BetReceipt({
             : "Single"}
         </p>
 
-        <ul className="mt-4 flex max-h-60 flex-col gap-3 overflow-y-auto border-t border-zinc-800 pt-3">
+        <ul className="mt-4 flex max-h-60 flex-col gap-2 overflow-y-auto border-t border-zinc-800 pt-3">
           {selections.map((s) => (
             <li key={s.id} className="text-sm">
               <p className="font-medium text-zinc-100">{s.gameTitle}</p>
               <p className="mt-1 text-zinc-200">{s.outcomeName}</p>
-              <p className="mt-0.5 text-xs tabular-nums text-zinc-400">
+              <p className="mt-0.5 font-mono text-xs tabular-nums text-zinc-400">
                 @{s.odds}
               </p>
             </li>
@@ -90,19 +90,19 @@ export function BetReceipt({
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-zinc-800 pt-4 text-sm">
           <div>
             <dt className="text-xs text-zinc-500">Odds</dt>
-            <dd className="font-semibold tabular-nums text-zinc-100">
+            <dd className="type-odds text-zinc-100">
               {oddsDisplay}
             </dd>
           </div>
           <div>
             <dt className="text-xs text-zinc-500">Stake ({tokenSymbol})</dt>
-            <dd className="font-semibold tabular-nums text-zinc-100">
+            <dd className="font-mono font-semibold tabular-nums text-zinc-100">
               {stakeLabel}
             </dd>
           </div>
           <div className="col-span-2">
             <dt className="text-xs text-zinc-500">Potential win</dt>
-            <dd className="font-semibold tabular-nums text-zinc-100">
+            <dd className="font-mono font-semibold tabular-nums text-zinc-100">
               {potentialWin != null
                 ? `${potentialWin.toFixed(2)} ${tokenSymbol}`
                 : "—"}
