@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, type State } from "wagmi";
 import { AzuroSDKProvider } from "@azuro-org/sdk";
 import { useState, type ReactNode } from "react";
+import { BetslipProvider } from "@/components/Betslip";
 import { wagmiConfig } from "./wagmi";
 
 export function Providers({
@@ -28,7 +29,7 @@ export function Providers({
     <WagmiProvider config={wagmiConfig} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
         <AzuroSDKProvider initialChainId={137}>
-          {children}
+          <BetslipProvider>{children}</BetslipProvider>
         </AzuroSDKProvider>
       </QueryClientProvider>
     </WagmiProvider>

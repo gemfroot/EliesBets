@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { cookieToInitialState } from "wagmi";
 import { Providers } from "@/providers";
 import { wagmiConfig } from "@/wagmi";
+import { BetslipPanel } from "@/components/Betslip";
 import { Header } from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
 import "./globals.css";
@@ -48,10 +49,7 @@ export default async function RootLayout({
                 className="hidden w-64 shrink-0 border-l border-zinc-800 bg-zinc-900/40 p-4 lg:block"
                 aria-label="Betslip"
               >
-                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Betslip
-                </p>
-                <p className="mt-4 text-sm text-zinc-500">No selections yet.</p>
+                <BetslipPanel />
               </aside>
             </div>
           </div>

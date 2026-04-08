@@ -1,8 +1,11 @@
+"use client";
+
 import {
   groupConditionsByMarket,
   type ConditionDetailedData,
   type GameData,
 } from "@azuro-org/toolkit";
+import { useBetslip } from "@/components/Betslip";
 
 export type TopOddsLine = { label: string; odds: string };
 
@@ -64,6 +67,7 @@ export type GameCardProps = {
 };
 
 export function GameCard({ game, topOdds }: GameCardProps) {
+  const { addSelection } = useBetslip();
   const names = participantLine(game);
   const when = formatStartTime(game.startsAt);
 
@@ -80,9 +84,17 @@ export function GameCard({ game, topOdds }: GameCardProps) {
             aria-label="Main odds"
           >
             {topOdds.map((line) => (
-              <div
+              <button
                 key={`${line.label}-${line.odds}`}
-                className="flex min-w-0 flex-1 flex-col items-center justify-center rounded-md bg-zinc-800/80 px-2 py-1.5"
+                type="button"
+                onClick={() =>
+                  addSelection({
+                    gameId: game.gameId,
+                    outcomeName: line.label,
+                    odds: line.odds,
+                  })
+                }
+                className="flex min-w-0 flex-1 flex-col items-center justify-center rounded-md bg-zinc-800/80 px-2 py-1.5 text-left transition-colors hover:bg-zinc-700/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500"
               >
                 <span className="max-w-full truncate text-[10px] font-medium uppercase tracking-wide text-zinc-500">
                   {line.label}
@@ -90,7 +102,7 @@ export function GameCard({ game, topOdds }: GameCardProps) {
                 <span className="text-sm font-semibold tabular-nums text-zinc-100">
                   {line.odds}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         ) : (
