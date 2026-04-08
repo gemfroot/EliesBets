@@ -319,7 +319,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
                 setSingleLegIndex(0);
                 setErrorMessage(null);
               }}
-              className={`flex-1 rounded px-2 py-1.5 text-xs font-medium transition ${
+              className={`min-h-11 flex-1 rounded px-2 py-2 text-xs font-medium transition md:min-h-0 md:py-1.5 ${
                 mode === "single"
                   ? "bg-zinc-700 text-zinc-100"
                   : "text-zinc-400 hover:text-zinc-200"
@@ -333,7 +333,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
                 setMode("combo");
                 setErrorMessage(null);
               }}
-              className={`flex-1 rounded px-2 py-1.5 text-xs font-medium transition ${
+              className={`min-h-11 flex-1 rounded px-2 py-2 text-xs font-medium transition md:min-h-0 md:py-1.5 ${
                 mode === "combo"
                   ? "bg-zinc-700 text-zinc-100"
                   : "text-zinc-400 hover:text-zinc-200"
@@ -369,7 +369,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
             setStake(e.target.value);
             setErrorMessage(null);
           }}
-          className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          className="min-h-11 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-base tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 md:min-h-0 md:text-sm"
         />
       </div>
       {mode === "combo" && multiPick ? (
@@ -418,7 +418,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
         type="button"
         disabled={!canSubmit}
         onClick={() => void submit()}
-        className="rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+        className="min-h-11 rounded-md bg-amber-600 px-3 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:py-2"
       >
         {isBusy ? "Working…" : placeBetLabel}
       </button>
@@ -472,7 +472,7 @@ export function BetslipPanel() {
                 <button
                   type="button"
                   onClick={() => removeSelection(s.id)}
-                  className="shrink-0 rounded px-2 py-1 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                  className="min-h-11 shrink-0 rounded px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 md:min-h-0 md:px-2 md:py-1"
                   aria-label={`Remove ${s.outcomeName}`}
                 >
                   Remove

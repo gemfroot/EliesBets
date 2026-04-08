@@ -39,7 +39,7 @@ export function FavoriteGameButton({
         e.stopPropagation();
         toggleGame({ gameId, title });
       }}
-      className={`inline-flex shrink-0 items-center justify-center rounded p-1 transition-colors ${
+      className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded p-1 transition-colors ${
         active
           ? "text-amber-400 hover:text-amber-300"
           : "text-zinc-500 hover:text-zinc-300"
@@ -73,7 +73,7 @@ export function LeagueFavoriteButton({
         e.stopPropagation();
         toggleLeague({ sportSlug, countrySlug, leagueSlug, title });
       }}
-      className={`inline-flex shrink-0 items-center justify-center rounded p-1 transition-colors ${
+      className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded p-1 transition-colors ${
         active
           ? "text-amber-400 hover:text-amber-300"
           : "text-zinc-500 hover:text-zinc-300"

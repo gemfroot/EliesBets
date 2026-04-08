@@ -142,7 +142,7 @@ export default async function GameDetailPage({ params }: Props) {
   const when = formatStartTime(game.startsAt);
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <p className="text-sm text-zinc-500">
         <Link href={`/sports/${game.sport.slug}`} className="hover:text-zinc-300">
           {game.sport.name}
