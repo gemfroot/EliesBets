@@ -22,6 +22,8 @@ type BetslipContextValue = {
     gameId: string;
     outcomeName: string;
     odds: string;
+    /** When set, uniquely identifies the outcome (avoids collisions across conditions). */
+    outcomeId?: string;
   }) => void;
   removeSelection: (id: string) => void;
 };
@@ -36,7 +38,14 @@ export function useBetslip() {
   return ctx;
 }
 
-function selectionId(gameId: string, outcomeName: string): string {
+function selectionId(
+  gameId: string,
+  outcomeName: string,
+  outcomeId?: string,
+): string {
+  if (outcomeId) {
+    return `${gameId}::${outcomeId}`;
+  }
   return `${gameId}::${outcomeName}`;
 }
 
@@ -44,8 +53,13 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
   const [selections, setSelections] = useState<BetslipSelection[]>([]);
 
   const addSelection = useCallback(
-    (item: { gameId: string; outcomeName: string; odds: string }) => {
-      const id = selectionId(item.gameId, item.outcomeName);
+    (item: {
+      gameId: string;
+      outcomeName: string;
+      odds: string;
+      outcomeId?: string;
+    }) => {
+      const id = selectionId(item.gameId, item.outcomeName, item.outcomeId);
       setSelections((prev) => {
         const next = prev.filter((s) => s.id !== id);
         next.push({
