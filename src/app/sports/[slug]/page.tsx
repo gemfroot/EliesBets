@@ -1,6 +1,7 @@
 import { getConditionsByGameIds, type GameData } from "@azuro-org/toolkit";
 import { LeagueFavoriteButton } from "@/components/FavoriteButton";
-import { GameCard, extractMainLineOdds } from "@/components/GameCard";
+import { GameCard } from "@/components/GameCard";
+import { extractMainLineOdds } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
 import { CHAIN_ID } from "@/lib/constants";
 import { chunk, fetchGamesForSport } from "@/lib/sportGames";

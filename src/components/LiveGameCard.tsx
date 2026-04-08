@@ -2,7 +2,8 @@
 
 import { useActiveConditions } from "@azuro-org/sdk";
 import type { GameData } from "@azuro-org/toolkit";
-import { GameCard, extractMainLineOdds } from "@/components/GameCard";
+import { GameCard } from "@/components/GameCard";
+import { extractMainLineOdds } from "@/lib/oddsUtils";
 import { LiveBadge } from "@/components/LiveBadge";
 
 const ODDS_REFETCH_MS = 4_000;

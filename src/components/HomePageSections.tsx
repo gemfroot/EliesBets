@@ -8,7 +8,8 @@ import {
   getSports,
   type GameData,
 } from "@azuro-org/toolkit";
-import { GameCard, extractMainLineOdds } from "@/components/GameCard";
+import { GameCard } from "@/components/GameCard";
+import { extractMainLineOdds } from "@/lib/oddsUtils";
 import { LiveGameCard } from "@/components/LiveGameCard";
 import { RetryCallout } from "@/components/RetryCallout";
 import { CHAIN_ID } from "@/lib/constants";
@@ -19,6 +20,7 @@ const CONDITIONS_BATCH = 40;
 const HERO_LIVE_LIMIT = 6;
 const HERO_FETCH_PER_PAGE = 24;
 const POPULAR_LIMIT = 8;
+const API_MIN_PER_PAGE = 10;
 const UPCOMING_LIMIT = 12;
 const UPCOMING_FETCH_BUFFER = 3;
 const SPORT_LINKS_MAX = 10;
@@ -76,9 +78,9 @@ async function fetchPopularGames(): Promise<GameData[]> {
     orderBy: GameOrderBy.Turnover,
     orderDir: OrderDirection.Desc,
     page: 1,
-    perPage: POPULAR_LIMIT,
+    perPage: Math.max(POPULAR_LIMIT, API_MIN_PER_PAGE),
   });
-  return res.games;
+  return res.games.slice(0, POPULAR_LIMIT);
 }
 
 async function fetchUpcomingGames(): Promise<GameData[]> {
