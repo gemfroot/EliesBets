@@ -5,6 +5,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -98,9 +99,46 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
 
 const SLIPPAGE_PERCENT = 5;
 
+type BetslipMode = "single" | "combo";
+
 function parseDecimalOdds(oddsStr: string): number {
   const n = Number.parseFloat(oddsStr);
   return Number.isFinite(n) && n > 0 ? n : NaN;
+}
+
+function oddsRecordForSelections(sel: BetslipSelection[]): Record<string, number> | null {
+  const o: Record<string, number> = {};
+  for (const s of sel) {
+    const v = parseDecimalOdds(s.odds);
+    if (!Number.isFinite(v)) {
+      return null;
+    }
+    o[`${s.conditionId}-${s.outcomeId}`] = v;
+  }
+  return o;
+}
+
+function combinedDecimalOdds(sel: BetslipSelection[]): number {
+  let product = 1;
+  for (const s of sel) {
+    const v = parseDecimalOdds(s.odds);
+    if (!Number.isFinite(v)) {
+      return 0;
+    }
+    product *= v;
+  }
+  return product;
+}
+
+function hasDuplicateGameInCombo(sel: BetslipSelection[]): boolean {
+  const seen = new Set<string>();
+  for (const s of sel) {
+    if (seen.has(s.gameId)) {
+      return true;
+    }
+    seen.add(s.gameId);
+  }
+  return false;
 }
 
 function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }) {
@@ -109,49 +147,73 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const [stake, setStake] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [mode, setMode] = useState<BetslipMode>("combo");
+  const [singleLegIndex, setSingleLegIndex] = useState(0);
+
+  const multiPick = selections.length > 1;
+  const comboInvalidSameGame =
+    mode === "combo" && multiPick && hasDuplicateGameInCombo(selections);
+
+  const activeSelections = useMemo(() => {
+    if (!multiPick || mode === "combo") {
+      return selections;
+    }
+    const leg = selections[singleLegIndex];
+    return leg ? [leg] : selections;
+  }, [selections, multiPick, mode, singleLegIndex]);
+
+  useEffect(() => {
+    setSingleLegIndex(0);
+  }, [selections]);
+
+  useEffect(() => {
+    if (!multiPick) {
+      return;
+    }
+    if (singleLegIndex >= selections.length) {
+      setSingleLegIndex(0);
+    }
+  }, [multiPick, selections.length, singleLegIndex]);
 
   const sdkSelections = useMemo(
     () =>
-      selections.map((s) => ({
+      activeSelections.map((s) => ({
         conditionId: s.conditionId,
         outcomeId: s.outcomeId,
       })),
-    [selections],
+    [activeSelections],
   );
 
-  const oddsRecord = useMemo(() => {
-    const o: Record<string, number> = {};
-    for (const s of selections) {
-      const v = parseDecimalOdds(s.odds);
-      if (!Number.isFinite(v)) {
-        return null;
-      }
-      o[`${s.conditionId}-${s.outcomeId}`] = v;
-    }
-    return o;
-  }, [selections]);
+  const oddsRecord = useMemo(
+    () => oddsRecordForSelections(activeSelections),
+    [activeSelections],
+  );
 
   const totalOdds = useMemo(() => {
     if (!oddsRecord) {
       return 0;
     }
-    let product = 1;
-    for (const s of selections) {
-      const v = parseDecimalOdds(s.odds);
-      if (!Number.isFinite(v)) {
-        return 0;
-      }
-      product *= v;
-    }
-    return product;
-  }, [selections, oddsRecord]);
+    return combinedDecimalOdds(activeSelections);
+  }, [activeSelections, oddsRecord]);
 
   const stakeAmount = stake.trim();
   const stakeNum = Number.parseFloat(stakeAmount);
   const stakeValid = Number.isFinite(stakeNum) && stakeNum > 0;
 
-  const potentialWin =
-    stakeValid && totalOdds > 0 ? stakeNum * totalOdds : null;
+  const singleLegOdds =
+    multiPick && mode === "single" && selections[singleLegIndex]
+      ? parseDecimalOdds(selections[singleLegIndex].odds)
+      : NaN;
+  const potentialWinSingleLeg =
+    stakeValid && Number.isFinite(singleLegOdds) && singleLegOdds > 0
+      ? stakeNum * singleLegOdds
+      : null;
+
+  const potentialWinCombo =
+    mode === "combo" && stakeValid && totalOdds > 0 ? stakeNum * totalOdds : null;
+
+  const potentialWinDisplay =
+    mode === "combo" ? potentialWinCombo : potentialWinSingleLeg;
 
   const { submit, approveTx, betTx, isApproveRequired, isWalletReadyToSubmit } =
     useBet({
@@ -164,6 +226,11 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       onSuccess: () => {
         setSuccess(true);
         setErrorMessage(null);
+        if (mode === "single" && multiPick) {
+          setSingleLegIndex((i) =>
+            i < selections.length - 1 ? i + 1 : i,
+          );
+        }
       },
       onError: (err) => {
         setSuccess(false);
@@ -184,12 +251,64 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     isConnected &&
     Boolean(address) &&
     isWalletReadyToSubmit &&
-    !isBusy;
+    !isBusy &&
+    !comboInvalidSameGame;
 
-  const placeBetLabel = isApproveRequired ? "Approve token" : "Place Bet";
+  const placeBetLabel = isApproveRequired
+    ? "Approve token"
+    : mode === "single" && multiPick
+      ? `Place bet (leg ${singleLegIndex + 1}/${selections.length})`
+      : "Place Bet";
 
   return (
     <div className="mt-4 flex flex-col gap-2 border-t border-zinc-800 pt-4">
+      {multiPick ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-xs font-medium text-zinc-400">Bet type</p>
+          <div className="flex rounded-md border border-zinc-700 p-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("single");
+                setSingleLegIndex(0);
+                setSuccess(false);
+                setErrorMessage(null);
+              }}
+              className={`flex-1 rounded px-2 py-1.5 text-xs font-medium transition ${
+                mode === "single"
+                  ? "bg-zinc-700 text-zinc-100"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Single
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("combo");
+                setSuccess(false);
+                setErrorMessage(null);
+              }}
+              className={`flex-1 rounded px-2 py-1.5 text-xs font-medium transition ${
+                mode === "combo"
+                  ? "bg-zinc-700 text-zinc-100"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Combo
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {comboInvalidSameGame ? (
+        <p
+          className="rounded-md border border-amber-800/80 bg-amber-950/40 px-3 py-2 text-xs text-amber-200"
+          role="status"
+        >
+          Combo bets cannot include more than one outcome from the same game.
+          Remove a selection or switch to Single to bet each leg separately.
+        </p>
+      ) : null}
       <label className="text-xs font-medium text-zinc-400" htmlFor="betslip-stake">
         Stake ({betToken.symbol})
       </label>
@@ -210,15 +329,29 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
         />
       </div>
+      {mode === "combo" && multiPick ? (
+        <p className="text-xs text-zinc-500">
+          Combined odds:{" "}
+          <span className="font-semibold tabular-nums text-zinc-300">
+            {totalOdds > 0 ? totalOdds.toFixed(2) : "—"}
+          </span>
+        </p>
+      ) : null}
       <p className="text-xs text-zinc-500">
         Potential win:{" "}
         <span className="font-semibold tabular-nums text-zinc-300">
-          {potentialWin != null
-            ? `${potentialWin.toFixed(2)} ${betToken.symbol}`
+          {potentialWinDisplay != null
+            ? `${potentialWinDisplay.toFixed(2)} ${betToken.symbol}`
             : "—"}
         </span>
-        {selections.length > 1 ? (
-          <span className="text-zinc-600"> (combined odds)</span>
+        {mode === "combo" && multiPick ? (
+          <span className="text-zinc-600"> (combo payout)</span>
+        ) : null}
+        {mode === "single" && multiPick ? (
+          <span className="text-zinc-600">
+            {" "}
+            (this leg only; stake applies per bet)
+          </span>
         ) : null}
       </p>
       {isApproveRequired ? (
