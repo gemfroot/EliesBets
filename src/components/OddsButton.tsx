@@ -92,13 +92,13 @@ export function OddsButton({
 
   const idleSurface = unavailable
     ? "cursor-not-allowed bg-zinc-800/40 opacity-50"
-    : "bg-zinc-800/80 hover:bg-zinc-700/80";
+    : "bg-zinc-800/80 hover:scale-[1.02] hover:bg-zinc-700/90 active:scale-[0.98]";
 
   const flashSurface =
     flash === "up"
-      ? "bg-emerald-600/35"
+      ? "bg-emerald-600/40 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.45)]"
       : flash === "down"
-        ? "bg-red-600/35"
+        ? "bg-red-600/40 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.45)]"
         : "";
 
   const surface =
@@ -107,7 +107,7 @@ export function OddsButton({
       : `${flashSurface} ${ringWhenSelected}`;
 
   const base =
-    "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-md px-2 py-2 text-center transition-colors duration-300 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500 md:min-h-0";
+    "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-md px-2 py-2 text-center transition-[background-color,box-shadow,transform] duration-300 ease-out motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500 md:min-h-0";
 
   return (
     <button
