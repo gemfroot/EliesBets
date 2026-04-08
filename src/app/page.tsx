@@ -11,6 +11,7 @@ import {
 import { GameCard, extractMainLineOdds } from "@/components/GameCard";
 import { LiveGameCard } from "@/components/LiveGameCard";
 import { CHAIN_ID, chunk } from "@/lib/sportGames";
+import { sportEmoji } from "@/lib/sportEmoji";
 
 export const dynamic = "force-dynamic";
 
@@ -22,31 +23,6 @@ const POPULAR_LIMIT = 8;
 const UPCOMING_LIMIT = 12;
 const UPCOMING_FETCH_BUFFER = 3;
 const SPORT_LINKS_MAX = 10;
-
-function sportEmoji(slug: string): string {
-  const map: Record<string, string> = {
-    football: "⚽",
-    soccer: "⚽",
-    basketball: "🏀",
-    tennis: "🎾",
-    "ice-hockey": "🏒",
-    hockey: "🏒",
-    "american-football": "🏈",
-    baseball: "⚾",
-    "counter-strike": "🎮",
-    esports: "🎮",
-    mma: "🥊",
-    boxing: "🥊",
-    volleyball: "🏐",
-    handball: "🤾",
-    rugby: "🏉",
-    cricket: "🏏",
-    darts: "🎯",
-    snooker: "🎱",
-    futsal: "⚽",
-  };
-  return map[slug] ?? "🏅";
-}
 
 function parseStartMs(startsAt: string): number {
   const n = +startsAt;
@@ -206,7 +182,7 @@ export default async function Home() {
         ) : heroGames.length === 0 ? (
           <p className="mt-6 text-sm text-zinc-500">No live games right now.</p>
         ) : (
-          <ul className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {heroGames.map((game) => (
               <li key={game.gameId}>
                 <LiveGameCard game={game} />
