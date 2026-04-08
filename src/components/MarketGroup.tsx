@@ -48,6 +48,7 @@ function OutcomeButton({
           odds: oddsStr,
           outcomeId: outcome.outcomeId,
           conditionId: outcome.conditionId,
+          isExpressForbidden: outcome.isExpressForbidden,
         })
       }
     />
