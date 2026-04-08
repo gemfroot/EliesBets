@@ -92,11 +92,29 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
   const openDrawer = useCallback(() => setMobileDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setMobileDrawerOpen(false), []);
 
+  const validSelectionIds = useMemo(
+    () =>
+      new Set(
+        items.map((item) => selectionId(item.gameId, "", item.outcomeId)),
+      ),
+    [items],
+  );
+
+  const metaByIdSynced = useMemo(() => {
+    const next: Record<string, BetslipSelection> = {};
+    for (const key of Object.keys(metaById)) {
+      if (validSelectionIds.has(key)) {
+        next[key] = metaById[key]!;
+      }
+    }
+    return next;
+  }, [metaById, validSelectionIds]);
+
   const selections = useMemo((): BetslipSelection[] => {
     return items.map((item) => {
       const id = selectionId(item.gameId, "", item.outcomeId);
       return (
-        metaById[id] ?? {
+        metaByIdSynced[id] ?? {
           id,
           gameId: item.gameId,
           gameTitle: "—",
@@ -107,24 +125,7 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
         }
       );
     });
-  }, [items, metaById]);
-
-  useEffect(() => {
-    const validIds = new Set(
-      items.map((item) => selectionId(item.gameId, "", item.outcomeId)),
-    );
-    setMetaById((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const key of Object.keys(next)) {
-        if (!validIds.has(key)) {
-          delete next[key];
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [items]);
+  }, [items, metaByIdSynced]);
 
   const addSelection = useCallback(
     (item: {
@@ -160,7 +161,7 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
   const removeSelection = useCallback(
     (id: string) => {
       const row =
-        metaById[id] ??
+        metaByIdSynced[id] ??
         items.find(
           (item) => selectionId(item.gameId, "", item.outcomeId) === id,
         );
@@ -173,7 +174,7 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [metaById, items, removeItem],
+    [metaByIdSynced, items, removeItem],
   );
 
   const clearSelections = useCallback(() => {
