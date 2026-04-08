@@ -1,5 +1,6 @@
 import { getConditionsByGameIds, type GameData } from "@azuro-org/toolkit";
 import Link from "next/link";
+import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { GameCard, extractMainLineOdds } from "@/components/GameCard";
 import {
   CHAIN_ID,
@@ -89,7 +90,15 @@ export default async function SportCountryLeaguePage({ params }: Props) {
         <span className="text-zinc-600"> · </span>
         <span className="text-zinc-400">{leagueName}</span>
       </p>
-      <h1 className="mt-2 text-2xl font-semibold text-zinc-50">{leagueName}</h1>
+      <div className="mt-2 flex items-start justify-between gap-3">
+        <h1 className="text-2xl font-semibold text-zinc-50">{leagueName}</h1>
+        <LeagueFavoriteButton
+          sportSlug={slug}
+          countrySlug={countrySlug}
+          leagueSlug={leagueSlug}
+          title={leagueName}
+        />
+      </div>
       <p className="mt-1 text-sm text-zinc-500">
         {sportTitle} · {countryName}
       </p>

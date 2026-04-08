@@ -1,5 +1,6 @@
 import { getConditionsByGameIds, type GameData } from "@azuro-org/toolkit";
 import Link from "next/link";
+import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { GameCard, extractMainLineOdds } from "@/components/GameCard";
 import {
   CHAIN_ID,
@@ -119,17 +120,25 @@ export default async function SportCountryPage({ params }: Props) {
         <div className="mt-8 flex flex-col gap-10">
           {byLeague.map((league) => (
             <section key={league.leagueKey} aria-labelledby={`league-${league.leagueKey}`}>
-              <h2
-                id={`league-${league.leagueKey}`}
-                className="border-b border-zinc-800 pb-2 text-sm font-semibold uppercase tracking-wider text-zinc-400"
-              >
-                <Link
-                  href={`/sports/${slug}/${countrySlug}/${league.leagueKey}`}
-                  className="hover:text-zinc-200"
+              <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-2">
+                <h2
+                  id={`league-${league.leagueKey}`}
+                  className="text-sm font-semibold uppercase tracking-wider text-zinc-400"
                 >
-                  {league.leagueName}
-                </Link>
-              </h2>
+                  <Link
+                    href={`/sports/${slug}/${countrySlug}/${league.leagueKey}`}
+                    className="hover:text-zinc-200"
+                  >
+                    {league.leagueName}
+                  </Link>
+                </h2>
+                <LeagueFavoriteButton
+                  sportSlug={slug}
+                  countrySlug={countrySlug}
+                  leagueSlug={league.leagueKey}
+                  title={league.leagueName}
+                />
+              </div>
               <ul className="mt-4 flex flex-col gap-3">
                 {league.games.map((game) => (
                   <li key={game.gameId}>

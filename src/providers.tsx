@@ -5,6 +5,7 @@ import { WagmiProvider, type State } from "wagmi";
 import { AzuroSDKProvider } from "@azuro-org/sdk";
 import { useState, type ReactNode } from "react";
 import { BetslipProvider } from "@/components/Betslip";
+import { FavoritesProvider } from "@/components/FavoritesProvider";
 import { wagmiConfig } from "./wagmi";
 
 export function Providers({
@@ -29,7 +30,9 @@ export function Providers({
     <WagmiProvider config={wagmiConfig} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
         <AzuroSDKProvider initialChainId={137}>
-          <BetslipProvider>{children}</BetslipProvider>
+          <FavoritesProvider>
+            <BetslipProvider>{children}</BetslipProvider>
+          </FavoritesProvider>
         </AzuroSDKProvider>
       </QueryClientProvider>
     </WagmiProvider>
