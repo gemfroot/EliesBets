@@ -57,6 +57,8 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
+    // Hydrate from localStorage after mount (browser-only).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time read
     setSnapshot(parseFavorites(localStorage.getItem(FAVORITES_STORAGE_KEY)));
   }, []);
 
