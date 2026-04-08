@@ -12,15 +12,19 @@ function formatOdds(odds: number): string {
 export type MarketGroupProps = {
   title: string;
   markets: Market[];
+  /** Match title for receipts (e.g. Team A vs Team B). */
+  gameTitle: string;
   defaultOpen?: boolean;
 };
 
 function OutcomeButton({
   gameId,
+  gameTitle,
   outcome,
   conditionState,
 }: {
   gameId: string;
+  gameTitle: string;
   outcome: MarketOutcome;
   conditionState: ConditionState;
 }) {
@@ -39,6 +43,7 @@ function OutcomeButton({
       onClick={() =>
         addSelection({
           gameId,
+          gameTitle,
           outcomeName: outcome.selectionName,
           odds: oddsStr,
           outcomeId: outcome.outcomeId,
@@ -51,11 +56,13 @@ function OutcomeButton({
 
 function ConditionBlock({
   gameId,
+  gameTitle,
   label,
   outcomes,
   conditionState,
 }: {
   gameId: string;
+  gameTitle: string;
   label: ReactNode;
   outcomes: MarketOutcome[];
   conditionState: ConditionState;
@@ -78,6 +85,7 @@ function ConditionBlock({
           <OutcomeButton
             key={o.outcomeId}
             gameId={gameId}
+            gameTitle={gameTitle}
             outcome={o}
             conditionState={conditionState}
           />
@@ -94,6 +102,7 @@ function ConditionBlock({
 export function MarketGroup({
   title,
   markets,
+  gameTitle,
   defaultOpen = true,
 }: MarketGroupProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -131,6 +140,7 @@ export function MarketGroup({
                   <ConditionBlock
                     key={cond.conditionId}
                     gameId={gameId}
+                    gameTitle={gameTitle}
                     conditionState={cond.state}
                     label={
                       market.conditions.length > 1 && cond.margin ? (

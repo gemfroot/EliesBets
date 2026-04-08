@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBalanceQueryKey } from "wagmi/query";
 import { useChainId, useConnection } from "wagmi";
+import { useToast } from "@/components/Toast";
 
 export type CashoutButtonProps = {
   bet: Bet;
@@ -27,6 +28,7 @@ function isPendingBet(bet: Bet): boolean {
 
 export function CashoutButton({ bet }: CashoutButtonProps) {
   const { betToken } = useChain();
+  const { showToast } = useToast();
   const { address } = useConnection();
   const chainId = useChainId();
   const queryClient = useQueryClient();
@@ -66,6 +68,7 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
         setDialogOpen(false);
         setActionError(null);
         invalidateBalances();
+        showToast("Cash out successful.", "success");
       },
       onError: (err) => {
         pendingCashoutAfterApprove.current = false;
