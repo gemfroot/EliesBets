@@ -4,7 +4,7 @@ import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { GameCard, extractMainLineOdds } from "@/components/GameCard";
 import { RetryCallout } from "@/components/RetryCallout";
 import { CHAIN_ID } from "@/lib/constants";
-import { chunk, fetchGamesForSport } from "@/lib/sportGames";
+import { chunk, fetchGamesForSportCountry } from "@/lib/sportGames";
 
 export const dynamic = "force-dynamic";
 
@@ -79,8 +79,7 @@ export default async function SportCountryPage({ params }: Props) {
   let games: GameData[] = [];
   let loadError: string | null = null;
   try {
-    const all = await fetchGamesForSport(slug);
-    games = all.filter((g) => g.country.slug === countrySlug);
+    games = await fetchGamesForSportCountry(slug, countrySlug);
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Failed to load games.";
   }
