@@ -5,6 +5,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -41,10 +42,27 @@ type BetslipContextValue = {
 
 const BetslipContext = createContext<BetslipContextValue | null>(null);
 
+type BetslipMobileDrawerContextValue = {
+  open: boolean;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+};
+
+const BetslipMobileDrawerContext =
+  createContext<BetslipMobileDrawerContextValue | null>(null);
+
 export function useBetslip() {
   const ctx = useContext(BetslipContext);
   if (!ctx) {
     throw new Error("useBetslip must be used within BetslipProvider");
+  }
+  return ctx;
+}
+
+export function useBetslipMobileDrawer() {
+  const ctx = useContext(BetslipMobileDrawerContext);
+  if (!ctx) {
+    throw new Error("useBetslipMobileDrawer must be used within BetslipProvider");
   }
   return ctx;
 }
@@ -62,6 +80,9 @@ export function selectionId(
 
 export function BetslipProvider({ children }: { children: ReactNode }) {
   const [selections, setSelections] = useState<BetslipSelection[]>([]);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const openDrawer = useCallback(() => setMobileDrawerOpen(true), []);
+  const closeDrawer = useCallback(() => setMobileDrawerOpen(false), []);
 
   const addSelection = useCallback(
     (item: {
@@ -103,8 +124,97 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
     [selections, addSelection, removeSelection, clearSelections],
   );
 
+  const mobileDrawer = useMemo(
+    () => ({
+      open: mobileDrawerOpen,
+      openDrawer,
+      closeDrawer,
+    }),
+    [mobileDrawerOpen, openDrawer, closeDrawer],
+  );
+
   return (
-    <BetslipContext.Provider value={value}>{children}</BetslipContext.Provider>
+    <BetslipContext.Provider value={value}>
+      <BetslipMobileDrawerContext.Provider value={mobileDrawer}>
+        {children}
+        <MobileBetslipDrawer />
+      </BetslipMobileDrawerContext.Provider>
+    </BetslipContext.Provider>
+  );
+}
+
+function MobileBetslipDrawer() {
+  const { open, closeDrawer } = useBetslipMobileDrawer();
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        closeDrawer();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, closeDrawer]);
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 md:hidden ${
+        open ? "pointer-events-auto" : "pointer-events-none"
+      }`}
+      role="presentation"
+    >
+      <button
+        type="button"
+        className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+          open ? "opacity-100" : "opacity-0"
+        }`}
+        aria-label="Close betslip"
+        aria-hidden={!open}
+        tabIndex={open ? 0 : -1}
+        onClick={closeDrawer}
+      />
+      <div
+        className={`betslip-slide-panel absolute bottom-0 right-0 top-[max(0.5rem,env(safe-area-inset-top))] flex w-full max-w-md flex-col border-l border-t border-zinc-700 bg-zinc-900 shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Betslip"
+        aria-hidden={!open}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-4 py-3">
+          <p className="text-sm font-semibold text-zinc-100">Betslip</p>
+          <button
+            type="button"
+            onClick={closeDrawer}
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
+            aria-label="Close"
+          >
+            <span className="text-xl leading-none" aria-hidden>
+              ×
+            </span>
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-2">
+          <BetslipPanel />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -418,7 +528,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
         type="button"
         disabled={!canSubmit}
         onClick={() => void submit()}
-        className="min-h-11 rounded-md bg-amber-600 px-3 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0 md:py-2"
+        className="min-h-11 rounded-md bg-amber-600 px-3 py-2.5 text-sm font-semibold text-zinc-950 transition-[background-color,transform,opacity] duration-200 ease-out hover:scale-[1.02] hover:bg-amber-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100 md:min-h-0 md:py-2"
       >
         {isBusy ? "Working…" : placeBetLabel}
       </button>

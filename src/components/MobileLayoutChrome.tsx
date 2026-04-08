@@ -2,30 +2,15 @@
 
 import Link from "next/link";
 import { useSports } from "@azuro-org/sdk";
-import { useCallback, useEffect, useState } from "react";
-import { BetslipPanel } from "@/components/Betslip";
+import { useBetslipMobileDrawer } from "@/components/Betslip";
 import { sportEmoji } from "@/lib/sportEmoji";
 
 export function MobileLayoutChrome() {
-  const [betslipOpen, setBetslipOpen] = useState(false);
-
-  const onClose = useCallback(() => setBetslipOpen(false), []);
-
-  useEffect(() => {
-    if (!betslipOpen) {
-      return;
-    }
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [betslipOpen]);
+  const { openDrawer } = useBetslipMobileDrawer();
 
   return (
     <>
-      <MobileBottomNav onOpenBetslip={() => setBetslipOpen(true)} />
-      <BetslipSlideUp open={betslipOpen} onClose={onClose} />
+      <MobileBottomNav onOpenBetslip={openDrawer} />
     </>
   );
 }
@@ -105,62 +90,5 @@ function MobileBottomNav({
         </button>
       </div>
     </nav>
-  );
-}
-
-function BetslipSlideUp({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) {
-    return null;
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Betslip">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/60"
-        aria-label="Close betslip"
-        onClick={onClose}
-      />
-      <div
-        className="absolute inset-x-0 bottom-0 top-[max(0.5rem,env(safe-area-inset-top))] flex max-h-[100dvh] flex-col rounded-t-2xl border border-zinc-700 border-b-0 bg-zinc-900 shadow-2xl"
-        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-      >
-        <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-4 py-3">
-          <p className="text-sm font-semibold text-zinc-100">Betslip</p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
-            aria-label="Close"
-          >
-            <span className="text-xl leading-none" aria-hidden>
-              ×
-            </span>
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-2">
-          <BetslipPanel />
-        </div>
-      </div>
-    </div>
   );
 }

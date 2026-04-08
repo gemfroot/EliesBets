@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  experimental: {
+    /** Enables React view transitions for Link navigation (see Next.js docs). */
+    viewTransition: true,
+  },
 };
 
 export default nextConfig;
