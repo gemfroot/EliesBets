@@ -5,8 +5,7 @@ import {
   getGamesByFilters,
   type GameData,
 } from "@azuro-org/toolkit";
-
-export const CHAIN_ID = 137 as const;
+import { CHAIN_ID } from "@/lib/constants";
 export const GAMES_PER_PAGE = 100;
 
 export function chunk<T>(items: T[], size: number): T[][] {

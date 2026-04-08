@@ -9,10 +9,9 @@ import {
   type Market,
 } from "@azuro-org/toolkit";
 import { GameDetailMarkets } from "@/components/GameDetailMarkets";
+import { CHAIN_ID } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
-
-const CHAIN_ID = 137 as const;
 
 type Props = {
   params: Promise<{ id: string }>;

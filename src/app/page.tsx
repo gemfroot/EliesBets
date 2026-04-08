@@ -11,7 +11,8 @@ import {
 import { GameCard, extractMainLineOdds } from "@/components/GameCard";
 import { LiveGameCard } from "@/components/LiveGameCard";
 import { RetryCallout } from "@/components/RetryCallout";
-import { CHAIN_ID, chunk } from "@/lib/sportGames";
+import { CHAIN_ID } from "@/lib/constants";
+import { chunk } from "@/lib/sportGames";
 import { sportEmoji } from "@/lib/sportEmoji";
 
 export const dynamic = "force-dynamic";
