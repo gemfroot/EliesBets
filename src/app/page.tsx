@@ -154,17 +154,14 @@ export default async function Home() {
   }
 
   return (
-    <div className="p-6 sm:p-8">
-      <section aria-labelledby="home-hero-heading" className="mb-10">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="page-shell">
+      <section aria-labelledby="home-hero-heading" className="mb-8">
+        <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h1
-              id="home-hero-heading"
-              className="text-2xl font-semibold tracking-tight text-zinc-50"
-            >
+            <h1 id="home-hero-heading" className="type-display">
               Live action
             </h1>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="type-muted mt-1">
               Top in-play fixtures with updating odds.
             </p>
           </div>
@@ -191,7 +188,7 @@ export default async function Home() {
             </p>
           </div>
         ) : (
-          <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {heroGames.map((game) => (
               <li key={game.gameId}>
                 <LiveGameCard game={game} />
@@ -201,8 +198,8 @@ export default async function Home() {
         )}
       </section>
 
-      {sportsError ? (
-        <div className="mb-10">
+        {sportsError ? (
+        <div className="mb-8">
           <RetryCallout
             title="Could not load sports"
             description={sportsError}
@@ -210,12 +207,10 @@ export default async function Home() {
         </div>
       ) : sportLinks.length > 0 ? (
         <nav
-          className="mb-10"
+          className="mb-8"
           aria-label="Sports"
         >
-          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Sports
-          </p>
+          <p className="type-overline">Sports</p>
           <ul className="mt-3 flex flex-wrap gap-2">
             {sportLinks.map((s) => (
               <li key={s.slug}>
@@ -236,14 +231,11 @@ export default async function Home() {
         </nav>
       ) : null}
 
-      <section aria-labelledby="popular-heading" className="mb-10">
-        <h2
-          id="popular-heading"
-          className="text-lg font-semibold text-zinc-50"
-        >
+      <section aria-labelledby="popular-heading" className="mb-8">
+        <h2 id="popular-heading" className="type-title">
           Popular
         </h2>
-        <p className="mt-0.5 text-sm text-zinc-500">
+        <p className="type-muted mt-0.5">
           High-volume markets by turnover.
         </p>
         {popularError ? (
@@ -261,7 +253,7 @@ export default async function Home() {
             </p>
           </div>
         ) : (
-          <ul className="mt-6 flex flex-col gap-3">
+          <ul className="mt-6 flex flex-col gap-2">
             {popularGames.map((game) => (
               <li key={game.gameId}>
                 <GameCard
@@ -275,13 +267,10 @@ export default async function Home() {
       </section>
 
       <section aria-labelledby="upcoming-heading">
-        <h2
-          id="upcoming-heading"
-          className="text-lg font-semibold text-zinc-50"
-        >
+        <h2 id="upcoming-heading" className="type-title">
           Starting soon
         </h2>
-        <p className="mt-0.5 text-sm text-zinc-500">
+        <p className="type-muted mt-0.5">
           Next upcoming fixtures.
         </p>
         {upcomingError ? (
@@ -299,7 +288,7 @@ export default async function Home() {
             </p>
           </div>
         ) : (
-          <ul className="mt-6 flex flex-col gap-3">
+          <ul className="mt-6 flex flex-col gap-2">
             {upcomingGames.map((game) => (
               <li key={game.gameId}>
                 <GameCard

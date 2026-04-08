@@ -40,7 +40,7 @@ export function GameDetailMarkets({
   }
 
   return (
-    <div className="mt-8 flex flex-col gap-3">
+    <div className="mt-8 flex flex-col gap-2">
       {sections.map((section) => (
         <MarketGroup
           key={`${section.title}|${section.markets.map((m) => m.marketKey).join("|")}`}

@@ -15,7 +15,7 @@ export default function RouteSegmentError({
   }, [error]);
 
   return (
-    <div className="p-4 sm:p-6 md:p-8">
+    <div className="page-shell">
       <RetryCallout
         title="Something went wrong"
         description="This page could not be displayed. You can try again, or go back and return later."

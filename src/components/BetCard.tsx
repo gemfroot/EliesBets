@@ -96,7 +96,7 @@ export function BetCard({ bet }: BetCardProps) {
         </span>
       </div>
 
-      <ul className="mt-3 flex flex-col gap-3">
+      <ul className="mt-3 flex flex-col gap-2">
         {bet.outcomes.map((o) => {
           const g = o.game;
           const title = g ? participantLine(g) : "Game unavailable";
@@ -123,7 +123,7 @@ export function BetCard({ bet }: BetCardProps) {
               <p className="mt-1 text-zinc-200">{o.selectionName}</p>
               <p className="text-xs text-zinc-500">{o.marketName}</p>
               {isCombo ? (
-                <p className="mt-0.5 text-xs tabular-nums text-zinc-400">
+                <p className="mt-0.5 font-mono text-xs tabular-nums text-zinc-400">
                   @{o.odds.toFixed(2)}
                 </p>
               ) : null}
@@ -135,25 +135,25 @@ export function BetCard({ bet }: BetCardProps) {
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-zinc-800/80 pt-3 text-sm sm:grid-cols-4">
         <div>
           <dt className="text-xs text-zinc-500">Odds</dt>
-          <dd className="font-semibold tabular-nums text-zinc-100">
+          <dd className="type-odds text-zinc-100">
             {oddsDisplay}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-zinc-500">Stake ({betToken.symbol})</dt>
-          <dd className="font-semibold tabular-nums text-zinc-100">
+          <dd className="font-mono font-semibold tabular-nums text-zinc-100">
             {stakeDisplay}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-zinc-500">Potential payout</dt>
-          <dd className="font-semibold tabular-nums text-zinc-100">
+          <dd className="font-mono font-semibold tabular-nums text-zinc-100">
             {possibleWinDisplay}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-zinc-500">Payout</dt>
-          <dd className="font-semibold tabular-nums text-zinc-100">
+          <dd className="font-mono font-semibold tabular-nums text-zinc-100">
             {payoutDisplay}
           </dd>
         </div>

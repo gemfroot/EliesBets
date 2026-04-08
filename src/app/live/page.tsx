@@ -42,9 +42,9 @@ export default async function LivePage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 md:p-8">
-      <h1 className="text-2xl font-semibold text-zinc-50">Live games</h1>
-      <p className="mt-1 text-sm text-zinc-500">
+    <div className="page-shell">
+      <h1 className="type-display">Live games</h1>
+      <p className="type-muted mt-1">
         In-play fixtures with updating odds.
       </p>
       <LiveGamesList games={games} loadError={loadError} />

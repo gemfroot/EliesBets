@@ -3,6 +3,10 @@
 :root {
   --background: #09090b;
   --foreground: #fafafa;
+  /* 8px base — Tailwind spacing scale (1 = 0.25rem = 4px at default root font size) */
+  --space-page: 1rem; /* 16px */
+  --space-page-sm: 1.5rem; /* 24px */
+  --space-page-lg: 2rem; /* 32px */
 }
 
 @theme inline {
@@ -16,6 +20,46 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9375rem; /* 15px — body between sm (14) and base (16) */
+  line-height: 1.5;
+}
+
+@layer components {
+  .page-shell {
+    padding: var(--space-page);
+  }
+  @media (min-width: 640px) {
+    .page-shell {
+      padding: var(--space-page-sm);
+    }
+  }
+  @media (min-width: 768px) {
+    .page-shell {
+      padding: var(--space-page-lg);
+    }
+  }
+
+  .type-display {
+    @apply text-2xl font-semibold tracking-tight text-zinc-50;
+  }
+  .type-title {
+    @apply text-lg font-semibold text-zinc-50;
+  }
+  .type-body {
+    @apply text-sm leading-normal text-zinc-200;
+  }
+  .type-muted {
+    @apply text-sm text-zinc-500;
+  }
+  .type-caption {
+    @apply text-xs text-zinc-500;
+  }
+  .type-overline {
+    @apply text-xs font-semibold uppercase tracking-wider text-zinc-500;
+  }
+  .type-odds {
+    @apply font-mono text-sm font-semibold tabular-nums;
+  }
 }
 
 /* Smooth client navigations when view transitions are active */

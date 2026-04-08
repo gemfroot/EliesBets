@@ -59,7 +59,7 @@ export function LiveGamesList({
   const byLeague = groupGamesByLeague(games);
 
   return (
-    <div className="mt-8 flex flex-col gap-10">
+    <div className="mt-8 flex flex-col gap-8">
       {byLeague.map((league) => (
         <section
           key={league.leagueKey}
@@ -68,7 +68,7 @@ export function LiveGamesList({
           <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-2">
             <h2
               id={`live-league-${league.leagueKey}`}
-              className="text-sm font-semibold uppercase tracking-wider text-zinc-400"
+              className="type-overline text-zinc-400"
             >
               {league.leagueName}
             </h2>
@@ -81,7 +81,7 @@ export function LiveGamesList({
               />
             ) : null}
           </div>
-          <ul className="mt-4 flex flex-col gap-3">
+          <ul className="mt-4 flex flex-col gap-2">
             {league.games.map((game) => (
               <li key={game.gameId}>
                 <LiveGameCard game={game} />

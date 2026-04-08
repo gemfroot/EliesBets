@@ -77,11 +77,9 @@ export default function BetsPage() {
   const visibleBets = useMemo(() => filterBets(allBets, tab), [allBets, tab]);
 
   return (
-    <div className="p-4 md:p-6">
-      <h1 className="text-xl font-semibold tracking-tight text-zinc-50">
-        My bets
-      </h1>
-      <p className="mt-1 text-sm text-zinc-500">
+    <div className="page-shell">
+      <h1 className="type-display text-xl">My bets</h1>
+      <p className="type-muted mt-1">
         Bets placed with your connected wallet on the app chain.
       </p>
 

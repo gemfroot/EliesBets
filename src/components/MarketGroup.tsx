@@ -138,7 +138,7 @@ export function MarketGroup({
                   {market.name}
                 </h3>
               )}
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 {market.conditions.map((cond) => (
                   <ConditionBlock
                     key={cond.conditionId}

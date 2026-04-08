@@ -98,16 +98,16 @@ export default async function SportCountryPage({ params }: Props) {
   const byLeague = groupGamesByLeague(games);
 
   return (
-    <div className="p-4 sm:p-6 md:p-8">
-      <p className="text-sm text-zinc-500">
+    <div className="page-shell">
+      <p className="type-muted">
         <Link href={`/sports/${slug}`} className="hover:text-zinc-300">
           {sportTitle}
         </Link>
         <span className="text-zinc-600"> · </span>
         <span className="text-zinc-400">{countryName}</span>
       </p>
-      <h1 className="mt-2 text-2xl font-semibold text-zinc-50">{countryName}</h1>
-      <p className="mt-1 text-sm text-zinc-500">
+      <h1 className="type-display mt-2">{countryName}</h1>
+      <p className="type-muted mt-1">
         {sportTitle} · {countrySlug}
       </p>
 
@@ -126,13 +126,13 @@ export default async function SportCountryPage({ params }: Props) {
           </p>
         </div>
       ) : (
-        <div className="mt-8 flex flex-col gap-10">
+        <div className="mt-8 flex flex-col gap-8">
           {byLeague.map((league) => (
             <section key={league.leagueKey} aria-labelledby={`league-${league.leagueKey}`}>
               <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-2">
                 <h2
                   id={`league-${league.leagueKey}`}
-                  className="text-sm font-semibold uppercase tracking-wider text-zinc-400"
+                  className="type-overline text-zinc-400"
                 >
                   <Link
                     href={`/sports/${slug}/${countrySlug}/${league.leagueKey}`}
@@ -148,7 +148,7 @@ export default async function SportCountryPage({ params }: Props) {
                   title={league.leagueName}
                 />
               </div>
-              <ul className="mt-4 flex flex-col gap-3">
+              <ul className="mt-4 flex flex-col gap-2">
                 {league.games.map((game) => (
                   <li key={game.gameId}>
                     <GameCard
