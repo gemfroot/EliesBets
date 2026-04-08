@@ -95,7 +95,7 @@ export function LiveGameGridSkeleton({ count = 6 }: { count?: number }) {
   );
 }
 
-function SectionHeadingSkeleton() {
+export function SectionHeadingSkeleton() {
   return (
     <div className="space-y-2">
       <Skeleton className="h-7 w-48" />

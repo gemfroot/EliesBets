@@ -1,9 +1,59 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode, SVGProps } from "react";
 import { useSports } from "@azuro-org/sdk";
 import { useBetslipMobileDrawer } from "@/components/Betslip";
-import { sportEmoji } from "@/lib/sportEmoji";
+import { SportNavIcon } from "@/lib/sportNavIcon";
+
+function NavGlyph({
+  children,
+  className = "h-[1.125rem] w-[1.125rem] text-zinc-400",
+  ...rest
+}: SVGProps<SVGSVGElement> & { children: ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className={className}
+      {...rest}
+    >
+      {children}
+    </svg>
+  );
+}
+
+function HomeIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <NavGlyph {...props}>
+      <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z" />
+    </NavGlyph>
+  );
+}
+
+function LiveIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <NavGlyph {...props}>
+      <circle cx="12" cy="12" r="3" fill="currentColor" />
+      <path d="M12 5v2M12 17v2M5 12h2M17 12h2M7.05 7.05l1.41 1.41M15.54 15.54l1.41 1.41M7.05 16.95l1.41-1.41M15.54 8.46l1.41-1.41" />
+    </NavGlyph>
+  );
+}
+
+function SlipIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <NavGlyph {...props}>
+      <path d="M4 9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1H4V9Z" />
+      <path d="M4 11v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <path d="M9 14h6" />
+    </NavGlyph>
+  );
+}
 
 export function MobileLayoutChrome() {
   const { openDrawer } = useBetslipMobileDrawer();
@@ -37,18 +87,14 @@ function MobileBottomNav({
           href="/"
           className="flex min-h-[44px] min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 px-2 text-[10px] font-medium text-zinc-400 transition hover:text-zinc-100"
         >
-          <span className="text-lg leading-none" aria-hidden>
-            🏠
-          </span>
+          <HomeIcon className="h-[1.125rem] w-[1.125rem]" />
           Home
         </Link>
         <Link
           href="/live"
           className="flex min-h-[44px] min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 px-2 text-[10px] font-medium text-zinc-400 transition hover:text-zinc-100"
         >
-          <span className="text-lg leading-none" aria-hidden>
-            🔴
-          </span>
+          <LiveIcon className="h-[1.125rem] w-[1.125rem] text-red-400/90" />
           Live
         </Link>
 
@@ -66,11 +112,11 @@ function MobileBottomNav({
                 <li key={sport.id}>
                   <Link
                     href={`/sports/${sport.slug}`}
-                    className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg text-lg transition hover:bg-zinc-900"
+                    className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg transition hover:bg-zinc-900"
                     title={sport.name}
                     aria-label={sport.name}
                   >
-                    <span aria-hidden>{sportEmoji(sport.slug)}</span>
+                    <SportNavIcon slug={sport.slug} />
                   </Link>
                 </li>
               ))}
@@ -83,9 +129,7 @@ function MobileBottomNav({
           onClick={onOpenBetslip}
           className="flex min-h-[44px] min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 border-l border-zinc-800 px-3 text-[10px] font-medium text-zinc-300 transition hover:bg-zinc-900 hover:text-zinc-50"
         >
-          <span className="text-lg leading-none" aria-hidden>
-            🎫
-          </span>
+          <SlipIcon className="h-[1.125rem] w-[1.125rem]" />
           Slip
         </button>
       </div>
