@@ -8,13 +8,12 @@ import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } 
 import { polygonAmoy } from "viem/chains";
 import { CoinFlipAnimation, type CoinFlipPhase } from "@/components/CoinFlipAnimation";
 import { useCoinToss } from "@/lib/casino/hooks";
-import type { RollResult } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS } from "@/lib/casino/addresses";
 
 type GamePhase = CoinFlipPhase;
 
 const STAKE_PRESET_ETH = ["0.01", "0.05", "0.1", "0.5", "1"] as const;
-const RECENT_RESULTS_CAP = 12;
+const BET_HISTORY_DISPLAY_CAP = 12;
 
 const PHASE_LABEL: Record<GamePhase, string> = {
   idle: "Ready",
@@ -56,6 +55,9 @@ export function CoinTossGame() {
     error,
     reset,
     lastRoll,
+    betHistory,
+    betHistoryLoading,
+    betHistoryError,
   } = useCoinToss();
 
   const [betHeads, setBetHeads] = useState(true);
@@ -65,10 +67,8 @@ export function CoinTossGame() {
   const [frozenBetHeads, setFrozenBetHeads] = useState(true);
   const [outcome, setOutcome] = useState<"heads" | "tails" | null>(null);
   const [payoutWei, setPayoutWei] = useState<bigint | null>(null);
-  const [recentResults, setRecentResults] = useState<("heads" | "tails")[]>([]);
   const [waitingVrf, setWaitingVrf] = useState(false);
   const rollSnapshotRef = useRef<number>(0);
-  const lastRecordedResultTs = useRef<number>(0);
 
   const isSupportedChain = (CASINO_CHAIN_IDS as readonly number[]).includes(chainId);
 
@@ -153,14 +153,6 @@ export function CoinTossGame() {
     setWaitingVrf(false);
     setPhase("result");
   }, [waitingVrf, lastRoll]);
-
-  // Record result in recent list
-  useEffect(() => {
-    if (phase !== "result" || outcome == null) return;
-    if (lastRoll && lastRoll.timestamp === lastRecordedResultTs.current) return;
-    lastRecordedResultTs.current = lastRoll?.timestamp ?? Date.now();
-    setRecentResults((prev) => [outcome, ...prev].slice(0, RECENT_RESULTS_CAP));
-  }, [phase, outcome, lastRoll]);
 
   const canSubmit =
     isConnected &&
@@ -392,26 +384,49 @@ export function CoinTossGame() {
                   ) : null}
                 </div>
 
-                {recentResults.length > 0 ? (
+                {isConnected && isSupportedChain ? (
                   <div>
-                    <p className="type-overline mb-2">Recent results</p>
-                    <ul
-                      className="flex flex-wrap gap-1.5"
-                      aria-label="Recent coin toss outcomes"
-                    >
-                      {recentResults.map((r, i) => (
-                        <li
-                          key={`${r}-${i}`}
-                          className={`flex h-9 min-w-[2.25rem] items-center justify-center rounded-md border font-mono text-xs uppercase ${
-                            r === "heads"
-                              ? "border-emerald-700/60 bg-emerald-950/40 text-emerald-300"
-                              : "border-red-700/60 bg-red-950/40 text-red-300"
-                          }`}
-                        >
-                          {r === "heads" ? "H" : "T"}
-                        </li>
-                      ))}
-                    </ul>
+                    <p className="type-overline mb-2">Bet history</p>
+                    {betHistoryError ? (
+                      <p className="type-caption text-amber-300" role="alert">
+                        Could not load full history from the network. New bets still appear here
+                        after they settle.
+                      </p>
+                    ) : null}
+                    {betHistoryLoading && betHistory.length === 0 ? (
+                      <p className="type-caption text-zinc-500">Loading history…</p>
+                    ) : betHistory.length === 0 ? (
+                      <p className="type-caption text-zinc-500">
+                        Your settled bets will show here (synced from chain).
+                      </p>
+                    ) : (
+                      <ul
+                        className="space-y-2"
+                        aria-label="Coin toss bet history"
+                      >
+                        {betHistory.slice(0, BET_HISTORY_DISPLAY_CAP).map((row) => {
+                          const landedHeads = row.rolled[0] === true;
+                          return (
+                            <li
+                              key={row.id.toString()}
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm"
+                            >
+                              <span
+                                className={`font-mono text-xs font-semibold uppercase ${
+                                  landedHeads ? "text-emerald-300" : "text-red-300"
+                                }`}
+                              >
+                                {landedHeads ? "Heads" : "Tails"}
+                              </span>
+                              <span className="font-mono text-xs text-zinc-400">
+                                Bet {formatEther(row.totalBetAmount)} · Payout{" "}
+                                {formatEther(row.payout)}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </div>
                 ) : null}
 
