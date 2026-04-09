@@ -7,7 +7,10 @@ import {
   type ButtonHTMLAttributes,
   type ReactNode,
 } from "react";
-import { selectionId, useBetslip } from "@/components/Betslip";
+import {
+  selectionId,
+  useBetslipSelectionSelected,
+} from "@/components/Betslip";
 import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { formatOddsValue } from "@/lib/oddsFormat";
 
@@ -41,15 +44,13 @@ export function OddsButton({
   type = "button",
   ...rest
 }: OddsButtonProps) {
-  const { selections } = useBetslip();
   const { format: oddsFormat } = useOddsFormat();
   const oddsText = formatOddsValue(odds, oddsFormat);
   const unavailable =
     disabledProp || !Number.isFinite(odds) || odds <= 0 || oddsText === "—";
 
-  const selected = selections.some(
-    (s) => s.id === selectionId(gameId, outcomeName, outcomeId),
-  );
+  const selectionKey = selectionId(gameId, outcomeName, outcomeId);
+  const selected = useBetslipSelectionSelected(selectionKey);
 
   const prevOddsRef = useRef<number | null>(null);
   const [flash, setFlash] = useState<"up" | "down" | null>(null);

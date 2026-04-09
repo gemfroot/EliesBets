@@ -14,6 +14,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { useAccount, useReadContract } from "wagmi";
@@ -34,8 +35,7 @@ export type BetslipSelection = {
   outcomeId: string;
 };
 
-type BetslipContextValue = {
-  selections: BetslipSelection[];
+type BetslipActionsValue = {
   addSelection: (item: {
     gameId: string;
     gameTitle: string;
@@ -49,7 +49,54 @@ type BetslipContextValue = {
   removeSelection: (id: string) => void;
 };
 
-const BetslipContext = createContext<BetslipContextValue | null>(null);
+type BetslipSelectionsValue = {
+  selections: BetslipSelection[];
+};
+
+const BetslipActionsContext = createContext<BetslipActionsValue | null>(null);
+const BetslipSelectionsContext = createContext<BetslipSelectionsValue | null>(
+  null,
+);
+
+/** Set of `selectionId` values currently on the slip; updated by `BetslipProvider`. */
+let betslipSelectionIdSnapshot: ReadonlySet<string> = new Set();
+const betslipSelectionIdListeners = new Map<string, Set<() => void>>();
+
+function subscribeBetslipSelectionId(id: string, onChange: () => void) {
+  let set = betslipSelectionIdListeners.get(id);
+  if (!set) {
+    set = new Set();
+    betslipSelectionIdListeners.set(id, set);
+  }
+  set.add(onChange);
+  return () => {
+    set!.delete(onChange);
+    if (set!.size === 0) {
+      betslipSelectionIdListeners.delete(id);
+    }
+  };
+}
+
+function setBetslipSelectionIdSnapshot(next: ReadonlySet<string>) {
+  const prev = betslipSelectionIdSnapshot;
+  betslipSelectionIdSnapshot = next;
+  const changed = new Set<string>();
+  for (const id of prev) {
+    if (!next.has(id)) {
+      changed.add(id);
+    }
+  }
+  for (const id of next) {
+    if (!prev.has(id)) {
+      changed.add(id);
+    }
+  }
+  for (const id of changed) {
+    betslipSelectionIdListeners.get(id)?.forEach((cb) => {
+      cb();
+    });
+  }
+}
 
 type BetslipMobileDrawerContextValue = {
   open: boolean;
@@ -60,12 +107,32 @@ type BetslipMobileDrawerContextValue = {
 const BetslipMobileDrawerContext =
   createContext<BetslipMobileDrawerContextValue | null>(null);
 
-export function useBetslip() {
-  const ctx = useContext(BetslipContext);
+export function useBetslipActions() {
+  const ctx = useContext(BetslipActionsContext);
   if (!ctx) {
-    throw new Error("useBetslip must be used within BetslipProvider");
+    throw new Error("useBetslipActions must be used within BetslipProvider");
   }
   return ctx;
+}
+
+export function useBetslipSelections() {
+  const ctx = useContext(BetslipSelectionsContext);
+  if (!ctx) {
+    throw new Error("useBetslipSelections must be used within BetslipProvider");
+  }
+  return ctx;
+}
+
+/**
+ * Subscribes only to whether this selection id is on the slip, so adding/removing
+ * elsewhere does not re-render unrelated odds buttons.
+ */
+export function useBetslipSelectionSelected(selectionKey: string): boolean {
+  return useSyncExternalStore(
+    (onStoreChange) => subscribeBetslipSelectionId(selectionKey, onStoreChange),
+    () => betslipSelectionIdSnapshot.has(selectionKey),
+    () => false,
+  );
 }
 
 export function useBetslipMobileDrawer() {
@@ -101,6 +168,9 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
       ),
     [items],
   );
+
+  // Keep module store in sync before descendants render (for `useBetslipSelectionSelected`).
+  setBetslipSelectionIdSnapshot(validSelectionIds);
 
   const metaByIdSynced = useMemo(() => {
     const next: Record<string, BetslipSelection> = {};
@@ -184,10 +254,12 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
     setMetaById({});
   }, [clear]);
 
-  const value = useMemo(
-    () => ({ selections, addSelection, removeSelection, clearSelections }),
-    [selections, addSelection, removeSelection, clearSelections],
+  const actionsValue = useMemo(
+    () => ({ addSelection, removeSelection, clearSelections }),
+    [addSelection, removeSelection, clearSelections],
   );
+
+  const selectionsValue = useMemo(() => ({ selections }), [selections]);
 
   const mobileDrawer = useMemo(
     () => ({
@@ -199,12 +271,14 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <BetslipContext.Provider value={value}>
-      <BetslipMobileDrawerContext.Provider value={mobileDrawer}>
-        {children}
-        <MobileBetslipDrawer />
-      </BetslipMobileDrawerContext.Provider>
-    </BetslipContext.Provider>
+    <BetslipSelectionsContext.Provider value={selectionsValue}>
+      <BetslipActionsContext.Provider value={actionsValue}>
+        <BetslipMobileDrawerContext.Provider value={mobileDrawer}>
+          {children}
+          <MobileBetslipDrawer />
+        </BetslipMobileDrawerContext.Provider>
+      </BetslipActionsContext.Provider>
+    </BetslipSelectionsContext.Provider>
   );
 }
 
@@ -333,7 +407,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     isBetCalculationFetching,
   } = useDetailedBetslip();
   const { showToast } = useToast();
-  const { clearSelections } = useBetslip();
+  const { clearSelections } = useBetslipActions();
   const { address, isConnected } = useAccount();
   const { data: tokenBalanceRaw } = useReadContract({
     address: betToken.address,
@@ -692,7 +766,8 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
 
 export function BetslipPanel() {
   const { format: oddsFormat } = useOddsFormat();
-  const { selections, removeSelection } = useBetslip();
+  const { selections } = useBetslipSelections();
+  const { removeSelection } = useBetslipActions();
 
   return (
     <>
