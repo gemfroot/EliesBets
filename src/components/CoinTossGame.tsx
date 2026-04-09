@@ -41,6 +41,7 @@ export function CoinTossGame() {
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [frozenBetHeads, setFrozenBetHeads] = useState(true);
   const [outcome, setOutcome] = useState<"heads" | "tails" | null>(null);
+  const [payoutWei, setPayoutWei] = useState<bigint | null>(null);
   const [recentResults, setRecentResults] = useState<("heads" | "tails")[]>([]);
   const lastRecordedResultTx = useRef<`0x${string}` | undefined>(undefined);
 
@@ -109,18 +110,21 @@ export function CoinTossGame() {
       });
       const last = logs[logs.length - 1];
       if (last && "args" in last && last.args && typeof last.args === "object") {
-        const args = last.args as { rolled?: boolean[] };
+        const args = last.args as { rolled?: boolean[]; payout?: bigint };
         const landedHeads = args.rolled?.[0] === true;
         if (typeof landedHeads === "boolean") {
           setOutcome(landedHeads ? "heads" : "tails");
         } else {
           setOutcome(null);
         }
+        setPayoutWei(typeof args.payout === "bigint" ? args.payout : null);
       } else {
         setOutcome(null);
+        setPayoutWei(null);
       }
     } catch {
       setOutcome(null);
+      setPayoutWei(null);
     }
     setPhase("result");
   }, [phase, receipt, receiptLoading, txHash]);
@@ -149,6 +153,7 @@ export function CoinTossGame() {
       if (!canSubmit) return;
       reset?.();
       setOutcome(null);
+      setPayoutWei(null);
       setFrozenBetHeads(betHeads);
       setPhase("flipping");
       setTxHash(undefined);
@@ -167,6 +172,7 @@ export function CoinTossGame() {
     reset?.();
     setTxHash(undefined);
     setOutcome(null);
+    setPayoutWei(null);
     if (parsedAmount.ok && parsedAmount.wei > BigInt(0)) {
       setPhase("picking");
     } else {
@@ -205,6 +211,7 @@ export function CoinTossGame() {
               phase={phase}
               outcome={outcome}
               betHeads={frozenBetHeads}
+              payoutWei={payoutWei}
               className="w-full"
             />
           </div>
