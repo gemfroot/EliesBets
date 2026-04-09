@@ -1,33 +1,10 @@
 import type { Abi } from "viem";
+import { coinTossAbi as betSwirlCoinTossAbi } from "@betswirl/sdk-core";
 
 /**
- * Coin toss game ABI — keep in sync with the deployed CoinToss contract.
- * Regenerate from `artifacts/contracts/CoinToss.sol/CoinToss.json` (or equivalent) after deploy.
+ * BetSwirl Coin Toss game ABI.
+ * Sourced from `@betswirl/sdk-core` — keep the dependency version aligned with protocol updates.
  */
-export const coinTossAbi = [
-  {
-    type: "event",
-    name: "Played",
-    inputs: [
-      { name: "player", type: "address", indexed: true },
-      { name: "betHeads", type: "bool", indexed: false },
-      { name: "won", type: "bool", indexed: false },
-    ],
-  },
-  {
-    type: "function",
-    name: "play",
-    stateMutability: "payable",
-    inputs: [{ name: "betHeads", type: "bool", internalType: "bool" }],
-    outputs: [{ name: "won", type: "bool", internalType: "bool" }],
-  },
-  {
-    type: "function",
-    name: "minBet",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
-  },
-] as const satisfies Abi;
+export const coinTossAbi = betSwirlCoinTossAbi as unknown as Abi;
 
-export type CoinTossAbi = typeof coinTossAbi;
+export type CoinTossAbi = typeof betSwirlCoinTossAbi;

@@ -6,14 +6,14 @@ import { formatEther, parseEther, parseEventLogs } from "viem";
 import { useConnection, useWaitForTransactionReceipt } from "wagmi";
 import { CoinFlipAnimation, type CoinFlipPhase } from "@/components/CoinFlipAnimation";
 import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
-import { useCoinTossMinBet, useCoinTossPlay } from "@/lib/casino/hooks";
+import { useCoinTossMinBet, useCoinTossWager } from "@/lib/casino/hooks";
 
 type GamePhase = CoinFlipPhase;
 
 export function CoinTossGame() {
   const { isConnected } = useConnection();
   const { data: minBet, isPending: minBetLoading } = useCoinTossMinBet();
-  const { play, canPlay, isPending, error, reset } = useCoinTossPlay();
+  const { placeWager, canWager, isPending, error, reset } = useCoinTossWager();
 
   const [betHeads, setBetHeads] = useState(true);
   const [amount, setAmount] = useState("");
@@ -75,15 +75,14 @@ export function CoinTossGame() {
     try {
       const logs = parseEventLogs({
         abi: coinTossAbi,
-        eventName: "Played",
+        eventName: "Roll",
         logs: receipt.logs,
       });
       const last = logs[logs.length - 1];
       if (last && "args" in last && last.args && typeof last.args === "object") {
-        const args = last.args as { won?: boolean };
-        if (typeof args.won === "boolean") {
-          const won = args.won;
-          const landedHeads = won ? frozenBetHeads : !frozenBetHeads;
+        const args = last.args as { rolled?: boolean[] };
+        const landedHeads = args.rolled?.[0] === true;
+        if (typeof landedHeads === "boolean") {
           setOutcome(landedHeads ? "heads" : "tails");
         } else {
           setOutcome(null);
@@ -99,7 +98,7 @@ export function CoinTossGame() {
 
   const canSubmit =
     isConnected &&
-    canPlay &&
+    canWager &&
     parsedAmount.ok &&
     parsedAmount.wei > BigInt(0) &&
     !belowMin &&
@@ -117,14 +116,14 @@ export function CoinTossGame() {
       setPhase("flipping");
       setTxHash(undefined);
       try {
-        const hash = await play(betHeads, parsedAmount.wei);
+        const hash = await placeWager(betHeads, parsedAmount.wei);
         setTxHash(hash);
       } catch {
         setPhase("picking");
         setTxHash(undefined);
       }
     },
-    [canSubmit, reset, play, betHeads, parsedAmount.wei],
+    [canSubmit, reset, placeWager, betHeads, parsedAmount.wei],
   );
 
   function onPlayAgain() {
@@ -150,12 +149,12 @@ export function CoinTossGame() {
         <header className="mb-8 lg:mb-10">
           <h1 className="type-display">Coin toss</h1>
           <p className="type-muted mt-1 max-w-2xl">
-            Pick a side, stake native currency, and settle on-chain. Minimum bet applies per
-            chain; connect your wallet on Polygon or Gnosis when the game is configured.
+            Pick a side, stake native POL (includes the Chainlink VRF fee). Connect your wallet
+            on Polygon (BetSwirl defaults) or Gnosis when configured.
           </p>
         </header>
 
-        {!canPlay ? (
+        {!canWager ? (
           <p className="type-body mb-8 max-w-xl rounded-lg border border-amber-800/60 bg-amber-950/40 px-4 py-3 text-amber-100">
             Coin toss is not configured for this network. Switch to Polygon or Gnosis when
             addresses are set, or try again later.
@@ -207,7 +206,7 @@ export function CoinTossGame() {
               onSubmit={onSubmit}
               className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 sm:p-6"
             >
-              <fieldset className="space-y-5" disabled={!canPlay || phase === "flipping"}>
+              <fieldset className="space-y-5" disabled={!canWager || phase === "flipping"}>
                 <legend className="sr-only">Bet options</legend>
 
                 <div>
@@ -269,7 +268,7 @@ export function CoinTossGame() {
                   ) : null}
                   {minBetLoading ? (
                     <p className="type-caption mt-1.5 text-zinc-600">Loading minimum…</p>
-                  ) : canPlay && minBet !== undefined ? (
+                  ) : canWager && minBet !== undefined ? (
                     <p className="type-caption mt-1.5 text-zinc-500">
                       Min. {formatEther(minBetWei)} · Enter a stake to move from idle to
                       picking.
