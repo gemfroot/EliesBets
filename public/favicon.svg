@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="EliesBets">
+  <rect width="32" height="32" rx="8" fill="#09090b"/>
+  <path
+    fill="#10b981"
+    d="M9 9h9v2.5H11.75v3.25h5.5V17H9V9zm11.5 0H24l-4.25 10.25h-3.1L20.5 9z"
+  />
+</svg>
