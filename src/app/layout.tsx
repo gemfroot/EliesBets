@@ -11,6 +11,7 @@ import { WrongNetworkBanner } from "@/components/WrongNetworkBanner";
 import { MobileLayoutChrome } from "@/components/MobileLayoutChrome";
 import { Sidebar } from "@/components/Sidebar";
 import "./globals.css";
+import { getSiteUrl } from "@/lib/siteUrl";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,8 +23,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const siteUrl = getSiteUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

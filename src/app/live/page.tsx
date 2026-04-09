@@ -7,8 +7,16 @@ import {
 } from "@azuro-org/toolkit";
 import { LiveGamesList } from "@/components/LiveGamesList";
 import { CHAIN_ID } from "@/lib/constants";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Live games",
+  description:
+    "In-play sports fixtures with updating odds. Follow live markets and bet with your wallet on EliesBets.",
+};
+
 const GAMES_PER_PAGE = 100;
 
 async function fetchAllLiveGames(): Promise<GameData[]> {

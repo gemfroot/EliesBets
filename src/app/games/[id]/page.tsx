@@ -11,6 +11,8 @@ import {
 import { GameDetailMarkets } from "@/components/GameDetailMarkets";
 import { GameDetailStatus } from "@/components/GameDetailStatus";
 import { CHAIN_ID } from "@/lib/constants";
+import { gameParticipantLine } from "@/lib/gameTitle";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +20,22 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
-function participantLine(game: GameData): string {
-  const { participants, title } = game;
-  if (participants.length >= 2) {
-    return `${participants[0]!.name} vs ${participants[1]!.name}`;
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const games = await getGamesByIds({ chainId: CHAIN_ID, gameIds: [id] });
+    const game = games[0];
+    if (!game) {
+      return { title: "Game" };
+    }
+    const line = gameParticipantLine(game);
+    return {
+      title: line,
+      description: `${line} — ${game.sport.name}, ${game.league.name}. Odds and markets on EliesBets.`,
+    };
+  } catch {
+    return { title: "Game" };
   }
-  if (participants.length === 1) {
-    return participants[0]!.name;
-  }
-  return title;
 }
 
 /** First segment of Azuro `marketKey` (e.g. "1-1-1" → "1"). */
@@ -129,7 +138,7 @@ export default async function GameDetailPage({ params }: Props) {
   const markets = groupConditionsByMarket(conditions);
   const sections = groupMarketsForUi(markets);
 
-  const names = participantLine(game);
+  const names = gameParticipantLine(game);
 
   return (
     <div className="page-shell">
