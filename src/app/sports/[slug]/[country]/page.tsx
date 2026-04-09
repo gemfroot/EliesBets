@@ -7,7 +7,7 @@ import { RetryCallout } from "@/components/RetryCallout";
 import { CHAIN_ID } from "@/lib/constants";
 import { chunk, fetchGamesForSportCountry } from "@/lib/sportGames";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 45;
 
 type Props = {
   params: Promise<{ slug: string; country: string }>;

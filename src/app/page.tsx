@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { unstable_noStore } from "next/cache";
 import {
   GameCardListSkeleton,
   LiveGameGridSkeleton,
@@ -11,7 +12,13 @@ import {
   HomeSportsNavSection,
 } from "@/components/HomePageSections";
 
-export const dynamic = "force-dynamic";
+/** Prematch/home lists: ISR. Live hero is dynamic via `unstable_noStore` in `LiveHeroSection`. */
+export const revalidate = 45;
+
+async function LiveHeroSection() {
+  unstable_noStore();
+  return <HomeHeroSection />;
+}
 
 function HomeHeroFallback() {
   return (
@@ -58,7 +65,7 @@ export default function Home() {
   return (
     <div className="page-shell">
       <Suspense fallback={<HomeHeroFallback />}>
-        <HomeHeroSection />
+        <LiveHeroSection />
       </Suspense>
 
       <Suspense fallback={<HomeSportsNavFallback />}>
