@@ -37,6 +37,32 @@ const TABS: { id: FilterTab; label: string }[] = [
   { id: "lost", label: "Lost" },
 ];
 
+const EMPTY_COPY: Record<
+  FilterTab,
+  { title: string; description: string }
+> = {
+  all: {
+    title: "No bets yet",
+    description:
+      "When you place a bet with this wallet, it will show up here. Open a game, add selections to the betslip, and confirm to get started.",
+  },
+  pending: {
+    title: "No pending bets",
+    description:
+      "You do not have any open bets waiting for results. Place a bet from a game, or check All to see your full history.",
+  },
+  won: {
+    title: "No winning bets",
+    description:
+      "None of your settled bets are wins yet. Pending bets will move here when they cash as a win.",
+  },
+  lost: {
+    title: "No lost bets",
+    description:
+      "None of your settled bets are losses. Pending bets will appear here if they settle as a loss.",
+  },
+};
+
 export default function BetsPage() {
   const { address, isConnected } = useConnection();
   const [tab, setTab] = useState<FilterTab>("all");
@@ -125,10 +151,11 @@ export default function BetsPage() {
             </div>
           ) : visibleBets.length === 0 ? (
             <div className="mt-8 max-w-lg rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-6">
-              <p className="text-sm font-medium text-zinc-200">No bets yet</p>
+              <p className="text-sm font-medium text-zinc-200">
+                {EMPTY_COPY[tab].title}
+              </p>
               <p className="mt-1 text-sm text-zinc-500">
-                When you place a bet with this wallet, it will show up here. Open a game,
-                add selections to the betslip, and confirm to get started.
+                {EMPTY_COPY[tab].description}
               </p>
             </div>
           ) : (
