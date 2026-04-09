@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { PublicClient } from "viem";
 import { isAddress, zeroAddress } from "viem";
 import { readContract } from "viem/actions";
@@ -21,6 +21,15 @@ import {
 import type { CasinoTxHash } from "@/lib/casino/types";
 
 const NATIVE_TOKEN = zeroAddress;
+
+export interface RollResult {
+  id: bigint;
+  rolled: readonly boolean[];
+  payout: bigint;
+  totalBetAmount: bigint;
+  face: boolean;
+  timestamp: number;
+}
 
 /**
  * Coin toss game: reads and writes use the on-chain ABI in `@/lib/casino/abis/CoinToss`.
@@ -63,7 +72,8 @@ export function useCoinToss() {
     query: { enabled: queryEnabled },
   });
 
-  const [lastRollHeads, setLastRollHeads] = useState<boolean | null>(null);
+  const [lastRoll, setLastRoll] = useState<RollResult | null>(null);
+  const rollCountRef = useRef(0);
 
   useWatchContractEvent({
     address: coinToss,
@@ -76,11 +86,23 @@ export function useCoinToss() {
       if (!last || !("args" in last) || !last.args || typeof last.args !== "object") {
         return;
       }
-      const rolled = (last.args as { rolled?: readonly boolean[] }).rolled;
-      const first = rolled?.[0];
-      if (typeof first === "boolean") {
-        setLastRollHeads(first);
-      }
+      const args = last.args as {
+        id?: bigint;
+        rolled?: readonly boolean[];
+        payout?: bigint;
+        totalBetAmount?: bigint;
+        face?: boolean;
+      };
+      if (!args.rolled || args.rolled.length === 0) return;
+      rollCountRef.current += 1;
+      setLastRoll({
+        id: args.id ?? BigInt(0),
+        rolled: args.rolled,
+        payout: args.payout ?? BigInt(0),
+        totalBetAmount: args.totalBetAmount ?? BigInt(0),
+        face: args.face ?? false,
+        timestamp: Date.now(),
+      });
     },
   });
 
@@ -104,7 +126,6 @@ export function useCoinToss() {
       const betAmount = valueWei > vrf ? valueWei - vrf : BigInt(0);
 
       // BetSwirl requires both receiver and affiliate to be non-zero.
-      // Use connected wallet as self-referral when no dedicated affiliate is set.
       const envAffiliate = process.env.NEXT_PUBLIC_CASINO_AFFILIATE;
       const affiliate: `0x${string}` =
         envAffiliate && isAddress(envAffiliate) ? envAffiliate : connected;
@@ -140,7 +161,7 @@ export function useCoinToss() {
     vrfCost,
     chainTokenConfig,
     paused,
-    lastRollHeads,
+    lastRoll,
     data: minTotal,
     isMinBetPending: vrfPending,
     isPending: writePending,

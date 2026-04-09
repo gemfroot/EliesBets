@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BP_VALUE } from "@betswirl/sdk-core";
-import { formatEther, parseEther, parseEventLogs } from "viem";
-import { useAccount, useWaitForTransactionReceipt } from "wagmi";
+import { formatEther, parseEther } from "viem";
+import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
+import { polygonAmoy } from "viem/chains";
 import { CoinFlipAnimation, type CoinFlipPhase } from "@/components/CoinFlipAnimation";
-import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
 import { useCoinToss } from "@/lib/casino/hooks";
+import type { RollResult } from "@/lib/casino/hooks";
+import { CASINO_CHAIN_IDS } from "@/lib/casino/addresses";
 
 type GamePhase = CoinFlipPhase;
 
@@ -21,7 +23,12 @@ const PHASE_LABEL: Record<GamePhase, string> = {
   result: "Result",
 };
 
-/** Prefer viem's short user-facing text; never surface raw revert details like `msg.value`. */
+const CHAIN_NAMES: Record<number, string> = {
+  137: "Polygon",
+  80002: "Polygon Amoy",
+  100: "Gnosis",
+};
+
 function formatCasinoTxError(error: Error): string {
   const e = error as Error & { shortMessage?: string };
   const text =
@@ -36,6 +43,8 @@ function formatCasinoTxError(error: Error): string {
 
 export function CoinTossGame() {
   const { isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
   const {
     data: minBet,
     isMinBetPending: minBetLoading,
@@ -46,6 +55,7 @@ export function CoinTossGame() {
     isPending,
     error,
     reset,
+    lastRoll,
   } = useCoinToss();
 
   const [betHeads, setBetHeads] = useState(true);
@@ -56,13 +66,15 @@ export function CoinTossGame() {
   const [outcome, setOutcome] = useState<"heads" | "tails" | null>(null);
   const [payoutWei, setPayoutWei] = useState<bigint | null>(null);
   const [recentResults, setRecentResults] = useState<("heads" | "tails")[]>([]);
-  const lastRecordedResultTx = useRef<`0x${string}` | undefined>(undefined);
+  const [waitingVrf, setWaitingVrf] = useState(false);
+  const rollSnapshotRef = useRef<number>(0);
+  const lastRecordedResultTs = useRef<number>(0);
+
+  const isSupportedChain = (CASINO_CHAIN_IDS as readonly number[]).includes(chainId);
 
   const { data: receipt, isLoading: receiptLoading } = useWaitForTransactionReceipt({
     hash: txHash,
-    query: {
-      enabled: Boolean(txHash),
-    },
+    query: { enabled: Boolean(txHash) },
   });
 
   const minBetWei = minBet ?? BigInt(0);
@@ -74,7 +86,6 @@ export function CoinTossGame() {
     return cfg[0];
   }, [chainTokenConfig]);
 
-  /** Gross win multiplier on the bet portion for a correct 50/50 outcome (before VRF fee). */
   const winMultiplier = useMemo(() => {
     if (houseEdgeBp === undefined) return undefined;
     return (2 * (BP_VALUE - houseEdgeBp)) / BP_VALUE;
@@ -114,47 +125,42 @@ export function CoinTossGame() {
     if (!isConnected && phase !== "idle" && phase !== "result") {
       setPhase("idle");
       setTxHash(undefined);
+      setWaitingVrf(false);
     }
   }, [isConnected, phase]);
 
+  // Wager tx confirmed → start waiting for VRF callback
   useEffect(() => {
     if (phase !== "flipping" || !receipt || receiptLoading) return;
     if (txHash && receipt.transactionHash !== txHash) return;
-
-    try {
-      const logs = parseEventLogs({
-        abi: coinTossAbi,
-        eventName: "Roll",
-        logs: receipt.logs,
-      });
-      const last = logs[logs.length - 1];
-      if (last && "args" in last && last.args && typeof last.args === "object") {
-        const args = last.args as { rolled?: boolean[]; payout?: bigint };
-        const landedHeads = args.rolled?.[0] === true;
-        if (typeof landedHeads === "boolean") {
-          setOutcome(landedHeads ? "heads" : "tails");
-        } else {
-          setOutcome(null);
-        }
-        setPayoutWei(typeof args.payout === "bigint" ? args.payout : null);
-      } else {
-        setOutcome(null);
-        setPayoutWei(null);
-      }
-    } catch {
-      setOutcome(null);
-      setPayoutWei(null);
+    if (receipt.status === "reverted") {
+      setPhase("picking");
+      setTxHash(undefined);
+      return;
     }
-    setPhase("result");
-  }, [phase, receipt, receiptLoading, txHash]);
+    setWaitingVrf(true);
+    rollSnapshotRef.current = lastRoll?.timestamp ?? 0;
+  }, [phase, receipt, receiptLoading, txHash, lastRoll?.timestamp]);
 
+  // Roll event arrives from VRF callback → show result
   useEffect(() => {
-    if (phase !== "result" || !receipt || outcome == null) return;
-    if (receipt.transactionHash !== txHash) return;
-    if (lastRecordedResultTx.current === receipt.transactionHash) return;
-    lastRecordedResultTx.current = receipt.transactionHash;
+    if (!waitingVrf || !lastRoll) return;
+    if (lastRoll.timestamp <= rollSnapshotRef.current) return;
+
+    const landedHeads = lastRoll.rolled[0] === true;
+    setOutcome(landedHeads ? "heads" : "tails");
+    setPayoutWei(lastRoll.payout);
+    setWaitingVrf(false);
+    setPhase("result");
+  }, [waitingVrf, lastRoll]);
+
+  // Record result in recent list
+  useEffect(() => {
+    if (phase !== "result" || outcome == null) return;
+    if (lastRoll && lastRoll.timestamp === lastRecordedResultTs.current) return;
+    lastRecordedResultTs.current = lastRoll?.timestamp ?? Date.now();
     setRecentResults((prev) => [outcome, ...prev].slice(0, RECENT_RESULTS_CAP));
-  }, [phase, receipt, outcome, txHash]);
+  }, [phase, outcome, lastRoll]);
 
   const canSubmit =
     isConnected &&
@@ -173,6 +179,7 @@ export function CoinTossGame() {
       reset?.();
       setOutcome(null);
       setPayoutWei(null);
+      setWaitingVrf(false);
       setFrozenBetHeads(betHeads);
       setPhase("flipping");
       setTxHash(undefined);
@@ -192,6 +199,7 @@ export function CoinTossGame() {
     setTxHash(undefined);
     setOutcome(null);
     setPayoutWei(null);
+    setWaitingVrf(false);
     if (parsedAmount.ok && parsedAmount.wei > BigInt(0)) {
       setPhase("picking");
     } else {
@@ -216,10 +224,33 @@ export function CoinTossGame() {
           </p>
         </header>
 
-        {!canWager ? (
+        {/* Network indicator */}
+        {isConnected && !isSupportedChain ? (
+          <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-amber-800/60 bg-amber-950/40 px-4 py-3">
+            <span className="text-sm text-amber-100">
+              You&apos;re connected to an unsupported network.
+            </span>
+            <button
+              type="button"
+              onClick={() => switchChain?.({ chainId: polygonAmoy.id })}
+              className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-500"
+            >
+              Switch to Polygon Amoy
+            </button>
+          </div>
+        ) : isConnected && isSupportedChain ? (
+          <div className="mb-6 flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-2.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <span className="text-sm text-zinc-300">
+              {CHAIN_NAMES[chainId] ?? `Chain ${chainId}`}
+            </span>
+          </div>
+        ) : null}
+
+        {isConnected && isSupportedChain && !canWager ? (
           <p className="type-body mb-8 max-w-xl rounded-lg border border-amber-800/60 bg-amber-950/40 px-4 py-3 text-amber-100">
-            CoinToss is available on Polygon and Polygon Amoy (testnet). Please switch your
-            wallet to a supported network to play.
+            CoinToss is currently paused on this network. Try switching to another supported
+            network.
           </p>
         ) : null}
 
@@ -259,8 +290,10 @@ export function CoinTossGame() {
                   {isPending
                     ? "Confirm in your wallet…"
                     : receiptLoading
-                      ? "Waiting for confirmation…"
-                      : null}
+                      ? "Waiting for on-chain confirmation…"
+                      : waitingVrf
+                        ? "Bet placed! Waiting for Chainlink VRF result…"
+                        : null}
                 </span>
               ) : null}
             </div>
@@ -369,7 +402,11 @@ export function CoinTossGame() {
                       {recentResults.map((r, i) => (
                         <li
                           key={`${r}-${i}`}
-                          className="flex h-9 min-w-[2.25rem] items-center justify-center rounded-md border border-zinc-700 bg-zinc-950 font-mono text-xs uppercase text-zinc-200"
+                          className={`flex h-9 min-w-[2.25rem] items-center justify-center rounded-md border font-mono text-xs uppercase ${
+                            r === "heads"
+                              ? "border-emerald-700/60 bg-emerald-950/40 text-emerald-300"
+                              : "border-red-700/60 bg-red-950/40 text-red-300"
+                          }`}
                         >
                           {r === "heads" ? "H" : "T"}
                         </li>
@@ -389,8 +426,8 @@ export function CoinTossGame() {
                         your bet and reserves the rest for settlement.
                       </li>
                       <li>
-                        Confirm in your wallet. The flip uses verifiable on-chain randomness, then
-                        pays out if you guessed correctly.
+                        Confirm in your wallet. The flip uses verifiable on-chain randomness
+                        (Chainlink VRF), which takes a few seconds to resolve.
                       </li>
                       <li>
                         {houseEdgeBp !== undefined && winMultiplier !== undefined ? (
