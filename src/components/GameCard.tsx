@@ -56,7 +56,7 @@ export function GameCard({
         className={
           variant === "heroLive"
             ? "flex w-full min-w-0 flex-row gap-2"
-            : "flex w-full min-w-0 shrink-0 flex-col gap-2 md:max-w-[min(100%,22rem)] md:flex-row md:gap-2"
+            : "flex w-full min-w-0 shrink flex-col gap-2 md:w-auto md:max-w-[min(100%,22rem)] md:flex-row md:gap-2"
         }
         aria-label="Main odds"
       >
@@ -71,7 +71,7 @@ export function GameCard({
             className={
               variant === "heroLive"
                 ? "min-h-10 min-w-0 flex-1 py-2 text-left"
-                : "min-h-11 w-full py-2 text-left md:min-h-0 md:w-auto md:py-1.5"
+                : "min-h-11 w-full flex-none py-2 text-left md:min-h-0 md:w-auto md:flex-none md:py-1.5"
             }
             onClick={() =>
               addSelection({
@@ -157,7 +157,7 @@ export function GameCard({
             <h2 className="min-w-0 flex-1 text-sm font-medium text-zinc-100">
               <Link
                 href={`/games/${game.gameId}`}
-                className="hover:text-zinc-50 hover:underline"
+                className="block min-w-0 truncate hover:text-zinc-50 hover:underline"
               >
                 {names}
               </Link>

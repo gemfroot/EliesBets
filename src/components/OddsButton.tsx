@@ -119,7 +119,7 @@ export function OddsButton({
       className={`${base} ${surface} ${className}`.trim()}
     >
       {label != null ? (
-        <span className="max-w-full truncate text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+        <span className="max-w-full truncate text-xs font-medium uppercase tracking-wide text-zinc-400">
           {label}
         </span>
       ) : null}
