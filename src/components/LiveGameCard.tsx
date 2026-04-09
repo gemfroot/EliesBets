@@ -54,7 +54,12 @@ export function LiveGameCard({
           : "flex flex-col items-start gap-0.5"
       }
     >
-      <LiveBadge startsAt={game.startsAt} />
+      <LiveBadge
+        startsAt={game.startsAt}
+        sportSlug={game.sport.slug}
+        scoreBoard={liveStats?.scoreBoard}
+        clock={liveStats?.clock}
+      />
       {scoreLine ? (
         <span
           className="text-xs font-semibold tabular-nums text-zinc-100"

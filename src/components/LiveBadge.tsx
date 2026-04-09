@@ -1,25 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import type { Clock, ScoreBoard } from "@azuro-org/sdk";
+import { useEffect, useMemo, useState } from "react";
+import {
+  formatLiveBadgeTimer,
+  formatLivePeriodLabel,
+} from "@/lib/useCountdown";
 
-function parseStartMs(startsAt: string): number {
-  const n = +startsAt;
-  return n < 32_503_680_000 ? n * 1000 : n;
-}
-
-function formatElapsed(fromMs: number, now: number): string {
-  const sec = Math.max(0, Math.floor((now - fromMs) / 1000));
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  if (h > 0) {
-    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  }
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-export function LiveBadge({ startsAt }: { startsAt: string }) {
-  const startMs = parseStartMs(startsAt);
+export function LiveBadge({
+  startsAt,
+  sportSlug,
+  scoreBoard,
+  clock,
+}: {
+  startsAt: string;
+  sportSlug: string;
+  scoreBoard?: ScoreBoard | null;
+  clock?: Clock | null;
+}) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -27,8 +25,16 @@ export function LiveBadge({ startsAt }: { startsAt: string }) {
     return () => window.clearInterval(id);
   }, []);
 
+  const timer = useMemo(
+    () =>
+      formatLiveBadgeTimer(sportSlug, startsAt, scoreBoard ?? null, clock ?? null, now),
+    [sportSlug, startsAt, scoreBoard, clock, now],
+  );
+
+  const period = formatLivePeriodLabel(scoreBoard ?? null);
+
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-medium tabular-nums text-red-400">
+    <span className="inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-medium tabular-nums text-red-400">
       <span className="relative flex h-2 w-2 shrink-0">
         <span
           className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"
@@ -36,8 +42,14 @@ export function LiveBadge({ startsAt }: { startsAt: string }) {
         />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
       </span>
-      <span>
-        LIVE · {formatElapsed(startMs, now)}
+      <span className="min-w-0">
+        LIVE · {timer}
+        {period ? (
+          <>
+            {" "}
+            <span className="text-zinc-500">· {period}</span>
+          </>
+        ) : null}
       </span>
     </span>
   );
