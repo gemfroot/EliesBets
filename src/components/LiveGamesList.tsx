@@ -47,7 +47,14 @@ function AllSportsIcon({
   );
 }
 
-type LeagueGroup = { leagueKey: string; leagueName: string; games: GameData[] };
+type LeagueGroup = {
+  leagueKey: string;
+  leagueName: string;
+  sportSlug: string;
+  sportName: string;
+  countryName: string;
+  games: GameData[];
+};
 
 function groupGamesByLeague(games: GameData[]): LeagueGroup[] {
   const map = new Map<string, LeagueGroup>();
@@ -56,7 +63,14 @@ function groupGamesByLeague(games: GameData[]): LeagueGroup[] {
     const leagueName = game.league.name;
     let group = map.get(leagueKey);
     if (!group) {
-      group = { leagueKey, leagueName, games: [] };
+      group = {
+        leagueKey,
+        leagueName,
+        sportSlug: game.sport.slug,
+        sportName: game.sport.name,
+        countryName: game.country.name,
+        games: [],
+      };
       map.set(leagueKey, group);
     }
     group.games.push(game);
@@ -215,12 +229,23 @@ export function LiveGamesList({
           aria-labelledby={`live-league-${league.leagueKey}`}
         >
           <div className="flex items-center justify-between gap-2 border-b border-zinc-800 pb-2">
-            <h2
-              id={`live-league-${league.leagueKey}`}
-              className="type-overline text-zinc-400"
-            >
-              {league.leagueName}
-            </h2>
+            <div className="flex min-w-0 items-center gap-2">
+              <SportNavIcon
+                slug={league.sportSlug}
+                className="h-[1.125rem] w-[1.125rem] shrink-0 text-zinc-400"
+              />
+              <div className="min-w-0">
+                <h2
+                  id={`live-league-${league.leagueKey}`}
+                  className="type-overline text-zinc-400"
+                >
+                  {league.leagueName}
+                </h2>
+                <p className="mt-0.5 truncate text-xs text-zinc-500">
+                  {league.sportName} · {league.countryName}
+                </p>
+              </div>
+            </div>
             {league.games[0] ? (
               <LeagueFavoriteButton
                 sportSlug={league.games[0].sport.slug}
