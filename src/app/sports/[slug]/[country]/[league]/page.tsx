@@ -1,11 +1,10 @@
-import { getConditionsByGameIds, type GameData } from "@azuro-org/toolkit";
+import type { GameData } from "@azuro-org/toolkit";
 import Link from "next/link";
 import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { GameCard } from "@/components/GameCard";
-import { extractMainLineOdds } from "@/lib/oddsUtils";
+import { extractMainLineOdds, fetchTopOddsByGameId } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
-import { CHAIN_ID } from "@/lib/constants";
-import { chunk, fetchGamesForLeague } from "@/lib/sportGames";
+import { fetchGamesForLeague } from "@/lib/sportGames";
 
 export const revalidate = 45;
 
@@ -13,42 +12,11 @@ type Props = {
   params: Promise<{ slug: string; country: string; league: string }>;
 };
 
-const CONDITIONS_BATCH = 40;
-
 function titleFromSlug(slug: string): string {
   return slug
     .split("-")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
-}
-
-async function fetchTopOddsByGameId(
-  gameIds: string[],
-): Promise<Map<string, ReturnType<typeof extractMainLineOdds>>> {
-  const result = new Map<string, ReturnType<typeof extractMainLineOdds>>();
-  if (!gameIds.length) {
-    return result;
-  }
-  for (const batch of chunk(gameIds, CONDITIONS_BATCH)) {
-    const conditions = await getConditionsByGameIds({
-      chainId: CHAIN_ID,
-      gameIds: batch,
-    });
-    const byGameId = new Map<string, typeof conditions>();
-    for (const c of conditions) {
-      const gid = c.game.gameId;
-      const list = byGameId.get(gid);
-      if (list) {
-        list.push(c);
-      } else {
-        byGameId.set(gid, [c]);
-      }
-    }
-    for (const gid of batch) {
-      result.set(gid, extractMainLineOdds(byGameId.get(gid) ?? []));
-    }
-  }
-  return result;
 }
 
 export default async function SportCountryLeaguePage({ params }: Props) {
