@@ -6,14 +6,21 @@ import { formatEther, parseEther, parseEventLogs } from "viem";
 import { useConnection, useWaitForTransactionReceipt } from "wagmi";
 import { CoinFlipAnimation, type CoinFlipPhase } from "@/components/CoinFlipAnimation";
 import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
-import { useCoinTossMinBet, useCoinTossWager } from "@/lib/casino/hooks";
+import { useCoinToss } from "@/lib/casino/hooks";
 
 type GamePhase = CoinFlipPhase;
 
 export function CoinTossGame() {
   const { isConnected } = useConnection();
-  const { data: minBet, isPending: minBetLoading } = useCoinTossMinBet();
-  const { placeWager, canWager, isPending, error, reset } = useCoinTossWager();
+  const {
+    data: minBet,
+    isMinBetPending: minBetLoading,
+    placeWager,
+    canWager,
+    isPending,
+    error,
+    reset,
+  } = useCoinToss();
 
   const [betHeads, setBetHeads] = useState(true);
   const [amount, setAmount] = useState("");
