@@ -5,6 +5,7 @@ import { cookieToInitialState } from "wagmi";
 import { Providers } from "@/providers";
 import { wagmiConfig } from "@/wagmi";
 import { BetslipPanel } from "@/components/Betslip";
+import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { WrongNetworkBanner } from "@/components/WrongNetworkBanner";
 import { MobileLayoutChrome } from "@/components/MobileLayoutChrome";
@@ -98,6 +99,7 @@ export default async function RootLayout({
                 <BetslipPanel />
               </aside>
             </div>
+            <Footer />
             <MobileLayoutChrome />
           </div>
         </Providers>

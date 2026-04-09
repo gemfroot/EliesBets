@@ -649,31 +649,34 @@ export function BetslipPanel() {
       </p>
       {selections.length === 0 ? (
         <div
-          className="mt-4 flex flex-col items-center rounded-lg border border-dashed border-zinc-700 bg-zinc-900/40 px-4 py-8 text-center"
+          className="mt-4 flex flex-col items-center rounded-lg border border-dashed border-zinc-700 bg-zinc-900/40 px-4 py-9 text-center"
           role="status"
         >
-          <span className="flex h-14 w-14 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900/80 text-zinc-500">
+          <span
+            className="flex h-16 w-16 items-center justify-center rounded-full border border-zinc-600/80 bg-zinc-900/90 text-zinc-400"
+            aria-hidden
+          >
+            {/* Betslip / ticket icon (aligned with mobile nav Slip glyph) */}
             <svg
-              xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.5"
-              className="h-7 w-7"
-              aria-hidden
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-8 w-8"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M16.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4.5 19.5V9a1.5 1.5 0 0 1 .44-1.06l6-6A1.5 1.5 0 0 1 12 1.5h3A1.5 1.5 0 0 1 16.5 3v3Zm0 0H12a1.5 1.5 0 0 1-1.5-1.5V1.5"
-              />
+              <path d="M4 9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1H4V9Z" />
+              <path d="M4 11v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+              <path d="M9 14h6" />
             </svg>
           </span>
-          <p className="mt-4 text-sm font-medium text-zinc-300">
-            Nothing on your slip yet
+          <p className="mt-4 text-sm font-semibold text-zinc-200">
+            Your betslip is empty
           </p>
-          <p className="mt-1 max-w-[16rem] text-xs leading-relaxed text-zinc-500">
-            Tap odds on any game to add selections here.
+          <p className="mt-1.5 max-w-[17rem] text-xs leading-relaxed text-zinc-500">
+            Tap odds on any game to add picks. With more than one selection you
+            can place singles or a combo.
           </p>
         </div>
       ) : (
