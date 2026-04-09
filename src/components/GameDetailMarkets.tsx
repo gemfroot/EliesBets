@@ -8,10 +8,12 @@ import { RetryCallout } from "@/components/RetryCallout";
 export function GameDetailMarkets({
   sections,
   gameTitle,
+  gameId,
   marketsError,
 }: {
   sections: { title: string; markets: Market[] }[];
   gameTitle: string;
+  gameId: string;
   marketsError: string | null;
 }) {
   const router = useRouter();
@@ -47,6 +49,7 @@ export function GameDetailMarkets({
           title={section.title}
           markets={section.markets}
           gameTitle={gameTitle}
+          gameId={gameId}
         />
       ))}
     </div>

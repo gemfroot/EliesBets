@@ -10,6 +10,8 @@ export type MarketGroupProps = {
   markets: Market[];
   /** Match title for receipts (e.g. Team A vs Team B). */
   gameTitle: string;
+  /** Fixture id; used when outcome rows omit `gameId` so buttons never receive an empty id. */
+  gameId: string;
   defaultOpen?: boolean;
 };
 
@@ -106,6 +108,7 @@ export function MarketGroup({
   title,
   markets,
   gameTitle,
+  gameId,
   defaultOpen = true,
 }: MarketGroupProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -129,7 +132,11 @@ export function MarketGroup({
       </summary>
       <div className="flex flex-col gap-4 border-t border-zinc-800 px-4 pb-4 pt-3">
         {markets.map((market) => {
-          const gameId = market.conditions[0]?.outcomes[0]?.gameId ?? "";
+          const resolvedGameId =
+            market.conditions[0]?.outcomes[0]?.gameId ?? gameId;
+          if (!resolvedGameId) {
+            return null;
+          }
           const showMarketName = markets.length > 1;
           return (
             <div key={market.marketKey} className="flex flex-col gap-2">
@@ -142,7 +149,7 @@ export function MarketGroup({
                 {market.conditions.map((cond) => (
                   <ConditionBlock
                     key={cond.conditionId}
-                    gameId={gameId}
+                    gameId={resolvedGameId}
                     gameTitle={gameTitle}
                     conditionState={cond.state}
                     label={

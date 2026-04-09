@@ -8,16 +8,50 @@ export function parseStartsAtMs(startsAt: string): number {
   return n < 32_503_680_000 ? n * 1000 : n;
 }
 
+export type UseCountdownOptions = {
+  /** When false, no timer runs (e.g. live or finished games that do not show a countdown). */
+  enabled?: boolean;
+};
+
 /**
  * Live-updating countdown to `targetMs`. For past targets, `label` is "Starting soon".
+ * Invalid `targetMs` yields a safe label (no NaN). The interval stops when the countdown hits zero.
  */
-export function useCountdown(targetMs: number): { remainingMs: number; label: string; isPast: boolean } {
+export function useCountdown(
+  targetMs: number,
+  options?: UseCountdownOptions,
+): { remainingMs: number; label: string; isPast: boolean } {
+  const enabled = options?.enabled !== false;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    if (!enabled || !Number.isFinite(targetMs)) {
+      return;
+    }
+
+    if (targetMs - Date.now() <= 0) {
+      setNow(Date.now());
+      return;
+    }
+
+    const id = window.setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (targetMs - t <= 0) {
+        window.clearInterval(id);
+      }
+    }, 1000);
+
     return () => window.clearInterval(id);
-  }, []);
+  }, [targetMs, enabled]);
+
+  if (!Number.isFinite(targetMs)) {
+    return { remainingMs: 0, label: "Starting soon", isPast: true };
+  }
+
+  if (!enabled) {
+    return { remainingMs: 0, label: "Starting soon", isPast: true };
+  }
 
   const remainingMs = targetMs - now;
   const isPast = remainingMs <= 0;

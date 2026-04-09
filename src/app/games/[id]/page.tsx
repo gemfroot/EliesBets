@@ -163,6 +163,7 @@ export default async function GameDetailPage({ params }: Props) {
       <GameDetailMarkets
         sections={sections}
         gameTitle={names}
+        gameId={game.gameId}
         marketsError={marketsError}
       />
     </div>
