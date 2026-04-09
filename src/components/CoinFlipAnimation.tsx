@@ -1,6 +1,7 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useMemo, type CSSProperties } from "react";
+import { formatEther } from "viem";
 
 export type CoinFlipPhase = "idle" | "picking" | "flipping" | "result";
 
@@ -10,13 +11,18 @@ type CoinFlipAnimationProps = {
   outcome?: "heads" | "tails" | null;
   /** Whether the player bet on heads (for result summary) */
   betHeads?: boolean;
+  /** Gross payout from the Roll event (wei), when known */
+  payoutWei?: bigint | null;
   className?: string;
 };
+
+const CONFETTI_COUNT = 42;
 
 export function CoinFlipAnimation({
   phase,
   outcome = null,
   betHeads = true,
+  payoutWei = null,
   className = "",
 }: CoinFlipAnimationProps) {
   const labelId = useId();
@@ -27,11 +33,35 @@ export function CoinFlipAnimation({
       ? (betHeads && landedHeads) || (!betHeads && !landedHeads)
       : null;
 
+  const confettiStyles = useMemo(
+    () =>
+      Array.from({ length: CONFETTI_COUNT }, (_, i) => ({
+        "--cf-left": `${(i * 17 + 13) % 100}%`,
+        "--cf-delay": `${(i % 12) * 0.04}s`,
+        "--cf-duration": `${2.4 + (i % 5) * 0.15}s`,
+        "--cf-rotate": `${(i * 47) % 360}deg`,
+        "--cf-hue": `${(i * 41) % 360}`,
+      })) as CSSProperties[],
+    [],
+  );
+
+  const showConfetti = phase === "result" && won === true;
+
   return (
     <div
-      className={`flex flex-col items-center ${className}`}
+      className={`relative flex flex-col items-center ${className}`}
       aria-labelledby={labelId}
     >
+      {showConfetti ? (
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 h-[min(28rem,90vw)] overflow-hidden motion-reduce:hidden"
+          aria-hidden
+        >
+          {confettiStyles.map((style, i) => (
+            <span key={i} className="confetti-bit" style={style} />
+          ))}
+        </div>
+      ) : null}
       <p id={labelId} className="type-overline mb-4 text-center">
         {phase === "idle" && "Ready when you are"}
         {phase === "picking" && "Pick your side"}
@@ -89,9 +119,20 @@ export function CoinFlipAnimation({
             <>
               <p className="type-title capitalize text-zinc-100">{outcome}</p>
               {won === true ? (
-                <p className="type-body mt-1 text-emerald-400/95">You won this round.</p>
+                <p className="type-body mt-1 text-emerald-400/95">
+                  {payoutWei != null && payoutWei > BigInt(0) ? (
+                    <>
+                      Won{" "}
+                      <span className="font-mono tabular-nums">
+                        {formatEther(payoutWei)} POL
+                      </span>
+                    </>
+                  ) : (
+                    "You won"
+                  )}
+                </p>
               ) : won === false ? (
-                <p className="type-body mt-1 text-zinc-400">You did not win this round.</p>
+                <p className="type-body mt-1 text-zinc-400">You lost</p>
               ) : null}
             </>
           ) : (
