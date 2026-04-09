@@ -1,20 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { BP_VALUE } from "@betswirl/sdk-core";
 import { formatEther, parseEther, parseEventLogs } from "viem";
-import { useConnection, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useWaitForTransactionReceipt } from "wagmi";
 import { CoinFlipAnimation, type CoinFlipPhase } from "@/components/CoinFlipAnimation";
 import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
 import { useCoinToss } from "@/lib/casino/hooks";
 
 type GamePhase = CoinFlipPhase;
 
+const STAKE_PRESET_ETH = ["0.01", "0.05", "0.1", "0.5", "1"] as const;
+const RECENT_RESULTS_CAP = 12;
+
 export function CoinTossGame() {
-  const { isConnected } = useConnection();
+  const { isConnected } = useAccount();
   const {
     data: minBet,
     isMinBetPending: minBetLoading,
+    vrfCost,
+    nativeTokenConfig,
     placeWager,
     canWager,
     isPending,
@@ -28,6 +34,8 @@ export function CoinTossGame() {
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [frozenBetHeads, setFrozenBetHeads] = useState(true);
   const [outcome, setOutcome] = useState<"heads" | "tails" | null>(null);
+  const [recentResults, setRecentResults] = useState<("heads" | "tails")[]>([]);
+  const lastRecordedResultTx = useRef<`0x${string}` | undefined>(undefined);
 
   const { data: receipt, isLoading: receiptLoading } = useWaitForTransactionReceipt({
     hash: txHash,
@@ -37,6 +45,13 @@ export function CoinTossGame() {
   });
 
   const minBetWei = minBet ?? BigInt(0);
+  const vrfWei = typeof vrfCost === "bigint" ? vrfCost : undefined;
+
+  const houseEdgeBp = useMemo(() => {
+    const cfg = nativeTokenConfig as readonly unknown[] | undefined;
+    if (!cfg || !Array.isArray(cfg) || typeof cfg[0] !== "number") return undefined;
+    return cfg[0];
+  }, [nativeTokenConfig]);
 
   const parsedAmount = useMemo(() => {
     const t = amount.trim();
@@ -101,7 +116,15 @@ export function CoinTossGame() {
       setOutcome(null);
     }
     setPhase("result");
-  }, [phase, receipt, receiptLoading, frozenBetHeads, txHash]);
+  }, [phase, receipt, receiptLoading, txHash]);
+
+  useEffect(() => {
+    if (phase !== "result" || !receipt || outcome == null) return;
+    if (receipt.transactionHash !== txHash) return;
+    if (lastRecordedResultTx.current === receipt.transactionHash) return;
+    lastRecordedResultTx.current = receipt.transactionHash;
+    setRecentResults((prev) => [outcome, ...prev].slice(0, RECENT_RESULTS_CAP));
+  }, [phase, receipt, outcome, txHash]);
 
   const canSubmit =
     isConnected &&
@@ -156,8 +179,9 @@ export function CoinTossGame() {
         <header className="mb-8 lg:mb-10">
           <h1 className="type-display">Coin toss</h1>
           <p className="type-muted mt-1 max-w-2xl">
-            Pick a side, stake native POL (includes the Chainlink VRF fee). Connect your wallet
-            on Polygon (BetSwirl defaults) or Gnosis when configured.
+            Pick a side and send your total stake in one transaction—the VRF oracle fee is paid
+            from <span className="font-mono text-zinc-400">msg.value</span> (see breakdown below).
+            Connect on Polygon (BetSwirl defaults) or Gnosis when configured.
           </p>
         </header>
 
@@ -254,8 +278,23 @@ export function CoinTossGame() {
 
                 <div>
                   <label htmlFor="coin-toss-amount" className="type-overline mb-2 block">
-                    Stake (native)
+                    Total to send (native)
                   </label>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {STAKE_PRESET_ETH.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => {
+                          setAmount(preset);
+                          setPhase("picking");
+                        }}
+                        className="min-h-[40px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100"
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
                   <input
                     id="coin-toss-amount"
                     inputMode="decimal"
@@ -265,23 +304,70 @@ export function CoinTossGame() {
                     onChange={(e) => setAmount(e.target.value)}
                     className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 font-mono text-sm text-zinc-100 outline-none ring-emerald-600/0 transition focus:border-zinc-600 focus:ring-2 focus:ring-emerald-600/30"
                   />
+                  {parsedAmount.ok && parsedAmount.wei > BigInt(0) && vrfWei !== undefined ? (
+                    <p className="type-caption mt-1.5 text-zinc-500">
+                      <span className="text-zinc-400">msg.value</span>{" "}
+                      {formatEther(parsedAmount.wei)} total — VRF fee{" "}
+                      {formatEther(vrfWei)} · bet amount{" "}
+                      {formatEther(
+                        parsedAmount.wei > vrfWei ? parsedAmount.wei - vrfWei : BigInt(0),
+                      )}
+                    </p>
+                  ) : null}
                   {amountError ? (
                     <p className="type-caption mt-1.5 text-red-400">{amountError}</p>
                   ) : null}
                   {belowMin ? (
                     <p className="type-caption mt-1.5 text-amber-300">
-                      Minimum bet is {formatEther(minBetWei)} (native).
+                      Minimum total send is {formatEther(minBetWei)} (covers VRF + min bet).
                     </p>
                   ) : null}
                   {minBetLoading ? (
                     <p className="type-caption mt-1.5 text-zinc-600">Loading minimum…</p>
                   ) : canWager && minBet !== undefined ? (
                     <p className="type-caption mt-1.5 text-zinc-500">
-                      Min. {formatEther(minBetWei)} · Enter a stake to move from idle to
+                      Min. total {formatEther(minBetWei)} · Enter an amount to move from idle to
                       picking.
                     </p>
                   ) : null}
                 </div>
+
+                {recentResults.length > 0 ? (
+                  <div>
+                    <p className="type-overline mb-2">Recent results</p>
+                    <ul
+                      className="flex flex-wrap gap-1.5"
+                      aria-label="Recent coin toss outcomes"
+                    >
+                      {recentResults.map((r, i) => (
+                        <li
+                          key={`${r}-${i}`}
+                          className="flex h-9 min-w-[2.25rem] items-center justify-center rounded-md border border-zinc-700 bg-zinc-950 font-mono text-xs uppercase text-zinc-200"
+                        >
+                          {r === "heads" ? "H" : "T"}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                <details className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
+                  <summary className="cursor-pointer select-none type-caption text-zinc-400">
+                    Game details
+                  </summary>
+                  <div className="type-caption mt-3 border-t border-zinc-800/80 pt-3 text-zinc-500">
+                    {houseEdgeBp !== undefined ? (
+                      <p>
+                        House edge:{" "}
+                        <span className="font-mono text-zinc-300">
+                          {((houseEdgeBp / BP_VALUE) * 100).toFixed(2)}%
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-zinc-600">Loading…</p>
+                    )}
+                  </div>
+                </details>
 
                 {!isConnected ? (
                   <p className="type-body text-zinc-400">
