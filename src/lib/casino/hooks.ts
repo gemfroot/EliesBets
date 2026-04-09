@@ -57,7 +57,7 @@ async function fetchVrfCostWithGasPrice(
     to: contractAddress,
     data,
     gasPrice: buffered,
-    from: callerAddress,
+    account: callerAddress,
     gas: BigInt(100_000),
   });
   if (!result.data) return BigInt(0);
