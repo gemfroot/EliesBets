@@ -47,6 +47,17 @@ function LiveIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function CasinoIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <NavGlyph {...props}>
+      <rect x="4" y="4" width="7" height="7" rx="1.25" />
+      <rect x="13" y="13" width="7" height="7" rx="1.25" />
+      <circle cx="7.5" cy="7.5" r="0.9" fill="currentColor" />
+      <circle cx="16.5" cy="16.5" r="0.9" fill="currentColor" />
+    </NavGlyph>
+  );
+}
+
 function SlipIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <NavGlyph {...props}>
@@ -198,6 +209,14 @@ function MobileBottomNav({
         >
           <LiveIcon className="h-[1.125rem] w-[1.125rem] text-red-400/90" />
           Live
+        </Link>
+
+        <Link
+          href="/casino"
+          className="flex min-h-[44px] min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 px-2 text-[10px] font-medium text-zinc-400 transition hover:text-zinc-100"
+        >
+          <CasinoIcon className="h-[1.125rem] w-[1.125rem] text-emerald-400/90" />
+          Casino
         </Link>
 
         <MyBetsLink variant="mobile" />
