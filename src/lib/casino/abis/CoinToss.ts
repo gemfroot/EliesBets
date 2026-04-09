@@ -6,6 +6,15 @@ import type { Abi } from "viem";
  */
 export const coinTossAbi = [
   {
+    type: "event",
+    name: "Played",
+    inputs: [
+      { name: "player", type: "address", indexed: true },
+      { name: "betHeads", type: "bool", indexed: false },
+      { name: "won", type: "bool", indexed: false },
+    ],
+  },
+  {
     type: "function",
     name: "play",
     stateMutability: "payable",
