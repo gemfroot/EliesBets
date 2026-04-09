@@ -91,7 +91,7 @@ export function CoinFlipAnimation({
               {won === true ? (
                 <p className="type-body mt-1 text-emerald-400/95">You won this round.</p>
               ) : won === false ? (
-                <p className="type-body mt-1 text-zinc-400">House wins this round.</p>
+                <p className="type-body mt-1 text-zinc-400">You did not win this round.</p>
               ) : null}
             </>
           ) : (
