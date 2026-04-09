@@ -78,16 +78,6 @@ export function GameCard({
   const { participants } = game;
   const gameHref = `/games/${game.gameId}`;
 
-  const mainButtonClass =
-    variant === "heroLive"
-      ? "min-h-10 min-w-0 flex-1 py-2 text-left"
-      : "min-h-11 w-full flex-none py-2 text-left md:min-h-0 md:w-auto md:flex-none md:py-1.5";
-
-  const ouButtonClass =
-    variant === "heroLive"
-      ? "min-h-10 min-w-0 flex-1 py-2 text-left"
-      : "min-h-11 w-full flex-none py-2 text-left md:min-h-0 md:w-auto md:flex-none md:py-1.5";
-
   const addLine = (line: TopOddsLine) =>
     addSelection({
       gameId: game.gameId,
@@ -102,102 +92,101 @@ export function GameCard({
       isExpressForbidden: line.isExpressForbidden,
     });
 
-  const extraBadgeRow = (onOuRow: boolean) =>
-    extraMarketsCount > 0 &&
-    (onOuRow ? !!overUnderOdds?.length : !overUnderOdds?.length) ? (
-      <Link
-        href={gameHref}
-        className={
-          variant === "heroLive"
-            ? "inline-flex min-h-10 min-w-[2.75rem] shrink-0 items-center justify-center self-stretch rounded-md border border-zinc-700 bg-zinc-800/80 px-2 text-xs font-semibold tabular-nums text-zinc-300 transition-colors hover:bg-zinc-700/90"
-            : "inline-flex min-h-11 min-w-[2.75rem] shrink-0 items-center justify-center self-stretch rounded-md border border-zinc-700 bg-zinc-800/80 px-2 text-xs font-semibold tabular-nums text-zinc-300 transition-colors hover:bg-zinc-700/90 md:min-h-0"
-        }
-        aria-label={`${extraMarketsCount} more markets`}
-      >
-        +{extraMarketsCount}
-      </Link>
-    ) : null;
-
-  const mainOddsRow =
-    topOdds && topOdds.length > 0 ? (
-      <div
-        className={
-          variant === "heroLive"
-            ? "flex w-full min-w-0 flex-row items-stretch gap-2"
-            : "flex w-full min-w-0 shrink flex-row items-stretch gap-2 md:w-auto md:max-w-[min(100%,22rem)]"
-        }
-        aria-label="Main odds"
-      >
-        <div
-          className={
-            variant === "heroLive"
-              ? "flex min-w-0 flex-1 flex-row gap-2"
-              : "flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:gap-2"
-          }
-        >
-          {topOdds.map((line) => (
-            <OddsButton
-              key={line.outcomeId}
-              gameId={game.gameId}
-              outcomeName={line.label}
-              outcomeId={line.outcomeId}
-              odds={line.odds}
-              label={line.label}
-              className={mainButtonClass}
-              onClick={() => addLine(line)}
-            />
-          ))}
-        </div>
-        {extraBadgeRow(false)}
-      </div>
-    ) : null;
-
-  const overUnderRow =
-    overUnderOdds && overUnderOdds.length > 0 ? (
-      <div
-        className={
-          variant === "heroLive"
-            ? "flex w-full min-w-0 flex-row items-stretch gap-2"
-            : "flex w-full min-w-0 shrink flex-row items-stretch gap-2 md:w-auto md:max-w-[min(100%,22rem)]"
-        }
-        aria-label="Over/Under odds"
-      >
-        <div
-          className={
-            variant === "heroLive"
-              ? "flex min-w-0 flex-1 flex-row gap-2"
-              : "flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:gap-2"
-          }
-        >
-          {overUnderOdds.map((line) => (
-            <OddsButton
-              key={line.outcomeId}
-              gameId={game.gameId}
-              outcomeName={line.label}
-              outcomeId={line.outcomeId}
-              odds={line.odds}
-              label={line.label}
-              className={ouButtonClass}
-              onClick={() => addLine(line)}
-            />
-          ))}
-        </div>
-        {extraBadgeRow(true)}
-      </div>
-    ) : null;
+  const hasMain = topOdds && topOdds.length > 0;
+  const hasOu = overUnderOdds && overUnderOdds.length > 0;
 
   const oddsBlock =
-    mainOddsRow || overUnderRow ? (
-      <div
-        className={
-          variant === "heroLive"
-            ? "flex w-full min-w-0 flex-col gap-2"
-            : "flex w-full min-w-0 shrink flex-col gap-2 md:w-auto md:max-w-[min(100%,22rem)] md:items-end"
-        }
-      >
-        {mainOddsRow}
-        {overUnderRow}
-      </div>
+    hasMain || hasOu ? (
+      variant === "heroLive" ? (
+        <div className="flex w-full min-w-0 flex-col gap-1.5">
+          <div className="flex w-full min-w-0 flex-row gap-1.5" aria-label="Odds">
+            {hasMain
+              ? topOdds.map((line) => (
+                  <OddsButton
+                    key={line.outcomeId}
+                    gameId={game.gameId}
+                    outcomeName={line.label}
+                    outcomeId={line.outcomeId}
+                    odds={line.odds}
+                    label={line.label}
+                    className="min-h-10 min-w-0 flex-1 py-1.5"
+                    onClick={() => addLine(line)}
+                  />
+                ))
+              : null}
+            {hasMain && hasOu ? (
+              <div className="w-px shrink-0 self-stretch bg-zinc-700/60" />
+            ) : null}
+            {hasOu
+              ? overUnderOdds.map((line) => (
+                  <OddsButton
+                    key={line.outcomeId}
+                    gameId={game.gameId}
+                    outcomeName={line.label}
+                    outcomeId={line.outcomeId}
+                    odds={line.odds}
+                    label={line.label}
+                    className="min-h-10 min-w-0 flex-1 py-1.5"
+                    onClick={() => addLine(line)}
+                  />
+                ))
+              : null}
+          </div>
+          {extraMarketsCount > 0 ? (
+            <Link
+              href={gameHref}
+              className="self-end text-[11px] font-medium tabular-nums text-zinc-500 transition-colors hover:text-zinc-300"
+            >
+              +{extraMarketsCount} markets
+            </Link>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex w-full min-w-0 shrink flex-col gap-1.5 md:w-auto md:max-w-[min(100%,26rem)] md:items-end">
+          <div className="flex w-full min-w-0 flex-row items-stretch gap-1.5">
+            {hasMain
+              ? topOdds.map((line) => (
+                  <OddsButton
+                    key={line.outcomeId}
+                    gameId={game.gameId}
+                    outcomeName={line.label}
+                    outcomeId={line.outcomeId}
+                    odds={line.odds}
+                    label={line.label}
+                    className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
+                    onClick={() => addLine(line)}
+                  />
+                ))
+              : null}
+            {hasMain && hasOu ? (
+              <div className="hidden w-px shrink-0 self-stretch bg-zinc-700/60 md:block" />
+            ) : null}
+            {hasOu
+              ? overUnderOdds.map((line) => (
+                  <OddsButton
+                    key={line.outcomeId}
+                    gameId={game.gameId}
+                    outcomeName={line.label}
+                    outcomeId={line.outcomeId}
+                    odds={line.odds}
+                    label={line.label}
+                    className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
+                    onClick={() => addLine(line)}
+                  />
+                ))
+              : null}
+            {extraMarketsCount > 0 ? (
+              <Link
+                href={gameHref}
+                className="inline-flex min-h-11 min-w-[2.75rem] shrink-0 items-center justify-center self-stretch rounded-md border border-zinc-700 bg-zinc-800/80 px-2 text-xs font-semibold tabular-nums text-zinc-300 transition-colors hover:bg-zinc-700/90 md:min-h-0"
+                aria-label={`${extraMarketsCount} more markets`}
+              >
+                +{extraMarketsCount}
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      )
     ) : (
       <p
         className={

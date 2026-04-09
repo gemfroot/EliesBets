@@ -62,6 +62,13 @@ export function extractMainLineOdds(
   }
 }
 
+/** "Over (2.5)" → "O 2.5", "Under (6.5)" → "U 6.5" */
+function shortenOuLabel(raw: string): string {
+  const m = raw.match(/^(over|under)\s*\((.+)\)$/i);
+  if (!m) return raw;
+  return `${m[1]!.charAt(0).toUpperCase()} ${m[2]}`;
+}
+
 /**
  * Over/Under for the primary total line (first condition after toolkit ordering — lowest line).
  */
@@ -79,7 +86,7 @@ export function extractOverUnderOdds(
       return null;
     }
     return firstCondition.outcomes.map((o) => ({
-      label: o.selectionName,
+      label: shortenOuLabel(o.selectionName),
       odds: o.odds,
       outcomeId: o.outcomeId,
       conditionId: firstCondition.conditionId,
