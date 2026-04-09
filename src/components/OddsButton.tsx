@@ -8,12 +8,10 @@ import {
   type ReactNode,
 } from "react";
 import { selectionId, useBetslip } from "@/components/Betslip";
+import { useOddsFormat } from "@/components/OddsFormatProvider";
+import { formatOddsValue } from "@/lib/oddsFormat";
 
 const FLASH_MS = 450;
-
-function formatDecimalOdds(odds: number): string {
-  return Number.isFinite(odds) && odds > 0 ? odds.toFixed(2) : "—";
-}
 
 export type OddsButtonProps = {
   gameId: string;
@@ -44,7 +42,8 @@ export function OddsButton({
   ...rest
 }: OddsButtonProps) {
   const { selections } = useBetslip();
-  const oddsText = formatDecimalOdds(odds);
+  const { format: oddsFormat } = useOddsFormat();
+  const oddsText = formatOddsValue(odds, oddsFormat);
   const unavailable =
     disabledProp || !Number.isFinite(odds) || odds <= 0 || oddsText === "—";
 

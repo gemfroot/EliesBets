@@ -9,7 +9,9 @@ import { formatUnits } from "viem";
 import { getBalanceQueryKey } from "wagmi/query";
 import { useChainId, useConnection } from "wagmi";
 import { CashoutButton } from "@/components/CashoutButton";
+import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { useToast } from "@/components/Toast";
+import { formatOddsValue } from "@/lib/oddsFormat";
 
 function participantLine(game: GameData): string {
   const { participants, title } = game;
@@ -54,6 +56,7 @@ export type BetCardProps = {
 };
 
 export function BetCard({ bet }: BetCardProps) {
+  const { format: oddsFormat } = useOddsFormat();
   const { betToken } = useChain();
   const { showToast } = useToast();
   const { address } = useConnection();
@@ -100,10 +103,7 @@ export function BetCard({ bet }: BetCardProps) {
     : "—";
 
   const oddsDisplay = Number.isFinite(bet.totalOdds)
-    ? bet.totalOdds.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
+    ? formatOddsValue(bet.totalOdds, oddsFormat)
     : "—";
 
   const isCombo = bet.outcomes.length > 1;
@@ -152,7 +152,7 @@ export function BetCard({ bet }: BetCardProps) {
               <p className="text-xs text-zinc-500">{o.marketName}</p>
               {isCombo ? (
                 <p className="mt-0.5 font-mono text-xs tabular-nums text-zinc-400">
-                  @{o.odds.toFixed(2)}
+                  @{formatOddsValue(o.odds, oddsFormat)}
                 </p>
               ) : null}
             </li>
