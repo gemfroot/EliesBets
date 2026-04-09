@@ -14,13 +14,20 @@ type GamePhase = CoinFlipPhase;
 const STAKE_PRESET_ETH = ["0.01", "0.05", "0.1", "0.5", "1"] as const;
 const RECENT_RESULTS_CAP = 12;
 
+const PHASE_LABEL: Record<GamePhase, string> = {
+  idle: "Ready",
+  picking: "Ready to play",
+  flipping: "Flipping",
+  result: "Result",
+};
+
 export function CoinTossGame() {
   const { isConnected } = useAccount();
   const {
     data: minBet,
     isMinBetPending: minBetLoading,
     vrfCost,
-    nativeTokenConfig,
+    chainTokenConfig,
     placeWager,
     canWager,
     isPending,
@@ -48,10 +55,10 @@ export function CoinTossGame() {
   const vrfWei = typeof vrfCost === "bigint" ? vrfCost : undefined;
 
   const houseEdgeBp = useMemo(() => {
-    const cfg = nativeTokenConfig as readonly unknown[] | undefined;
+    const cfg = chainTokenConfig as readonly unknown[] | undefined;
     if (!cfg || !Array.isArray(cfg) || typeof cfg[0] !== "number") return undefined;
     return cfg[0];
-  }, [nativeTokenConfig]);
+  }, [chainTokenConfig]);
 
   const parsedAmount = useMemo(() => {
     const t = amount.trim();
@@ -179,9 +186,9 @@ export function CoinTossGame() {
         <header className="mb-8 lg:mb-10">
           <h1 className="type-display">Coin toss</h1>
           <p className="type-muted mt-1 max-w-2xl">
-            Pick a side and send your total stake in one transaction—the VRF oracle fee is paid
-            from <span className="font-mono text-zinc-400">msg.value</span> (see breakdown below).
-            Connect on Polygon (BetSwirl defaults) or Gnosis when configured.
+            Pick a side and confirm your stake in one transaction—the randomness fee is included in
+            that amount (see game details for a breakdown). Connect on Polygon (BetSwirl defaults) or
+            Gnosis when configured.
           </p>
         </header>
 
@@ -220,7 +227,7 @@ export function CoinTossGame() {
                         : "bg-zinc-800 text-zinc-200 ring-1 ring-zinc-600"
                 }`}
               >
-                {phase}
+                {PHASE_LABEL[phase]}
               </span>
               {phase === "flipping" ? (
                 <span className="type-caption text-zinc-500">
@@ -278,7 +285,7 @@ export function CoinTossGame() {
 
                 <div>
                   <label htmlFor="coin-toss-amount" className="type-overline mb-2 block">
-                    Total to send (native)
+                    Stake
                   </label>
                   <div className="mb-2 flex flex-wrap gap-2">
                     {STAKE_PRESET_ETH.map((preset) => (
@@ -306,12 +313,7 @@ export function CoinTossGame() {
                   />
                   {parsedAmount.ok && parsedAmount.wei > BigInt(0) && vrfWei !== undefined ? (
                     <p className="type-caption mt-1.5 text-zinc-500">
-                      <span className="text-zinc-400">msg.value</span>{" "}
-                      {formatEther(parsedAmount.wei)} total — VRF fee{" "}
-                      {formatEther(vrfWei)} · bet amount{" "}
-                      {formatEther(
-                        parsedAmount.wei > vrfWei ? parsedAmount.wei - vrfWei : BigInt(0),
-                      )}
+                      Includes the randomness fee. Open game details for the full breakdown.
                     </p>
                   ) : null}
                   {amountError ? (
@@ -319,15 +321,15 @@ export function CoinTossGame() {
                   ) : null}
                   {belowMin ? (
                     <p className="type-caption mt-1.5 text-amber-300">
-                      Minimum total send is {formatEther(minBetWei)} (covers VRF + min bet).
+                      Minimum stake is {formatEther(minBetWei)} (covers randomness fee and minimum
+                      bet).
                     </p>
                   ) : null}
                   {minBetLoading ? (
                     <p className="type-caption mt-1.5 text-zinc-600">Loading minimum…</p>
                   ) : canWager && minBet !== undefined ? (
                     <p className="type-caption mt-1.5 text-zinc-500">
-                      Min. total {formatEther(minBetWei)} · Enter an amount to move from idle to
-                      picking.
+                      Minimum stake {formatEther(minBetWei)} · Enter an amount to continue.
                     </p>
                   ) : null}
                 </div>
@@ -355,7 +357,7 @@ export function CoinTossGame() {
                   <summary className="cursor-pointer select-none type-caption text-zinc-400">
                     Game details
                   </summary>
-                  <div className="type-caption mt-3 border-t border-zinc-800/80 pt-3 text-zinc-500">
+                  <div className="type-caption mt-3 space-y-2 border-t border-zinc-800/80 pt-3 text-zinc-500">
                     {houseEdgeBp !== undefined ? (
                       <p>
                         House edge:{" "}
@@ -366,6 +368,29 @@ export function CoinTossGame() {
                     ) : (
                       <p className="text-zinc-600">Loading…</p>
                     )}
+                    {parsedAmount.ok && parsedAmount.wei > BigInt(0) && vrfWei !== undefined ? (
+                      <div className="space-y-1">
+                        <p className="text-zinc-400">VRF (randomness) breakdown</p>
+                        <p>
+                          Payment total:{" "}
+                          <span className="font-mono text-zinc-300">
+                            {formatEther(parsedAmount.wei)}
+                          </span>
+                        </p>
+                        <p>
+                          VRF fee:{" "}
+                          <span className="font-mono text-zinc-300">{formatEther(vrfWei)}</span>
+                        </p>
+                        <p>
+                          Bet amount:{" "}
+                          <span className="font-mono text-zinc-300">
+                            {formatEther(
+                              parsedAmount.wei > vrfWei ? parsedAmount.wei - vrfWei : BigInt(0),
+                            )}
+                          </span>
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 </details>
 
