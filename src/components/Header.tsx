@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useBalance, useConnection, useDisconnect } from "wagmi";
 import { useState } from "react";
 import { formatUnits } from "viem";
@@ -38,12 +39,18 @@ export function Header() {
   });
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-2 border-b border-zinc-800 bg-zinc-950 px-4">
-      <span className="shrink-0 text-lg font-semibold tracking-tight text-zinc-50">
+    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4">
+      <Link
+        href="/"
+        className="shrink-0 text-lg font-semibold tracking-tight text-zinc-50 transition hover:text-zinc-200"
+      >
         EliesBets
-      </span>
+      </Link>
 
-      <div className="min-w-0 flex-1 px-1" data-header-search>
+      <div
+        className="flex min-w-0 flex-1 items-center justify-center px-1"
+        data-header-search
+      >
         <SearchBar />
       </div>
 
