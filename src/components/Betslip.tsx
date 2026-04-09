@@ -16,8 +16,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useAccount } from "wagmi";
-import { zeroAddress } from "viem";
+import { useAccount, useReadContract } from "wagmi";
+import { erc20Abi, formatUnits, zeroAddress } from "viem";
 import { BetReceipt } from "@/components/BetReceipt";
 import { useToast } from "@/components/Toast";
 
@@ -283,6 +283,8 @@ function MobileBetslipDrawer() {
 
 const SLIPPAGE_PERCENT = 5;
 
+const QUICK_STAKE_PRESETS = ["5", "10", "25", "50"] as const;
+
 type BetslipMode = "single" | "combo";
 
 function messageForBetslipDisableReason(
@@ -330,6 +332,31 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const { showToast } = useToast();
   const { clearSelections } = useBetslip();
   const { address, isConnected } = useAccount();
+  const { data: tokenBalanceRaw } = useReadContract({
+    address: betToken.address,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: Boolean(address && isConnected && betToken.address),
+    },
+  });
+
+  const applyStake = useCallback(
+    (value: string) => {
+      changeBetAmount(value);
+      setErrorMessage(null);
+    },
+    [changeBetAmount],
+  );
+
+  const fillMaxStake = useCallback(() => {
+    if (tokenBalanceRaw == null || tokenBalanceRaw === BigInt(0)) {
+      return;
+    }
+    applyStake(formatUnits(tokenBalanceRaw, betToken.decimals));
+  }, [applyStake, betToken.decimals, tokenBalanceRaw]);
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptSnapshot, setReceiptSnapshot] = useState<{
@@ -539,6 +566,30 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       <label className="text-xs font-medium text-zinc-400" htmlFor="betslip-stake">
         Stake ({betToken.symbol})
       </label>
+      <div className="flex flex-wrap gap-2">
+        {QUICK_STAKE_PRESETS.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => applyStake(preset)}
+            className="min-h-9 min-w-[2.75rem] touch-manipulation rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-medium tabular-nums text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-800 active:bg-zinc-800/90"
+          >
+            {preset}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={fillMaxStake}
+          disabled={
+            !isConnected ||
+            tokenBalanceRaw == null ||
+            tokenBalanceRaw === BigInt(0)
+          }
+          className="min-h-9 touch-manipulation rounded-md border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-100 transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          MAX
+        </button>
+      </div>
       <div className="flex items-center gap-2">
         <input
           id="betslip-stake"
@@ -548,10 +599,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           step="any"
           placeholder="0"
           value={betAmount}
-          onChange={(e) => {
-            changeBetAmount(e.target.value);
-            setErrorMessage(null);
-          }}
+          onChange={(e) => applyStake(e.target.value)}
           className="min-h-11 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-base tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 md:min-h-0 md:text-sm"
         />
       </div>
