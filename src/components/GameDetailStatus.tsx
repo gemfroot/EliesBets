@@ -19,11 +19,13 @@ function formatStartTime(startsAt: string): string {
 export function GameDetailStatus({
   gameId,
   sportId,
+  sportSlug,
   state,
   startsAt,
 }: {
   gameId: string;
   sportId: string;
+  sportSlug: string;
   state: GameState;
   startsAt: string;
 }) {
@@ -54,7 +56,12 @@ export function GameDetailStatus({
     return (
       <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/20 px-4 py-4">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <LiveBadge startsAt={startsAt} />
+          <LiveBadge
+            startsAt={startsAt}
+            sportSlug={sportSlug}
+            scoreBoard={liveStats?.scoreBoard}
+            clock={liveStats?.clock}
+          />
           {scoreLine ? (
             <span
               className="type-display text-2xl tabular-nums text-zinc-50 sm:text-3xl"

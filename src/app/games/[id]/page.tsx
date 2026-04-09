@@ -180,6 +180,7 @@ export default async function GameDetailPage({ params }: Props) {
       <GameDetailStatus
         gameId={game.gameId}
         sportId={game.sport.sportId}
+        sportSlug={game.sport.slug}
         state={game.state}
         startsAt={game.startsAt}
       />
