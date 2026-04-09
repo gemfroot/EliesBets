@@ -11,6 +11,11 @@ import { useChainId, useConnection } from "wagmi";
 import { CashoutButton } from "@/components/CashoutButton";
 import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { useToast } from "@/components/Toast";
+import {
+  formatBetHistoryShareText,
+  shareOrCopyBetText,
+  txExplorerUrlFromAppChain,
+} from "@/lib/betShare";
 import { formatOddsValue } from "@/lib/oddsFormat";
 
 function participantLine(game: GameData): string {
@@ -57,7 +62,7 @@ export type BetCardProps = {
 
 export function BetCard({ bet }: BetCardProps) {
   const { format: oddsFormat } = useOddsFormat();
-  const { betToken } = useChain();
+  const { betToken, appChain } = useChain();
   const { showToast } = useToast();
   const { address } = useConnection();
   const chainId = useChainId();
@@ -108,6 +113,12 @@ export function BetCard({ bet }: BetCardProps) {
 
   const isCombo = bet.outcomes.length > 1;
 
+  const txExplorer = txExplorerUrlFromAppChain(
+    appChain.id,
+    appChain.blockExplorers?.default?.url,
+    bet.txHash,
+  );
+
   return (
     <article className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-zinc-800/80 pb-2">
@@ -117,11 +128,39 @@ export function BetCard({ bet }: BetCardProps) {
           </p>
           <p className="mt-1 font-mono text-xs text-zinc-500">{bet.orderId}</p>
         </div>
-        <span
-          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(bet)}`}
-        >
-          {statusLabel(bet)}
-        </span>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              const text = formatBetHistoryShareText(
+                bet,
+                stakeDisplay,
+                possibleWinDisplay,
+                payoutDisplay,
+                oddsDisplay,
+                betToken.symbol,
+                oddsFormat,
+                txExplorer,
+              );
+              const result = await shareOrCopyBetText(text);
+              if (result === "shared") {
+                showToast("Shared.", "success");
+              } else if (result === "copied") {
+                showToast("Bet copied to clipboard.", "success");
+              } else if (result === "failed") {
+                showToast("Could not share or copy.", "error");
+              }
+            }}
+            className="rounded-lg border border-zinc-600 px-2.5 py-1 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800"
+          >
+            Share
+          </button>
+          <span
+            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(bet)}`}
+          >
+            {statusLabel(bet)}
+          </span>
+        </div>
       </div>
 
       <ul className="mt-3 flex flex-col gap-2">
