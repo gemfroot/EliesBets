@@ -5,6 +5,7 @@ import { useBalance, useConnection, useDisconnect } from "wagmi";
 import { useState } from "react";
 import { formatUnits } from "viem";
 import { ConnectModal } from "@/components/ConnectModal";
+import { MyBetsLink } from "@/components/MyBetsLink";
 import { SearchBar } from "@/components/SearchBar";
 
 function formatAddress(address: string) {
@@ -55,6 +56,7 @@ export function Header() {
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <MyBetsLink variant="header" />
         {isConnected && address ? (
           <>
             <span className="font-mono text-sm text-zinc-300">
