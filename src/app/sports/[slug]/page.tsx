@@ -5,12 +5,29 @@ import { extractMainLineOdds } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
 import { CHAIN_ID } from "@/lib/constants";
 import { chunk, fetchGamesForSport } from "@/lib/sportGames";
+import type { Metadata } from "next";
 
 export const revalidate = 45;
 
 type Props = {
   params: Promise<{ slug: string }>;
 };
+
+function titleFromSlug(slug: string): string {
+  return slug
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const title = titleFromSlug(slug);
+  return {
+    title: `${title} betting`,
+    description: `Browse ${title} fixtures, leagues, and live or prematch odds on EliesBets.`,
+  };
+}
 
 const CONDITIONS_BATCH = 40;
 
@@ -67,10 +84,7 @@ function groupGamesByLeague(games: GameData[]): LeagueGroup[] {
 
 export default async function SportPage({ params }: Props) {
   const { slug } = await params;
-  const title = slug
-    .split("-")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+  const title = titleFromSlug(slug);
 
   let games: GameData[] = [];
   let loadError: string | null = null;
