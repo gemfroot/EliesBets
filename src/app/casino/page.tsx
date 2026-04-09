@@ -18,17 +18,17 @@ type GameCard =
 const GAMES: readonly GameCard[] = [
   {
     status: "live",
-    icon: "🪙",
-    title: "Coin toss",
-    description: "Call heads or tails and settle on-chain with your stake.",
-    href: "/casino/coin-toss",
-  },
-  {
-    status: "live",
     icon: "🎲",
     title: "Dice",
     description: "Roll provably fair dice with adjustable risk and payouts.",
     href: "/casino/dice",
+  },
+  {
+    status: "live",
+    icon: "🪙",
+    title: "Coin toss",
+    description: "Call heads or tails and settle on-chain with your stake.",
+    href: "/casino/coin-toss",
   },
   {
     status: "soon",
