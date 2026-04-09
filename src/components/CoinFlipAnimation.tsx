@@ -146,7 +146,7 @@ export function CoinFlipAnimation({
         <p className="type-caption mt-6 max-w-xs text-center text-zinc-600">
           {phase === "flipping"
             ? "Waiting for the network to settle the flip."
-            : "Stake native currency on heads or tails."}
+            : "Pick a side and stake POL to flip."}
         </p>
       )}
     </div>

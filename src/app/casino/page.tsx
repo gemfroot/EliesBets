@@ -48,10 +48,9 @@ export default function CasinoPage() {
     <div className="page-shell">
       <header className="max-w-3xl">
         <h1 className="type-display">Casino</h1>
-        <p className="type-title mt-2 text-zinc-300">Provably fair</p>
         <p className="type-muted mt-2">
-          Wallet games on Polygon and Gnosis. Pick a table below—more titles
-          ship on-chain as we roll them out.
+          Provably fair games powered by Chainlink VRF. Every result is
+          verifiable on-chain.
         </p>
       </header>
 
