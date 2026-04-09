@@ -14,7 +14,7 @@ import { LiveGameCard } from "@/components/LiveGameCard";
 import { RetryCallout } from "@/components/RetryCallout";
 import { CHAIN_ID } from "@/lib/constants";
 import { chunk } from "@/lib/sportGames";
-import { sportEmoji } from "@/lib/sportEmoji";
+import { SportNavIcon } from "@/lib/sportNavIcon";
 
 const CONDITIONS_BATCH = 40;
 const HERO_LIVE_LIMIT = 6;
@@ -189,17 +189,17 @@ export async function HomeSportsNavSection() {
 
   return (
     <nav className="mb-8" aria-label="Sports">
-      <p className="type-overline">Sports</p>
-      <ul className="mt-3 flex flex-wrap gap-2">
+      <ul className="flex flex-wrap gap-2">
         {sportLinks.map((s) => (
           <li key={s.slug}>
             <Link
               href={`/sports/${s.slug}`}
-              className="flex min-w-[4.5rem] flex-col items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-center transition hover:border-zinc-600 hover:bg-zinc-900"
+              className="flex min-h-[44px] min-w-[4.5rem] flex-col items-center justify-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-center transition hover:border-zinc-600 hover:bg-zinc-900"
             >
-              <span className="text-xl leading-none" aria-hidden>
-                {sportEmoji(s.slug)}
-              </span>
+              <SportNavIcon
+                slug={s.slug}
+                className="h-6 w-6 shrink-0 text-zinc-300"
+              />
               <span className="max-w-[5.5rem] truncate text-[11px] font-medium text-zinc-300">
                 {s.name}
               </span>

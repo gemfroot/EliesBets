@@ -30,10 +30,7 @@ function HomeHeroFallback() {
 function HomeSportsNavFallback() {
   return (
     <div className="mb-8" aria-hidden>
-      <div className="h-3 w-16 animate-pulse rounded bg-zinc-800" />
-      <div className="mt-3">
-        <SportsNavSkeleton pills={10} />
-      </div>
+      <SportsNavSkeleton pills={10} />
     </div>
   );
 }
