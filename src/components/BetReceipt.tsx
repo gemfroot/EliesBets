@@ -1,6 +1,7 @@
 "use client";
 
 import { useChain } from "@azuro-org/sdk";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { BetslipSelection } from "@/components/Betslip";
 import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { useToast } from "@/components/Toast";
@@ -35,6 +36,8 @@ export function BetReceipt({
   const { format: oddsFormat } = useOddsFormat();
   const { appChain } = useChain();
   const { showToast } = useToast();
+  const [shareBusy, setShareBusy] = useState(false);
+  const shareInFlightRef = useRef(false);
   const explorer = transactionHash
     ? txExplorerUrlFromAppChain(
         appChain.id,
@@ -42,6 +45,76 @@ export function BetReceipt({
         transactionHash,
       )
     : null;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const main = document.querySelector("main");
+    const prevMainOverflow = main?.style.overflow ?? "";
+    if (main) {
+      main.style.overflow = "hidden";
+    }
+    return () => {
+      if (main) {
+        main.style.overflow = prevMainOverflow;
+      }
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  const handleShare = useCallback(async () => {
+    if (shareInFlightRef.current) {
+      return;
+    }
+    shareInFlightRef.current = true;
+    setShareBusy(true);
+    try {
+      const text = formatBetReceiptShareText(
+        selections,
+        stakeLabel,
+        tokenSymbol,
+        totalOdds,
+        potentialWin,
+        oddsFormat,
+        transactionHash,
+        explorer,
+      );
+      const result = await shareOrCopyBetText(text);
+      if (result === "shared") {
+        showToast("Shared.", "success");
+      } else if (result === "copied") {
+        showToast("Bet receipt copied to clipboard.", "success");
+      } else if (result === "failed") {
+        showToast("Could not share or copy.", "error");
+      }
+    } finally {
+      shareInFlightRef.current = false;
+      setShareBusy(false);
+    }
+  }, [
+    explorer,
+    oddsFormat,
+    potentialWin,
+    selections,
+    stakeLabel,
+    showToast,
+    tokenSymbol,
+    totalOdds,
+    transactionHash,
+  ]);
 
   if (!open) {
     return null;
@@ -133,29 +206,11 @@ export function BetReceipt({
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            onClick={async () => {
-              const text = formatBetReceiptShareText(
-                selections,
-                stakeLabel,
-                tokenSymbol,
-                totalOdds,
-                potentialWin,
-                oddsFormat,
-                transactionHash,
-                explorer,
-              );
-              const result = await shareOrCopyBetText(text);
-              if (result === "shared") {
-                showToast("Shared.", "success");
-              } else if (result === "copied") {
-                showToast("Bet receipt copied to clipboard.", "success");
-              } else if (result === "failed") {
-                showToast("Could not share or copy.", "error");
-              }
-            }}
-            className="rounded-lg border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-100 transition hover:bg-zinc-800"
+            disabled={shareBusy}
+            onClick={() => void handleShare()}
+            className="rounded-lg border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-100 transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Share
+            {shareBusy ? "Sharing…" : "Share"}
           </button>
           <button
             type="button"
