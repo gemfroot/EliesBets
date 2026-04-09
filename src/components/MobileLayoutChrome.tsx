@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode, SVGProps } from "react";
+import { useEffect, useState, type ReactNode, type SVGProps } from "react";
 import { useSports } from "@azuro-org/sdk";
 import { useBetslipMobileDrawer } from "@/components/Betslip";
+import { FavoritesNav } from "@/components/FavoritesNav";
 import { MyBetsLink } from "@/components/MyBetsLink";
 import { SportNavIcon } from "@/lib/sportNavIcon";
 
@@ -56,20 +57,120 @@ function SlipIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function StarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <NavGlyph {...props}>
+      <path d="M12 3.5 14.09 8.26 19.5 9.1 15.5 12.74 16.5 18.5 12 15.77 7.5 18.5 8.5 12.74 4.5 9.1 9.91 8.26 12 3.5Z" />
+    </NavGlyph>
+  );
+}
+
+function MobileFavoritesDrawer({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 md:hidden ${
+        open ? "pointer-events-auto" : "pointer-events-none"
+      }`}
+      role="presentation"
+    >
+      <button
+        type="button"
+        className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+          open ? "opacity-100" : "opacity-0"
+        }`}
+        aria-label="Close favorites"
+        aria-hidden={!open}
+        tabIndex={open ? 0 : -1}
+        onClick={onClose}
+      />
+      <div
+        className={`absolute bottom-0 left-0 right-0 flex max-h-[min(85vh,32rem)] flex-col rounded-t-xl border border-b-0 border-zinc-700 bg-zinc-900 shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none ${
+          open ? "translate-y-0" : "translate-y-full"
+        }`}
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Favorites"
+        aria-hidden={!open}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-4 py-3">
+          <p className="text-sm font-semibold text-zinc-100">Favorites</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
+            aria-label="Close"
+          >
+            <span className="text-xl leading-none" aria-hidden>
+              ×
+            </span>
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+          <FavoritesNav variant="sheet" onFavoriteNavigate={onClose} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MobileLayoutChrome() {
   const { openDrawer } = useBetslipMobileDrawer();
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
 
   return (
     <>
-      <MobileBottomNav onOpenBetslip={openDrawer} />
+      <MobileBottomNav
+        onOpenBetslip={openDrawer}
+        favoritesOpen={favoritesOpen}
+        onToggleFavorites={() => setFavoritesOpen((v) => !v)}
+      />
+      <MobileFavoritesDrawer
+        open={favoritesOpen}
+        onClose={() => setFavoritesOpen(false)}
+      />
     </>
   );
 }
 
 function MobileBottomNav({
   onOpenBetslip,
+  favoritesOpen,
+  onToggleFavorites,
 }: {
   onOpenBetslip: () => void;
+  favoritesOpen: boolean;
+  onToggleFavorites: () => void;
 }) {
   const { data: sports, isLoading, isError } = useSports({
     isLive: false,
@@ -100,6 +201,21 @@ function MobileBottomNav({
         </Link>
 
         <MyBetsLink variant="mobile" />
+
+        <button
+          type="button"
+          onClick={onToggleFavorites}
+          className={`flex min-h-[44px] min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 px-2 text-[10px] font-medium transition hover:text-zinc-100 ${
+            favoritesOpen
+              ? "text-amber-400"
+              : "text-zinc-400"
+          }`}
+          aria-label="Favorites"
+          aria-expanded={favoritesOpen}
+        >
+          <StarIcon className="h-[1.125rem] w-[1.125rem]" />
+          Favs
+        </button>
 
         <div className="flex min-h-[44px] min-w-0 flex-1 items-center overflow-x-auto overscroll-x-contain px-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {isLoading ? (
