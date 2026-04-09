@@ -499,7 +499,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       : "Place Bet";
 
   return (
-    <div className="mt-4 flex flex-col gap-2 border-t border-zinc-800 pt-4">
+    <div className="mt-4 flex flex-col gap-3 border-t border-zinc-800 pt-4">
       {multiPick ? (
         <div className="flex flex-col gap-1">
           <p className="text-xs font-medium text-zinc-400">Bet type</p>
@@ -648,14 +648,41 @@ export function BetslipPanel() {
         Betslip
       </p>
       {selections.length === 0 ? (
-        <p className="mt-4 text-sm text-zinc-500">No selections yet.</p>
+        <div
+          className="mt-4 flex flex-col items-center rounded-lg border border-dashed border-zinc-700 bg-zinc-900/40 px-4 py-8 text-center"
+          role="status"
+        >
+          <span className="flex h-14 w-14 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900/80 text-zinc-500">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              className="h-7 w-7"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.5 6v13.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4.5 19.5V9a1.5 1.5 0 0 1 .44-1.06l6-6A1.5 1.5 0 0 1 12 1.5h3A1.5 1.5 0 0 1 16.5 3v3Zm0 0H12a1.5 1.5 0 0 1-1.5-1.5V1.5"
+              />
+            </svg>
+          </span>
+          <p className="mt-4 text-sm font-medium text-zinc-300">
+            Nothing on your slip yet
+          </p>
+          <p className="mt-1 max-w-[16rem] text-xs leading-relaxed text-zinc-500">
+            Tap odds on any game to add selections here.
+          </p>
+        </div>
       ) : (
         <>
-          <ul className="mt-4 flex flex-col gap-2">
+          <ul className="mt-4 flex flex-col gap-3">
             {selections.map((s) => (
               <li
                 key={s.id}
-                className="flex items-start justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900/80 px-2 py-2"
+                className="flex items-start justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-zinc-500">{s.gameTitle}</p>
