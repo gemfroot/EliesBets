@@ -80,15 +80,42 @@ export function GameCardListSkeleton({
   );
 }
 
+/** Matches hero live grid: stacked names + badge row + odds row */
+export function HeroLiveGameCardSkeleton() {
+  return (
+    <div
+      className="flex h-full min-h-0 flex-col rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3"
+      aria-hidden
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="mx-auto h-3 w-6" />
+          <Skeleton className="h-4 w-full" />
+        </div>
+        <Skeleton className="h-11 w-11 shrink-0 rounded" />
+      </div>
+      <div className="flex min-h-[1.75rem] items-center justify-center py-1">
+        <Skeleton className="h-3 w-24" />
+      </div>
+      <div className="mt-auto flex gap-2 pt-1">
+        <Skeleton className="h-10 min-h-10 flex-1 rounded-md" />
+        <Skeleton className="h-10 min-h-10 flex-1 rounded-md" />
+        <Skeleton className="h-10 min-h-10 flex-1 rounded-md" />
+      </div>
+    </div>
+  );
+}
+
 export function LiveGameGridSkeleton({ count = 6 }: { count?: number }) {
   return (
     <ul
-      className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3"
+      className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-3"
       aria-hidden
     >
       {Array.from({ length: count }).map((_, i) => (
-        <li key={i}>
-          <GameCardSkeleton />
+        <li key={i} className="min-w-0">
+          <HeroLiveGameCardSkeleton />
         </li>
       ))}
     </ul>
