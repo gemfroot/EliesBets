@@ -43,7 +43,7 @@ export function Header() {
         EliesBets
       </span>
 
-      <div className="min-w-0 flex-1 px-1">
+      <div className="min-w-0 flex-1 px-1" data-header-search>
         <SearchBar />
       </div>
 
