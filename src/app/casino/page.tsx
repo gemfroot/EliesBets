@@ -24,10 +24,11 @@ const GAMES: readonly GameCard[] = [
     href: "/casino/coin-toss",
   },
   {
-    status: "soon",
+    status: "live",
     icon: "🎲",
     title: "Dice",
     description: "Roll provably fair dice with adjustable risk and payouts.",
+    href: "/casino/dice",
   },
   {
     status: "soon",

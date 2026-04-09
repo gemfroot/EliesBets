@@ -101,6 +101,21 @@ body {
     }
   }
 
+  /** Dice: cap range slider (WebKit + Firefox) */
+  .dice-cap-slider::-webkit-slider-thumb {
+    @apply h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-emerald-400 bg-zinc-950 shadow-md;
+    margin-top: -5px;
+  }
+  .dice-cap-slider::-webkit-slider-runnable-track {
+    @apply h-3 rounded-full bg-zinc-800;
+  }
+  .dice-cap-slider::-moz-range-thumb {
+    @apply h-5 w-5 cursor-pointer rounded-full border-2 border-emerald-400 bg-zinc-950 shadow-md;
+  }
+  .dice-cap-slider::-moz-range-track {
+    @apply h-3 rounded-full bg-zinc-800;
+  }
+
   /**
    * Coin toss win: lightweight confetti (CSS-only, respects reduced motion via parent visibility).
    */
