@@ -8,6 +8,7 @@ import { OddsButton } from "@/components/OddsButton";
 import { useBetslipActions } from "@/components/Betslip";
 import type { TopOddsLine } from "@/lib/oddsUtils";
 import { useCountdown, parseStartsAtMs } from "@/lib/useCountdown";
+import { SportNavIcon } from "@/lib/sportNavIcon";
 
 function formatStartTime(startsAt: string): string {
   const ms = +startsAt < 32_503_680_000 ? +startsAt * 1000 : +startsAt;
@@ -241,6 +242,12 @@ export function GameCard({
 
     return (
       <article className="flex h-full min-h-0 flex-col rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
+        <div className="mb-1.5 flex min-w-0 items-center gap-1.5">
+          <SportNavIcon slug={game.sport.slug} className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+          <span className="truncate text-[11px] text-zinc-500">
+            {game.sport.name} · {game.league.name}
+          </span>
+        </div>
         <div className="flex min-w-0 items-start justify-between gap-2">
           {titleBlock}
           <FavoriteGameButton gameId={game.gameId} title={names} />
@@ -260,6 +267,14 @@ export function GameCard({
 
   return (
     <article className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
+      {variant === "default" && (
+        <div className="mb-1.5 flex min-w-0 items-center gap-1.5">
+          <SportNavIcon slug={game.sport.slug} className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+          <span className="truncate text-[11px] text-zinc-500">
+            {game.sport.name} · {game.league.name}
+          </span>
+        </div>
+      )}
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-start gap-1">
