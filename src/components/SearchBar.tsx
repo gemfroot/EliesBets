@@ -132,6 +132,7 @@ export function SearchBar() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   const trimmed = query.trim();
   const items = useMemo(() => {
@@ -207,6 +208,17 @@ export function SearchBar() {
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, []);
 
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    function onChange() {
+      if (mq.matches) {
+        setMobileSearchOpen(false);
+      }
+    }
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
   const showPanel = Boolean(
     open &&
       trimmed.length >= MIN_QUERY &&
@@ -216,6 +228,7 @@ export function SearchBar() {
   const go = useCallback(
     (href: string) => {
       setOpen(false);
+      setMobileSearchOpen(false);
       router.push(href);
     },
     [router],
@@ -247,33 +260,86 @@ export function SearchBar() {
     if (e.key === "Escape") {
       e.preventDefault();
       setOpen(false);
+      setMobileSearchOpen(false);
     }
   };
 
+  const inputId = `${listId}-input`;
+  const showInputDesktop = "hidden min-w-0 flex-1 md:block";
+  const showInputMobile =
+    mobileSearchOpen ? "block min-w-0 flex-1" : showInputDesktop;
+
   return (
     <div ref={containerRef} className="relative w-full min-w-0 max-w-md">
-      <label className="sr-only" htmlFor={`${listId}-input`}>
-        Search games, teams, and leagues
-      </label>
-      <input
-        id={`${listId}-input`}
-        type="search"
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setHighlight(0);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={onKeyDown}
-        autoComplete="off"
-        placeholder="Search games, teams, leagues…"
-        aria-expanded={showPanel}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        role="combobox"
-        className="w-full rounded-lg border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-      />
+      <div
+        className={`flex w-full items-center gap-2 ${
+          mobileSearchOpen ? "" : "justify-center md:justify-start"
+        }`}
+      >
+        <div className={showInputMobile}>
+          <label className="sr-only" htmlFor={inputId}>
+            Search games, teams, and leagues
+          </label>
+          <input
+            id={inputId}
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setHighlight(0);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={onKeyDown}
+            autoComplete="off"
+            placeholder="Search games, teams, leagues…"
+            aria-expanded={showPanel}
+            aria-controls={listId}
+            aria-autocomplete="list"
+            role="combobox"
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          />
+        </div>
+
+        <button
+          type="button"
+          className="shrink-0 rounded-lg border border-zinc-700 bg-zinc-900/80 p-2 text-zinc-300 transition hover:bg-zinc-800 md:hidden"
+          aria-expanded={mobileSearchOpen}
+          aria-controls={inputId}
+          aria-label={mobileSearchOpen ? "Close search" : "Open search"}
+          onClick={() => setMobileSearchOpen((v) => !v)}
+        >
+          {mobileSearchOpen ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="h-5 w-5"
+              aria-hidden
+            >
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className="h-5 w-5"
+              aria-hidden
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+          )}
+        </button>
+      </div>
 
       {showPanel ? (
         <div
