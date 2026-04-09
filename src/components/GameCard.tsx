@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { GameData } from "@azuro-org/toolkit";
+import { GameState, type GameData } from "@azuro-org/toolkit";
 import { FavoriteGameButton } from "@/components/FavoriteButton";
 import { OddsButton } from "@/components/OddsButton";
 import { useBetslip } from "@/components/Betslip";
 import type { TopOddsLine } from "@/lib/oddsUtils";
+import { useCountdown, parseStartsAtMs } from "@/lib/useCountdown";
 
 function formatStartTime(startsAt: string): string {
   const ms = +startsAt < 32_503_680_000 ? +startsAt * 1000 : +startsAt;
@@ -17,6 +18,25 @@ function formatStartTime(startsAt: string): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(ms));
+}
+
+function PrematchCountdown({
+  startsAt,
+  variant,
+}: {
+  startsAt: string;
+  variant: "default" | "heroLive";
+}) {
+  const { label } = useCountdown(parseStartsAtMs(startsAt));
+  const className =
+    variant === "heroLive"
+      ? "text-xs tabular-nums text-zinc-400"
+      : "mt-1 text-xs tabular-nums text-zinc-400";
+  return (
+    <p className={className} aria-live="polite">
+      Starts in {label}
+    </p>
+  );
 }
 
 function participantLine(game: GameData): string {
@@ -140,9 +160,12 @@ export function GameCard({
           <FavoriteGameButton gameId={game.gameId} title={names} />
         </div>
         <div className="flex min-h-[1.75rem] shrink-0 items-center justify-center py-1">
-          {meta ?? (
-            <p className="text-xs tabular-nums text-zinc-500">{when}</p>
-          )}
+          {meta ??
+            (game.state === GameState.Prematch ? (
+              <PrematchCountdown startsAt={game.startsAt} variant="heroLive" />
+            ) : (
+              <p className="text-xs tabular-nums text-zinc-500">{when}</p>
+            ))}
         </div>
         <div className="mt-auto min-w-0 pt-1">{oddsBlock}</div>
       </article>
@@ -164,9 +187,12 @@ export function GameCard({
             </h2>
             <FavoriteGameButton gameId={game.gameId} title={names} />
           </div>
-          {meta ?? (
-            <p className="mt-1 text-xs tabular-nums text-zinc-500">{when}</p>
-          )}
+          {meta ??
+            (game.state === GameState.Prematch ? (
+              <PrematchCountdown startsAt={game.startsAt} variant="default" />
+            ) : (
+              <p className="mt-1 text-xs tabular-nums text-zinc-500">{when}</p>
+            ))}
         </div>
         {oddsBlock}
       </div>

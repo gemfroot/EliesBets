@@ -9,6 +9,7 @@ import {
   type Market,
 } from "@azuro-org/toolkit";
 import { GameDetailMarkets } from "@/components/GameDetailMarkets";
+import { GameDetailStatus } from "@/components/GameDetailStatus";
 import { CHAIN_ID } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -16,17 +17,6 @@ export const dynamic = "force-dynamic";
 type Props = {
   params: Promise<{ id: string }>;
 };
-
-function formatStartTime(startsAt: string): string {
-  const ms = +startsAt < 32_503_680_000 ? +startsAt * 1000 : +startsAt;
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(ms));
-}
 
 function participantLine(game: GameData): string {
   const { participants, title } = game;
@@ -140,7 +130,6 @@ export default async function GameDetailPage({ params }: Props) {
   const sections = groupMarketsForUi(markets);
 
   const names = participantLine(game);
-  const when = formatStartTime(game.startsAt);
 
   return (
     <div className="page-shell">
@@ -164,7 +153,12 @@ export default async function GameDetailPage({ params }: Props) {
         </Link>
       </p>
       <h1 className="type-display mt-2">{names}</h1>
-      <p className="type-caption mt-1 font-mono tabular-nums">{when}</p>
+      <GameDetailStatus
+        gameId={game.gameId}
+        sportId={game.sport.sportId}
+        state={game.state}
+        startsAt={game.startsAt}
+      />
 
       <GameDetailMarkets
         sections={sections}
