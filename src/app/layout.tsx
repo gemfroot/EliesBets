@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import { cookieToInitialState } from "wagmi";
@@ -103,6 +104,7 @@ export default async function RootLayout({
             <MobileLayoutChrome />
           </div>
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
