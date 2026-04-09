@@ -162,6 +162,7 @@ export default async function GameDetailPage({ params }: Props) {
 
       <GameDetailMarkets
         sections={sections}
+        gameId={game.gameId}
         gameTitle={names}
         marketsError={marketsError}
       />

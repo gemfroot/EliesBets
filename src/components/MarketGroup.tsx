@@ -8,6 +8,8 @@ import { useBetslip } from "@/components/Betslip";
 export type MarketGroupProps = {
   title: string;
   markets: Market[];
+  /** Azuro game id for betslip selections; must be non-empty. */
+  gameId: string;
   /** Match title for receipts (e.g. Team A vs Team B). */
   gameTitle: string;
   defaultOpen?: boolean;
@@ -105,6 +107,7 @@ function ConditionBlock({
 export function MarketGroup({
   title,
   markets,
+  gameId,
   gameTitle,
   defaultOpen = true,
 }: MarketGroupProps) {
@@ -129,7 +132,6 @@ export function MarketGroup({
       </summary>
       <div className="flex flex-col gap-4 border-t border-zinc-800 px-4 pb-4 pt-3">
         {markets.map((market) => {
-          const gameId = market.conditions[0]?.outcomes[0]?.gameId ?? "";
           const showMarketName = markets.length > 1;
           return (
             <div key={market.marketKey} className="flex flex-col gap-2">
