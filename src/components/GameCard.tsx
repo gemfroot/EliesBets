@@ -53,6 +53,10 @@ function participantLine(game: GameData): string {
 export type GameCardProps = {
   game: GameData;
   topOdds?: TopOddsLine[] | null;
+  /** Optional Over/Under line (shown below main line when distinct from it). */
+  overUnderOdds?: TopOddsLine[] | null;
+  /** Markets not represented by the main + O/U rows; "+N" links to game detail. */
+  extraMarketsCount?: number;
   /** When set, replaces the default formatted start time under the title. */
   meta?: ReactNode;
   /** Stacked layout for home hero live grid: names → meta → odds, no side-by-side clash. */
@@ -62,6 +66,8 @@ export type GameCardProps = {
 export function GameCard({
   game,
   topOdds,
+  overUnderOdds,
+  extraMarketsCount = 0,
   meta,
   variant = "default",
 }: GameCardProps) {
@@ -69,46 +75,127 @@ export function GameCard({
   const names = participantLine(game);
   const when = formatStartTime(game.startsAt);
   const { participants } = game;
+  const gameHref = `/games/${game.gameId}`;
 
-  const oddsBlock =
+  const mainButtonClass =
+    variant === "heroLive"
+      ? "min-h-10 min-w-0 flex-1 py-2 text-left"
+      : "min-h-11 w-full flex-none py-2 text-left md:min-h-0 md:w-auto md:flex-none md:py-1.5";
+
+  const ouButtonClass =
+    variant === "heroLive"
+      ? "min-h-10 min-w-0 flex-1 py-2 text-left"
+      : "min-h-11 w-full flex-none py-2 text-left md:min-h-0 md:w-auto md:flex-none md:py-1.5";
+
+  const addLine = (line: TopOddsLine) =>
+    addSelection({
+      gameId: game.gameId,
+      gameTitle: names,
+      outcomeName: line.label,
+      odds:
+        Number.isFinite(line.odds) && line.odds > 0
+          ? line.odds.toFixed(2)
+          : "—",
+      outcomeId: line.outcomeId,
+      conditionId: line.conditionId,
+      isExpressForbidden: line.isExpressForbidden,
+    });
+
+  const extraBadgeRow = (onOuRow: boolean) =>
+    extraMarketsCount > 0 &&
+    (onOuRow ? !!overUnderOdds?.length : !overUnderOdds?.length) ? (
+      <Link
+        href={gameHref}
+        className={
+          variant === "heroLive"
+            ? "inline-flex min-h-10 min-w-[2.75rem] shrink-0 items-center justify-center self-stretch rounded-md border border-zinc-700 bg-zinc-800/80 px-2 text-xs font-semibold tabular-nums text-zinc-300 transition-colors hover:bg-zinc-700/90"
+            : "inline-flex min-h-11 min-w-[2.75rem] shrink-0 items-center justify-center self-stretch rounded-md border border-zinc-700 bg-zinc-800/80 px-2 text-xs font-semibold tabular-nums text-zinc-300 transition-colors hover:bg-zinc-700/90 md:min-h-0"
+        }
+        aria-label={`${extraMarketsCount} more markets`}
+      >
+        +{extraMarketsCount}
+      </Link>
+    ) : null;
+
+  const mainOddsRow =
     topOdds && topOdds.length > 0 ? (
       <div
         className={
           variant === "heroLive"
-            ? "flex w-full min-w-0 flex-row gap-2"
-            : "flex w-full min-w-0 shrink flex-col gap-2 md:w-auto md:max-w-[min(100%,22rem)] md:flex-row md:gap-2"
+            ? "flex w-full min-w-0 flex-row items-stretch gap-2"
+            : "flex w-full min-w-0 shrink flex-row items-stretch gap-2 md:w-auto md:max-w-[min(100%,22rem)]"
         }
         aria-label="Main odds"
       >
-        {topOdds.map((line) => (
-          <OddsButton
-            key={line.outcomeId}
-            gameId={game.gameId}
-            outcomeName={line.label}
-            outcomeId={line.outcomeId}
-            odds={line.odds}
-            label={line.label}
-            className={
-              variant === "heroLive"
-                ? "min-h-10 min-w-0 flex-1 py-2 text-left"
-                : "min-h-11 w-full flex-none py-2 text-left md:min-h-0 md:w-auto md:flex-none md:py-1.5"
-            }
-            onClick={() =>
-              addSelection({
-                gameId: game.gameId,
-                gameTitle: names,
-                outcomeName: line.label,
-                odds:
-                  Number.isFinite(line.odds) && line.odds > 0
-                    ? line.odds.toFixed(2)
-                    : "—",
-                outcomeId: line.outcomeId,
-                conditionId: line.conditionId,
-                isExpressForbidden: line.isExpressForbidden,
-              })
-            }
-          />
-        ))}
+        <div
+          className={
+            variant === "heroLive"
+              ? "flex min-w-0 flex-1 flex-row gap-2"
+              : "flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:gap-2"
+          }
+        >
+          {topOdds.map((line) => (
+            <OddsButton
+              key={line.outcomeId}
+              gameId={game.gameId}
+              outcomeName={line.label}
+              outcomeId={line.outcomeId}
+              odds={line.odds}
+              label={line.label}
+              className={mainButtonClass}
+              onClick={() => addLine(line)}
+            />
+          ))}
+        </div>
+        {extraBadgeRow(false)}
+      </div>
+    ) : null;
+
+  const overUnderRow =
+    overUnderOdds && overUnderOdds.length > 0 ? (
+      <div
+        className={
+          variant === "heroLive"
+            ? "flex w-full min-w-0 flex-row items-stretch gap-2"
+            : "flex w-full min-w-0 shrink flex-row items-stretch gap-2 md:w-auto md:max-w-[min(100%,22rem)]"
+        }
+        aria-label="Over/Under odds"
+      >
+        <div
+          className={
+            variant === "heroLive"
+              ? "flex min-w-0 flex-1 flex-row gap-2"
+              : "flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:gap-2"
+          }
+        >
+          {overUnderOdds.map((line) => (
+            <OddsButton
+              key={line.outcomeId}
+              gameId={game.gameId}
+              outcomeName={line.label}
+              outcomeId={line.outcomeId}
+              odds={line.odds}
+              label={line.label}
+              className={ouButtonClass}
+              onClick={() => addLine(line)}
+            />
+          ))}
+        </div>
+        {extraBadgeRow(true)}
+      </div>
+    ) : null;
+
+  const oddsBlock =
+    mainOddsRow || overUnderRow ? (
+      <div
+        className={
+          variant === "heroLive"
+            ? "flex w-full min-w-0 flex-col gap-2"
+            : "flex w-full min-w-0 shrink flex-col gap-2 md:w-auto md:max-w-[min(100%,22rem)] md:items-end"
+        }
+      >
+        {mainOddsRow}
+        {overUnderRow}
       </div>
     ) : (
       <p
@@ -123,7 +210,6 @@ export function GameCard({
     );
 
   if (variant === "heroLive") {
-    const gameHref = `/games/${game.gameId}`;
     const titleBlock =
       participants.length >= 2 ? (
         <h2 className="min-w-0 flex-1 text-sm font-medium">

@@ -3,7 +3,11 @@
 import { useActiveConditions, useLiveStatistics } from "@azuro-org/sdk";
 import { GameState, type GameData } from "@azuro-org/toolkit";
 import { GameCard } from "@/components/GameCard";
-import { extractMainLineOdds } from "@/lib/oddsUtils";
+import {
+  countGameMarkets,
+  extractMainLineOdds,
+  extractOverUnderOdds,
+} from "@/lib/oddsUtils";
 import { LiveBadge } from "@/components/LiveBadge";
 import { formatLiveScoreBoard } from "@/lib/useCountdown";
 
@@ -29,6 +33,17 @@ export function LiveGameCard({
     enabled: game.state === GameState.Live,
   });
   const topOdds = conditions ? extractMainLineOdds(conditions) : null;
+  const ouRaw = conditions ? extractOverUnderOdds(conditions) : null;
+  const overUnderOdds =
+    ouRaw?.length &&
+    topOdds?.length &&
+    ouRaw[0]!.conditionId === topOdds[0]!.conditionId
+      ? null
+      : ouRaw;
+  const totalMarkets = conditions ? countGameMarkets(conditions) : 0;
+  const marketsShown =
+    (topOdds?.length ? 1 : 0) + (overUnderOdds?.length ? 1 : 0);
+  const extraMarketsCount = Math.max(0, totalMarkets - marketsShown);
   const scoreLine = formatLiveScoreBoard(liveStats?.scoreBoard);
 
   const meta = (
@@ -55,6 +70,8 @@ export function LiveGameCard({
     <GameCard
       game={game}
       topOdds={topOdds}
+      overUnderOdds={overUnderOdds}
+      extraMarketsCount={extraMarketsCount}
       meta={meta}
       variant={variant}
     />
