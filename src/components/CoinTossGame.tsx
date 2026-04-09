@@ -61,6 +61,12 @@ export function CoinTossGame() {
     return cfg[0];
   }, [chainTokenConfig]);
 
+  /** Gross win multiplier on the bet portion for a correct 50/50 outcome (before VRF fee). */
+  const winMultiplier = useMemo(() => {
+    if (houseEdgeBp === undefined) return undefined;
+    return (2 * (BP_VALUE - houseEdgeBp)) / BP_VALUE;
+  }, [houseEdgeBp]);
+
   const parsedAmount = useMemo(() => {
     const t = amount.trim();
     const zero = BigInt(0);
@@ -192,9 +198,8 @@ export function CoinTossGame() {
         <header className="mb-8 lg:mb-10">
           <h1 className="type-display">Coin toss</h1>
           <p className="type-muted mt-1 max-w-2xl">
-            Pick a side and confirm your stake in one transaction—the randomness fee is included in
-            that amount (see game details for a breakdown). Connect on Polygon (BetSwirl defaults) or
-            Gnosis when configured.
+            Pick a side and confirm your stake in one transaction. Connect on Polygon (BetSwirl
+            defaults) or Gnosis when configured.
           </p>
         </header>
 
@@ -320,7 +325,7 @@ export function CoinTossGame() {
                   />
                   {parsedAmount.ok && parsedAmount.wei > BigInt(0) && vrfWei !== undefined ? (
                     <p className="type-caption mt-1.5 text-zinc-500">
-                      Includes the randomness fee. Open game details for the full breakdown.
+                      Open How it works below for how your payment is split.
                     </p>
                   ) : null}
                   {amountError ? (
@@ -328,7 +333,7 @@ export function CoinTossGame() {
                   ) : null}
                   {belowMin ? (
                     <p className="type-caption mt-1.5 text-amber-300">
-                      Minimum stake is {formatEther(minBetWei)} (covers randomness fee and minimum
+                      Minimum stake is {formatEther(minBetWei)} (covers required fees and minimum
                       bet).
                     </p>
                   ) : null}
@@ -362,21 +367,38 @@ export function CoinTossGame() {
 
                 <details className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
                   <summary className="cursor-pointer select-none type-caption text-zinc-400">
-                    Game details
+                    How it works
                   </summary>
-                  <div className="type-caption mt-3 space-y-2 border-t border-zinc-800/80 pt-3 text-zinc-500">
-                    {houseEdgeBp !== undefined ? (
-                      <p>
-                        House edge:{" "}
-                        <span className="font-mono text-zinc-300">
-                          {((houseEdgeBp / BP_VALUE) * 100).toFixed(2)}%
-                        </span>
-                      </p>
-                    ) : (
-                      <p className="text-zinc-600">Loading…</p>
-                    )}
+                  <div className="type-caption mt-3 space-y-3 border-t border-zinc-800/80 pt-3 text-zinc-500">
+                    <ol className="list-decimal space-y-2 pl-4 text-zinc-400">
+                      <li>
+                        Choose heads or tails and enter your payment. The contract uses part of it as
+                        your bet and reserves the rest for settlement.
+                      </li>
+                      <li>
+                        Confirm in your wallet. The flip uses verifiable on-chain randomness, then
+                        pays out if you guessed correctly.
+                      </li>
+                      <li>
+                        {houseEdgeBp !== undefined && winMultiplier !== undefined ? (
+                          <>
+                            On a win, payout is based on a{" "}
+                            <span className="font-mono text-zinc-300">
+                              ~{winMultiplier.toFixed(2)}×
+                            </span>{" "}
+                            multiplier on your bet amount (house edge{" "}
+                            <span className="font-mono text-zinc-300">
+                              {((houseEdgeBp / BP_VALUE) * 100).toFixed(2)}%
+                            </span>
+                            ).
+                          </>
+                        ) : (
+                          <span className="text-zinc-600">Loading payout rules…</span>
+                        )}
+                      </li>
+                    </ol>
                     {parsedAmount.ok && parsedAmount.wei > BigInt(0) && vrfWei !== undefined ? (
-                      <div className="space-y-1">
+                      <div className="space-y-1 border-t border-zinc-800/80 pt-3">
                         <p className="text-zinc-400">VRF (randomness) breakdown</p>
                         <p>
                           Payment total:{" "}
@@ -397,7 +419,11 @@ export function CoinTossGame() {
                           </span>
                         </p>
                       </div>
-                    ) : null}
+                    ) : (
+                      <p className="border-t border-zinc-800/80 pt-3 text-zinc-600">
+                        Enter a stake above to see the VRF fee breakdown for your payment.
+                      </p>
+                    )}
                   </div>
                 </details>
 
