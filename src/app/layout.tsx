@@ -34,8 +34,8 @@ export const metadata: Metadata = {
     "Sports betting on Polygon and Gnosis with live and prematch markets, wallet connect, and an in-app betslip.",
   applicationName: "EliesBets",
   icons: {
-    icon: [{ url: "/favicon.ico", sizes: "any" }],
-    shortcut: "/favicon.ico",
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    shortcut: "/favicon.svg",
   },
   openGraph: {
     type: "website",
@@ -45,12 +45,21 @@ export const metadata: Metadata = {
     description:
       "Sports betting with live and prematch markets. Connect your wallet and place bets on-chain.",
     url: siteUrl,
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "EliesBets — sports betting on Polygon and Gnosis",
+      },
+    ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "EliesBets",
     description:
       "Sports betting with live and prematch markets. Connect your wallet and place bets on-chain.",
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,
