@@ -745,19 +745,7 @@ export function useDice() {
   }, [vrfCost]);
 
   const placeWager = useCallback(
-    async (
-      cap: number,
-      receiver: `0x${string}`,
-      affiliate: `0x${string}`,
-      betData: {
-        token: `0x${string}`;
-        betAmount: bigint;
-        betCount: number;
-        stopGain: bigint;
-        stopLoss: bigint;
-        maxHouseEdge: number;
-      },
-    ): Promise<CasinoTxHash> => {
+    async (cap: number, valueWei: bigint): Promise<CasinoTxHash> => {
       if (!publicClient || !connected) {
         throw new Error("Wallet not connected");
       }
@@ -767,18 +755,34 @@ export function useDice() {
         dice,
         connected,
       );
-      if (betData.betAmount === BigInt(0)) {
+      const betAmount = valueWei > vrf ? valueWei - vrf : BigInt(0);
+      if (betAmount === BigInt(0)) {
         throw new Error(
-          "Bet amount must be greater than zero.",
+          "Stake too low to cover VRF fee. Increase your stake amount.",
         );
       }
-      const valueWei = vrf + betData.betAmount;
+
+      const envAffiliate = process.env.NEXT_PUBLIC_CASINO_AFFILIATE;
+      const affiliate: `0x${string}` =
+        envAffiliate && isAddress(envAffiliate) ? envAffiliate : connected;
 
       return writeContractAsync({
         address: dice,
         abi: diceAbi,
         functionName: "wager",
-        args: [cap, receiver, affiliate, betData],
+        args: [
+          cap,
+          connected,
+          affiliate,
+          {
+            token: NATIVE_TOKEN,
+            betAmount,
+            betCount: defaultCasinoGameParams.betCount,
+            stopGain: defaultCasinoGameParams.stopGain,
+            stopLoss: defaultCasinoGameParams.stopLoss,
+            maxHouseEdge: MAX_HOUSE_EGDE,
+          },
+        ],
         value: valueWei,
       });
     },
