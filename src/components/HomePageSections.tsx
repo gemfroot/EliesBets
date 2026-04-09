@@ -3,20 +3,17 @@ import {
   GameOrderBy,
   GameState,
   OrderDirection,
-  getConditionsByGameIds,
   getGamesByFilters,
   getSports,
   type GameData,
 } from "@azuro-org/toolkit";
 import { GameCard } from "@/components/GameCard";
-import { extractMainLineOdds } from "@/lib/oddsUtils";
+import { extractMainLineOdds, fetchTopOddsByGameId } from "@/lib/oddsUtils";
 import { LiveGameCard } from "@/components/LiveGameCard";
 import { RetryCallout } from "@/components/RetryCallout";
 import { CHAIN_ID } from "@/lib/constants";
-import { chunk } from "@/lib/sportGames";
 import { SportNavIcon } from "@/lib/sportNavIcon";
 
-const CONDITIONS_BATCH = 40;
 const HERO_LIVE_LIMIT = 6;
 const HERO_FETCH_PER_PAGE = 24;
 const POPULAR_LIMIT = 8;
@@ -28,35 +25,6 @@ const SPORT_LINKS_MAX = 10;
 function parseStartMs(startsAt: string): number {
   const n = +startsAt;
   return n < 32_503_680_000 ? n * 1000 : n;
-}
-
-async function fetchTopOddsByGameId(
-  gameIds: string[],
-): Promise<Map<string, ReturnType<typeof extractMainLineOdds>>> {
-  const result = new Map<string, ReturnType<typeof extractMainLineOdds>>();
-  if (!gameIds.length) {
-    return result;
-  }
-  for (const batch of chunk(gameIds, CONDITIONS_BATCH)) {
-    const conditions = await getConditionsByGameIds({
-      chainId: CHAIN_ID,
-      gameIds: batch,
-    });
-    const byGameId = new Map<string, typeof conditions>();
-    for (const c of conditions) {
-      const gid = c.game.gameId;
-      const list = byGameId.get(gid);
-      if (list) {
-        list.push(c);
-      } else {
-        byGameId.set(gid, [c]);
-      }
-    }
-    for (const gid of batch) {
-      result.set(gid, extractMainLineOdds(byGameId.get(gid) ?? []));
-    }
-  }
-  return result;
 }
 
 async function fetchHeroLiveGames(): Promise<GameData[]> {
@@ -218,16 +186,27 @@ export async function HomePopularUpcomingSections() {
   let popularError: string | null = null;
   let upcomingError: string | null = null;
 
-  try {
-    popularGames = await fetchPopularGames();
-  } catch (e) {
-    popularError = e instanceof Error ? e.message : "Failed to load popular games.";
+  const [popularOutcome, upcomingOutcome] = await Promise.allSettled([
+    fetchPopularGames(),
+    fetchUpcomingGames(),
+  ]);
+
+  if (popularOutcome.status === "fulfilled") {
+    popularGames = popularOutcome.value;
+  } else {
+    popularError =
+      popularOutcome.reason instanceof Error
+        ? popularOutcome.reason.message
+        : "Failed to load popular games.";
   }
 
-  try {
-    upcomingGames = await fetchUpcomingGames();
-  } catch (e) {
-    upcomingError = e instanceof Error ? e.message : "Failed to load upcoming games.";
+  if (upcomingOutcome.status === "fulfilled") {
+    upcomingGames = upcomingOutcome.value;
+  } else {
+    upcomingError =
+      upcomingOutcome.reason instanceof Error
+        ? upcomingOutcome.reason.message
+        : "Failed to load upcoming games.";
   }
 
   const staticGameIds = [
