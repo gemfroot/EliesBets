@@ -21,6 +21,19 @@ const PHASE_LABEL: Record<GamePhase, string> = {
   result: "Result",
 };
 
+/** Prefer viem's short user-facing text; never surface raw revert details like `msg.value`. */
+function formatCasinoTxError(error: Error): string {
+  const e = error as Error & { shortMessage?: string };
+  const text =
+    typeof e.shortMessage === "string" && e.shortMessage.trim()
+      ? e.shortMessage.trim()
+      : (e.message ?? "").trim() || "Transaction failed.";
+  if (/msg\.value/i.test(text)) {
+    return "Transaction failed. Check your stake covers the minimum and network fees, then try again.";
+  }
+  return text;
+}
+
 export function CoinTossGame() {
   const { isConnected } = useAccount();
   const {
@@ -435,7 +448,7 @@ export function CoinTossGame() {
 
                 {error ? (
                   <p className="type-body text-red-400" role="alert">
-                    {error.message || "Transaction failed."}
+                    {formatCasinoTxError(error)}
                   </p>
                 ) : null}
 
