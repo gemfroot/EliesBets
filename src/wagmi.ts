@@ -22,7 +22,7 @@ export const wagmiConfig = createConfig({
   connectors,
   transports: {
     [polygon.id]: http(),
-    [polygonAmoy.id]: http(),
+    [polygonAmoy.id]: http("https://polygon-amoy-bor-rpc.publicnode.com"),
     [gnosis.id]: http(),
   },
   ssr: true,
