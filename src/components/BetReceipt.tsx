@@ -3,7 +3,12 @@
 import { useChain } from "@azuro-org/sdk";
 import type { BetslipSelection } from "@/components/Betslip";
 import { useOddsFormat } from "@/components/OddsFormatProvider";
-import { CHAIN_ID } from "@/lib/constants";
+import { useToast } from "@/components/Toast";
+import {
+  formatBetReceiptShareText,
+  shareOrCopyBetText,
+  txExplorerUrlFromAppChain,
+} from "@/lib/betShare";
 import { formatOddsValue, formatStoredOddsString } from "@/lib/oddsFormat";
 
 export type BetReceiptProps = {
@@ -17,16 +22,6 @@ export type BetReceiptProps = {
   transactionHash: `0x${string}` | undefined;
 };
 
-function txExplorerUrl(chainId: number, hash: `0x${string}`): string | null {
-  const base =
-    chainId === CHAIN_ID
-      ? "https://polygonscan.com"
-      : chainId === 80002
-        ? "https://amoy.polygonscan.com"
-        : null;
-  return base ? `${base}/tx/${hash}` : null;
-}
-
 export function BetReceipt({
   open,
   onClose,
@@ -39,12 +34,14 @@ export function BetReceipt({
 }: BetReceiptProps) {
   const { format: oddsFormat } = useOddsFormat();
   const { appChain } = useChain();
-  const explorer =
-    appChain.blockExplorers?.default?.url && transactionHash
-      ? `${appChain.blockExplorers.default.url.replace(/\/$/, "")}/tx/${transactionHash}`
-      : transactionHash
-        ? txExplorerUrl(appChain.id, transactionHash)
-        : null;
+  const { showToast } = useToast();
+  const explorer = transactionHash
+    ? txExplorerUrlFromAppChain(
+        appChain.id,
+        appChain.blockExplorers?.default?.url,
+        transactionHash,
+      )
+    : null;
 
   if (!open) {
     return null;
@@ -133,7 +130,33 @@ export function BetReceipt({
           ) : null}
         </dl>
 
-        <div className="mt-6 flex justify-end">
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              const text = formatBetReceiptShareText(
+                selections,
+                stakeLabel,
+                tokenSymbol,
+                totalOdds,
+                potentialWin,
+                oddsFormat,
+                transactionHash,
+                explorer,
+              );
+              const result = await shareOrCopyBetText(text);
+              if (result === "shared") {
+                showToast("Shared.", "success");
+              } else if (result === "copied") {
+                showToast("Bet receipt copied to clipboard.", "success");
+              } else if (result === "failed") {
+                showToast("Could not share or copy.", "error");
+              }
+            }}
+            className="rounded-lg border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-100 transition hover:bg-zinc-800"
+          >
+            Share
+          </button>
           <button
             type="button"
             onClick={onClose}
