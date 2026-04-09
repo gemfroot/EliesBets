@@ -218,8 +218,8 @@ export function CoinTossGame() {
 
         {!canWager ? (
           <p className="type-body mb-8 max-w-xl rounded-lg border border-amber-800/60 bg-amber-950/40 px-4 py-3 text-amber-100">
-            CoinToss is available on Polygon. Please switch your wallet to the Polygon network
-            to play.
+            CoinToss is available on Polygon and Polygon Amoy (testnet). Please switch your
+            wallet to a supported network to play.
           </p>
         ) : null}
 

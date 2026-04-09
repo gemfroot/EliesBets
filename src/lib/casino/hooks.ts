@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { PublicClient } from "viem";
-import { zeroAddress } from "viem";
+import { isAddress, zeroAddress } from "viem";
 import { readContract } from "viem/actions";
 import { MAX_HOUSE_EGDE, defaultCasinoGameParams } from "@betswirl/sdk-core";
 import {
@@ -91,8 +91,8 @@ export function useCoinToss() {
 
   const placeWager = useCallback(
     async (betHeads: boolean, valueWei: bigint): Promise<CasinoTxHash> => {
-      if (!publicClient) {
-        throw new Error("Wallet client not available");
+      if (!publicClient || !connected) {
+        throw new Error("Wallet not connected");
       }
       const vrfUnknown = await readContract(publicClient as PublicClient, {
         address: coinToss,
@@ -103,14 +103,20 @@ export function useCoinToss() {
       const vrf = vrfUnknown as bigint;
       const betAmount = valueWei > vrf ? valueWei - vrf : BigInt(0);
 
+      // BetSwirl requires both receiver and affiliate to be non-zero.
+      // Use connected wallet as self-referral when no dedicated affiliate is set.
+      const envAffiliate = process.env.NEXT_PUBLIC_CASINO_AFFILIATE;
+      const affiliate: `0x${string}` =
+        envAffiliate && isAddress(envAffiliate) ? envAffiliate : connected;
+
       return writeContractAsync({
         address: coinToss,
         abi: coinTossAbi,
         functionName: "wager",
         args: [
           betHeads,
-          connected ?? zeroAddress,
-          zeroAddress,
+          connected,
+          affiliate,
           {
             token: NATIVE_TOKEN,
             betAmount,
