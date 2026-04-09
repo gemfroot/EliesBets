@@ -62,6 +62,46 @@ body {
   }
 
   /**
+   * Coin toss: 3D flip animation (Y rotation) and idle float.
+   */
+  @keyframes coin-spin-y {
+    from {
+      transform: rotateY(0deg);
+    }
+    to {
+      transform: rotateY(360deg);
+    }
+  }
+
+  @keyframes coin-float-y {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  .animate-coin-flip {
+    animation: coin-spin-y 0.7s linear infinite;
+    transform-style: preserve-3d;
+  }
+
+  .animate-coin-float {
+    animation: coin-float-y 3.5s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-coin-flip {
+      animation: none;
+    }
+    .animate-coin-float {
+      animation: none;
+    }
+  }
+
+  /**
    * Header search: stronger edge and fill so the field reads clearly on `bg-zinc-950`.
    * Scoped via `data-header-search` on the wrapper in Header.tsx (input lives in SearchBar).
    */
