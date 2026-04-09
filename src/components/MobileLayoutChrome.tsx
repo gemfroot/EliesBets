@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode, SVGProps } from "react";
 import { useSports } from "@azuro-org/sdk";
 import { useBetslipMobileDrawer } from "@/components/Betslip";
+import { MyBetsLink } from "@/components/MyBetsLink";
 import { SportNavIcon } from "@/lib/sportNavIcon";
 
 function NavGlyph({
@@ -97,6 +98,8 @@ function MobileBottomNav({
           <LiveIcon className="h-[1.125rem] w-[1.125rem] text-red-400/90" />
           Live
         </Link>
+
+        <MyBetsLink variant="mobile" />
 
         <div className="flex min-h-[44px] min-w-0 flex-1 items-center overflow-x-auto overscroll-x-contain px-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {isLoading ? (
