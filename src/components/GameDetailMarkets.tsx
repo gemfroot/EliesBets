@@ -7,10 +7,12 @@ import { RetryCallout } from "@/components/RetryCallout";
 
 export function GameDetailMarkets({
   sections,
+  gameId,
   gameTitle,
   marketsError,
 }: {
   sections: { title: string; markets: Market[] }[];
+  gameId: string;
   gameTitle: string;
   marketsError: string | null;
 }) {
@@ -46,6 +48,7 @@ export function GameDetailMarkets({
           key={`${section.title}|${section.markets.map((m) => m.marketKey).join("|")}`}
           title={section.title}
           markets={section.markets}
+          gameId={gameId}
           gameTitle={gameTitle}
         />
       ))}

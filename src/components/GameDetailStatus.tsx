@@ -28,7 +28,9 @@ export function GameDetailStatus({
   startsAt: string;
 }) {
   const when = formatStartTime(startsAt);
-  const { label: countdownLabel } = useCountdown(parseStartsAtMs(startsAt));
+  const { label: countdownLabel } = useCountdown(parseStartsAtMs(startsAt), {
+    enabled: state === GameState.Prematch,
+  });
   const { data: liveStats } = useLiveStatistics({
     gameId,
     sportId,
