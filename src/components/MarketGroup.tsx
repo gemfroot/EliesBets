@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { ConditionState, type Market, type MarketOutcome } from "@azuro-org/toolkit";
 import { OddsButton } from "@/components/OddsButton";
-import { useBetslip } from "@/components/Betslip";
+import { useBetslipActions } from "@/components/Betslip";
 
 export type MarketGroupProps = {
   title: string;
@@ -26,7 +26,7 @@ function OutcomeButton({
   outcome: MarketOutcome;
   conditionState: ConditionState;
 }) {
-  const { addSelection } = useBetslip();
+  const { addSelection } = useBetslipActions();
   const oddsStr =
     Number.isFinite(outcome.odds) && outcome.odds > 0
       ? outcome.odds.toFixed(2)

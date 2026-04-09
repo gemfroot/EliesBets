@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { GameState, type GameData } from "@azuro-org/toolkit";
 import { FavoriteGameButton } from "@/components/FavoriteButton";
 import { OddsButton } from "@/components/OddsButton";
-import { useBetslip } from "@/components/Betslip";
+import { useBetslipActions } from "@/components/Betslip";
 import type { TopOddsLine } from "@/lib/oddsUtils";
 import { useCountdown, parseStartsAtMs } from "@/lib/useCountdown";
 
@@ -65,7 +65,7 @@ export function GameCard({
   meta,
   variant = "default",
 }: GameCardProps) {
-  const { addSelection } = useBetslip();
+  const { addSelection } = useBetslipActions();
   const names = participantLine(game);
   const when = formatStartTime(game.startsAt);
   const { participants } = game;
