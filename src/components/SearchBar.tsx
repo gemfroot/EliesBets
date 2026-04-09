@@ -158,7 +158,9 @@ export function SearchBar() {
       return;
     }
 
-    setSearchSettled(false);
+    queueMicrotask(() => {
+      setSearchSettled(false);
+    });
     const myId = ++searchRequestId.current;
     const t = window.setTimeout(() => {
       if (searchRequestId.current !== myId) {
