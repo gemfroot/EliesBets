@@ -23,11 +23,15 @@ function formatStartTime(startsAt: string): string {
 function PrematchCountdown({
   startsAt,
   variant,
+  state,
 }: {
   startsAt: string;
   variant: "default" | "heroLive";
+  state: GameState;
 }) {
-  const { label } = useCountdown(parseStartsAtMs(startsAt));
+  const { label } = useCountdown(parseStartsAtMs(startsAt), {
+    enabled: state === GameState.Prematch,
+  });
   const className =
     variant === "heroLive"
       ? "text-xs tabular-nums text-zinc-400"
@@ -162,7 +166,11 @@ export function GameCard({
         <div className="flex min-h-[1.75rem] shrink-0 items-center justify-center py-1">
           {meta ??
             (game.state === GameState.Prematch ? (
-              <PrematchCountdown startsAt={game.startsAt} variant="heroLive" />
+              <PrematchCountdown
+                startsAt={game.startsAt}
+                variant="heroLive"
+                state={game.state}
+              />
             ) : (
               <p className="text-xs tabular-nums text-zinc-500">{when}</p>
             ))}
@@ -189,7 +197,11 @@ export function GameCard({
           </div>
           {meta ??
             (game.state === GameState.Prematch ? (
-              <PrematchCountdown startsAt={game.startsAt} variant="default" />
+              <PrematchCountdown
+                startsAt={game.startsAt}
+                variant="default"
+                state={game.state}
+              />
             ) : (
               <p className="mt-1 text-xs tabular-nums text-zinc-500">{when}</p>
             ))}
