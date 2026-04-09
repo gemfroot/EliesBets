@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:casino": "node scripts/verify-casino-build.mjs"
   },
   "dependencies": {
     "@azuro-org/sdk": "^7.1.1",
