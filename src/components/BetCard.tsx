@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useChain, useRedeemBet, type Bet } from "@azuro-org/sdk";
 import type { GameData } from "@azuro-org/toolkit";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { formatUnits } from "viem";
 import { getBalanceQueryKey } from "wagmi/query";
 import { useChainId, useConnection } from "wagmi";
@@ -69,6 +69,8 @@ export function BetCard({ bet }: BetCardProps) {
   const queryClient = useQueryClient();
   const { submit, isPending, isProcessing } = useRedeemBet();
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const shareInFlightRef = useRef(false);
 
   const showClaim =
     bet.isWin &&
@@ -119,6 +121,47 @@ export function BetCard({ bet }: BetCardProps) {
     bet.txHash,
   );
 
+  const handleShare = useCallback(async () => {
+    if (shareInFlightRef.current) {
+      return;
+    }
+    shareInFlightRef.current = true;
+    setShareBusy(true);
+    try {
+      const text = formatBetHistoryShareText(
+        bet,
+        stakeDisplay,
+        possibleWinDisplay,
+        payoutDisplay,
+        oddsDisplay,
+        betToken.symbol,
+        oddsFormat,
+        txExplorer,
+      );
+      const result = await shareOrCopyBetText(text);
+      if (result === "shared") {
+        showToast("Shared.", "success");
+      } else if (result === "copied") {
+        showToast("Bet copied to clipboard.", "success");
+      } else if (result === "failed") {
+        showToast("Could not share or copy.", "error");
+      }
+    } finally {
+      shareInFlightRef.current = false;
+      setShareBusy(false);
+    }
+  }, [
+    bet,
+    betToken.symbol,
+    oddsDisplay,
+    oddsFormat,
+    payoutDisplay,
+    possibleWinDisplay,
+    showToast,
+    stakeDisplay,
+    txExplorer,
+  ]);
+
   return (
     <article className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-zinc-800/80 pb-2">
@@ -131,29 +174,11 @@ export function BetCard({ bet }: BetCardProps) {
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <button
             type="button"
-            onClick={async () => {
-              const text = formatBetHistoryShareText(
-                bet,
-                stakeDisplay,
-                possibleWinDisplay,
-                payoutDisplay,
-                oddsDisplay,
-                betToken.symbol,
-                oddsFormat,
-                txExplorer,
-              );
-              const result = await shareOrCopyBetText(text);
-              if (result === "shared") {
-                showToast("Shared.", "success");
-              } else if (result === "copied") {
-                showToast("Bet copied to clipboard.", "success");
-              } else if (result === "failed") {
-                showToast("Could not share or copy.", "error");
-              }
-            }}
-            className="rounded-lg border border-zinc-600 px-2.5 py-1 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800"
+            disabled={shareBusy}
+            onClick={() => void handleShare()}
+            className="rounded-lg border border-zinc-600 px-2.5 py-1 text-xs font-medium text-zinc-200 transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Share
+            {shareBusy ? "Sharing…" : "Share"}
           </button>
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass(bet)}`}
