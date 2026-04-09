@@ -481,7 +481,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
 
   const sdkDisableMessage = messageForBetslipDisableReason(disableReason);
 
-  const { submit, approveTx, betTx, isApproveRequired, isWalletReadyToSubmit } =
+  const { submit, approveTx, betTx, isApproveRequired } =
     useBet({
       betAmount: stakeValid ? stakeAmount : "0",
       slippage: SLIPPAGE_PERCENT,
@@ -536,7 +536,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     totalOddsForBet > 0 &&
     isConnected &&
     Boolean(address) &&
-    isWalletReadyToSubmit &&
     !isBusy &&
     !isOddsFetching &&
     !isBetCalculationFetching &&
