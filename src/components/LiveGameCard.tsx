@@ -8,7 +8,13 @@ import { LiveBadge } from "@/components/LiveBadge";
 
 const ODDS_REFETCH_MS = 4_000;
 
-export function LiveGameCard({ game }: { game: GameData }) {
+export function LiveGameCard({
+  game,
+  variant = "default",
+}: {
+  game: GameData;
+  variant?: "default" | "heroLive";
+}) {
   const { data: conditions } = useActiveConditions({
     gameId: game.gameId,
     query: {
@@ -22,6 +28,7 @@ export function LiveGameCard({ game }: { game: GameData }) {
       game={game}
       topOdds={topOdds}
       meta={<LiveBadge startsAt={game.startsAt} />}
+      variant={variant}
     />
   );
 }
