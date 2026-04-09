@@ -27,12 +27,13 @@ export function formatFootballLiveMinute(
   scoreBoard: ScoreBoard | null | undefined,
   clock: Clock | null | undefined,
 ): string | null {
-  const tm = clock?.clock_tm?.trim();
+  const raw = clock?.clock_tm;
+  const tm = raw != null ? String(raw).trim() : "";
   if (tm) {
     return /^\d+$/.test(tm) ? `${tm}'` : tm;
   }
   if (isSoccerScoreBoard(scoreBoard)) {
-    const t = scoreBoard.time?.trim();
+    const t = scoreBoard.time != null ? String(scoreBoard.time).trim() : "";
     if (!t) {
       return null;
     }
@@ -77,7 +78,7 @@ export function formatLiveBadgeTimer(
     }
   }
   if (sportSlug === "basketball" && isBasketballScoreBoard(scoreBoard)) {
-    const t = scoreBoard.time?.trim();
+    const t = scoreBoard.time != null ? String(scoreBoard.time).trim() : "";
     if (t) {
       return t;
     }
@@ -89,7 +90,7 @@ export function formatLiveBadgeTimer(
 export function formatLivePeriodLabel(
   scoreBoard: ScoreBoard | null | undefined,
 ): string | null {
-  const raw = scoreBoard?.state?.trim();
+  const raw = scoreBoard?.state != null ? String(scoreBoard.state).trim() : "";
   if (!raw) {
     return null;
   }

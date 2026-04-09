@@ -14,15 +14,11 @@ export default function RouteSegmentError({
     console.error(error);
   }, [error]);
 
-  const detail = error?.message
-    ? `${error.message}${error.digest ? ` [digest: ${error.digest}]` : ""}`
-    : "This page could not be displayed. You can try again, or go back and return later.";
-
   return (
     <div className="page-shell">
       <RetryCallout
         title="Something went wrong"
-        description={detail}
+        description="This page could not be displayed. You can try again, or go back and return later."
         onRetry={unstable_retry}
       />
     </div>
