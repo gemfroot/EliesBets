@@ -10,7 +10,7 @@ import {
   getCasinoCoinTossAddress,
   isCasinoAddressConfigured,
 } from "@/lib/casino/addresses";
-import type { CasinoContracts } from "@/lib/casino/types";
+import type { CasinoContracts, CasinoTxHash } from "@/lib/casino/types";
 
 export function useCasinoContracts(): CasinoContracts {
   const chainId = useChainId();
@@ -59,7 +59,7 @@ export function useBankDeposit() {
   const { writeContractAsync, ...rest } = useWriteContract();
 
   const deposit = useCallback(
-    (valueWei: bigint) =>
+    (valueWei: bigint): Promise<CasinoTxHash> =>
       writeContractAsync({
         address: bank,
         abi: bankAbi,
@@ -81,7 +81,7 @@ export function useBankWithdraw() {
   const { writeContractAsync, ...rest } = useWriteContract();
 
   const withdraw = useCallback(
-    (amount: bigint) =>
+    (amount: bigint): Promise<CasinoTxHash> =>
       writeContractAsync({
         address: bank,
         abi: bankAbi,
@@ -103,7 +103,7 @@ export function useCoinTossPlay() {
   const { writeContractAsync, ...rest } = useWriteContract();
 
   const play = useCallback(
-    (betHeads: boolean, valueWei: bigint) =>
+    (betHeads: boolean, valueWei: bigint): Promise<CasinoTxHash> =>
       writeContractAsync({
         address: coinToss,
         abi: coinTossAbi,
