@@ -8,7 +8,7 @@ import {
   isAddress,
   zeroAddress,
 } from "viem";
-import { getGasPrice } from "viem/actions";
+import { getBlockNumber, getContractEvents, getGasPrice } from "viem/actions";
 import { MAX_HOUSE_EGDE, defaultCasinoGameParams } from "@betswirl/sdk-core";
 import {
   useAccount,
@@ -26,6 +26,103 @@ import {
 import type { CasinoTxHash } from "@/lib/casino/types";
 
 const NATIVE_TOKEN = zeroAddress;
+
+/** ~46 days at ~2s block time; caps RPC log query range. */
+const ROLL_EVENT_LOOKBACK_BLOCKS = BigInt(2_000_000);
+const MAX_BET_HISTORY = 100;
+
+const betHistoryStorageKey = (chainId: number, wallet: `0x${string}`) =>
+  `coinToss.betHistory.v1:${chainId}:${wallet.toLowerCase()}`;
+
+function rollSortKeyFromLog(log: {
+  blockNumber?: bigint | null;
+  logIndex?: number | null;
+}): bigint {
+  const bn = log.blockNumber ?? BigInt(0);
+  const li = BigInt(log.logIndex ?? 0);
+  return bn * BigInt(1_000_000) + li;
+}
+
+function parseStoredBetHistory(raw: string | null): RollResult[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const out: RollResult[] = [];
+    for (const row of parsed) {
+      if (!row || typeof row !== "object") continue;
+      const o = row as Record<string, unknown>;
+      const id = o.id;
+      const payout = o.payout;
+      const totalBetAmount = o.totalBetAmount;
+      const rolled = o.rolled;
+      const face = o.face;
+      const timestamp = o.timestamp;
+      if (typeof id !== "string" || typeof payout !== "string" || typeof totalBetAmount !== "string")
+        continue;
+      if (!Array.isArray(rolled) || rolled.some((x) => typeof x !== "boolean")) continue;
+      if (typeof face !== "boolean" || typeof timestamp !== "number") continue;
+      out.push({
+        id: BigInt(id),
+        rolled: rolled as boolean[],
+        payout: BigInt(payout),
+        totalBetAmount: BigInt(totalBetAmount),
+        face,
+        timestamp,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function serializeBetHistory(rolls: RollResult[]): string {
+  return JSON.stringify(
+    rolls.map((r) => ({
+      id: r.id.toString(),
+      rolled: [...r.rolled],
+      payout: r.payout.toString(),
+      totalBetAmount: r.totalBetAmount.toString(),
+      face: r.face,
+      timestamp: r.timestamp,
+    })),
+  );
+}
+
+function mergeBetHistoryById(existing: RollResult[], incoming: RollResult[]): RollResult[] {
+  const byId = new Map<string, RollResult>();
+  for (const r of [...existing, ...incoming]) {
+    const id = r.id.toString();
+    const prev = byId.get(id);
+    byId.set(id, !prev || r.timestamp >= prev.timestamp ? r : prev);
+  }
+  return [...byId.values()]
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, MAX_BET_HISTORY);
+}
+
+function rollFromDecodedLog(
+  args: {
+    id?: bigint;
+    rolled?: readonly boolean[];
+    payout?: bigint;
+    totalBetAmount?: bigint;
+    face?: boolean;
+  },
+  log: { blockNumber?: bigint | null; logIndex?: number | null },
+): RollResult | null {
+  if (!args.rolled || args.rolled.length === 0) return null;
+  const ts = Number(rollSortKeyFromLog(log));
+  return {
+    id: args.id ?? BigInt(0),
+    rolled: args.rolled,
+    payout: args.payout ?? BigInt(0),
+    totalBetAmount: args.totalBetAmount ?? BigInt(0),
+    face: args.face ?? false,
+    timestamp: ts,
+  };
+}
 
 export interface RollResult {
   id: bigint;
@@ -138,6 +235,91 @@ export function useCoinToss() {
 
   const [lastRoll, setLastRoll] = useState<RollResult | null>(null);
   const rollCountRef = useRef(0);
+  const [betHistory, setBetHistory] = useState<RollResult[]>([]);
+  const [betHistoryLoading, setBetHistoryLoading] = useState(false);
+  const [betHistoryError, setBetHistoryError] = useState<Error | undefined>(undefined);
+
+  useEffect(() => {
+    if (!queryEnabled || !publicClient || !connected) {
+      setBetHistory([]);
+      setBetHistoryLoading(false);
+      setBetHistoryError(undefined);
+      return;
+    }
+    const storageKey = betHistoryStorageKey(chainId, connected);
+    const stored = parseStoredBetHistory(
+      typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null,
+    );
+    if (stored.length > 0) {
+      setBetHistory(stored);
+    } else {
+      setBetHistory([]);
+    }
+
+    let cancelled = false;
+    setBetHistoryLoading(true);
+    setBetHistoryError(undefined);
+
+    async function loadFromChain() {
+      try {
+        const head = await getBlockNumber(publicClient as PublicClient);
+        const from =
+          head > ROLL_EVENT_LOOKBACK_BLOCKS
+            ? head - ROLL_EVENT_LOOKBACK_BLOCKS
+            : BigInt(0);
+        const logs = await getContractEvents(publicClient as PublicClient, {
+          address: coinToss,
+          abi: coinTossAbi,
+          eventName: "Roll",
+          args: { receiver: connected },
+          fromBlock: from,
+          toBlock: head,
+        });
+        const rolls: RollResult[] = [];
+        for (const log of logs) {
+          if (!("args" in log) || !log.args || typeof log.args !== "object") continue;
+          const r = rollFromDecodedLog(
+            log.args as {
+              id?: bigint;
+              rolled?: readonly boolean[];
+              payout?: bigint;
+              totalBetAmount?: bigint;
+              face?: boolean;
+            },
+            log,
+          );
+          if (r) rolls.push(r);
+        }
+        if (cancelled) return;
+        setBetHistory((prev) => mergeBetHistoryById(prev, rolls));
+      } catch (e) {
+        if (!cancelled) {
+          setBetHistoryError(
+            e instanceof Error ? e : new Error("Failed to load bet history"),
+          );
+        }
+      } finally {
+        if (!cancelled) setBetHistoryLoading(false);
+      }
+    }
+
+    void loadFromChain();
+    return () => {
+      cancelled = true;
+    };
+  }, [queryEnabled, publicClient, connected, coinToss, chainId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !connected) return;
+    try {
+      window.localStorage.setItem(
+        betHistoryStorageKey(chainId, connected),
+        serializeBetHistory(betHistory),
+      );
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [betHistory, chainId, connected]);
 
   useWatchContractEvent({
     address: coinToss,
@@ -159,14 +341,16 @@ export function useCoinToss() {
       };
       if (!args.rolled || args.rolled.length === 0) return;
       rollCountRef.current += 1;
-      setLastRoll({
+      const roll: RollResult = {
         id: args.id ?? BigInt(0),
         rolled: args.rolled,
         payout: args.payout ?? BigInt(0),
         totalBetAmount: args.totalBetAmount ?? BigInt(0),
         face: args.face ?? false,
         timestamp: Date.now(),
-      });
+      };
+      setLastRoll(roll);
+      setBetHistory((prev) => mergeBetHistoryById(prev, [roll]));
     },
   });
 
@@ -230,6 +414,9 @@ export function useCoinToss() {
     chainTokenConfig,
     paused,
     lastRoll,
+    betHistory,
+    betHistoryLoading,
+    betHistoryError,
     data: minTotal,
     isMinBetPending: vrfPending,
     isPending: writePending,
