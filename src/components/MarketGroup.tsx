@@ -5,10 +5,6 @@ import { ConditionState, type Market, type MarketOutcome } from "@azuro-org/tool
 import { OddsButton } from "@/components/OddsButton";
 import { useBetslip } from "@/components/Betslip";
 
-function formatOdds(odds: number): string {
-  return Number.isFinite(odds) && odds > 0 ? odds.toFixed(2) : "—";
-}
-
 export type MarketGroupProps = {
   title: string;
   markets: Market[];
@@ -29,7 +25,10 @@ function OutcomeButton({
   conditionState: ConditionState;
 }) {
   const { addSelection } = useBetslip();
-  const oddsStr = formatOdds(outcome.odds);
+  const oddsStr =
+    Number.isFinite(outcome.odds) && outcome.odds > 0
+      ? outcome.odds.toFixed(2)
+      : "—";
   const suspended = conditionState !== ConditionState.Active;
 
   return (

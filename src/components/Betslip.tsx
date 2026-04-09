@@ -19,7 +19,9 @@ import {
 import { useAccount, useReadContract } from "wagmi";
 import { erc20Abi, formatUnits, zeroAddress } from "viem";
 import { BetReceipt } from "@/components/BetReceipt";
+import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { useToast } from "@/components/Toast";
+import { formatOddsValue, formatStoredOddsString } from "@/lib/oddsFormat";
 
 export type BetslipSelection = {
   id: string;
@@ -318,6 +320,7 @@ function messageForBetslipDisableReason(
 }
 
 function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }) {
+  const { format: oddsFormat } = useOddsFormat();
   const { betToken } = useChain();
   const {
     betAmount,
@@ -610,7 +613,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
             {isOddsFetching
               ? "…"
               : totalOddsDisplay > 0
-                ? totalOddsDisplay.toFixed(2)
+                ? formatOddsValue(totalOddsDisplay, oddsFormat)
                 : "—"}
           </span>
         </p>
@@ -688,6 +691,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
 }
 
 export function BetslipPanel() {
+  const { format: oddsFormat } = useOddsFormat();
   const { selections, removeSelection } = useBetslip();
 
   return (
@@ -739,7 +743,7 @@ export function BetslipPanel() {
                   <p className="text-xs text-zinc-500">{s.gameTitle}</p>
                   <p className="mt-0.5 text-sm text-zinc-100">{s.outcomeName}</p>
                   <p className="type-odds mt-0.5 text-zinc-300">
-                    {s.odds}
+                    {formatStoredOddsString(s.odds, oddsFormat)}
                   </p>
                 </div>
                 <button

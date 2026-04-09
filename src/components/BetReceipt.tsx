@@ -2,7 +2,9 @@
 
 import { useChain } from "@azuro-org/sdk";
 import type { BetslipSelection } from "@/components/Betslip";
+import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { CHAIN_ID } from "@/lib/constants";
+import { formatOddsValue, formatStoredOddsString } from "@/lib/oddsFormat";
 
 export type BetReceiptProps = {
   open: boolean;
@@ -35,6 +37,7 @@ export function BetReceipt({
   potentialWin,
   transactionHash,
 }: BetReceiptProps) {
+  const { format: oddsFormat } = useOddsFormat();
   const { appChain } = useChain();
   const explorer =
     appChain.blockExplorers?.default?.url && transactionHash
@@ -49,7 +52,7 @@ export function BetReceipt({
 
   const isCombo = selections.length > 1;
   const oddsDisplay =
-    totalOdds > 0 ? totalOdds.toFixed(2) : "—";
+    totalOdds > 0 ? formatOddsValue(totalOdds, oddsFormat) : "—";
 
   return (
     <div
@@ -82,7 +85,7 @@ export function BetReceipt({
               <p className="font-medium text-zinc-100">{s.gameTitle}</p>
               <p className="mt-1 text-zinc-200">{s.outcomeName}</p>
               <p className="mt-0.5 font-mono text-xs tabular-nums text-zinc-400">
-                @{s.odds}
+                @{formatStoredOddsString(s.odds, oddsFormat)}
               </p>
             </li>
           ))}

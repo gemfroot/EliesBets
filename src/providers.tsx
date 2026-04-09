@@ -5,6 +5,7 @@ import { WagmiProvider, type State } from "wagmi";
 import { AzuroSDKProvider, BetslipProvider as AzuroBetslipProvider } from "@azuro-org/sdk";
 import { useState, type ReactNode } from "react";
 import { BetslipProvider } from "@/components/Betslip";
+import { OddsFormatProvider } from "@/components/OddsFormatProvider";
 import { FavoritesProvider } from "@/components/FavoritesProvider";
 import { BetSettlementToasts } from "@/components/BetSettlementToasts";
 import { ToastProvider } from "@/components/Toast";
@@ -32,6 +33,7 @@ export function Providers({
   return (
     <WagmiProvider config={wagmiConfig} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
+        <OddsFormatProvider>
         <AzuroSDKProvider initialChainId={CHAIN_ID}>
           <AzuroBetslipProvider>
             <FavoritesProvider>
@@ -44,6 +46,7 @@ export function Providers({
             </FavoritesProvider>
           </AzuroBetslipProvider>
         </AzuroSDKProvider>
+        </OddsFormatProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

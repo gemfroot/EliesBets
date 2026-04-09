@@ -6,7 +6,9 @@ import { useState } from "react";
 import { formatUnits } from "viem";
 import { ConnectModal } from "@/components/ConnectModal";
 import { MyBetsLink } from "@/components/MyBetsLink";
+import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { SearchBar } from "@/components/SearchBar";
+import type { OddsFormat } from "@/lib/oddsFormat";
 
 function formatAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -29,7 +31,14 @@ function formatNativeBalance(
   return `${rounded} ${symbol}`;
 }
 
+const ODDS_FORMAT_OPTIONS: { value: OddsFormat; label: string }[] = [
+  { value: "decimal", label: "Decimal" },
+  { value: "fractional", label: "Fractional" },
+  { value: "american", label: "American" },
+];
+
 export function Header() {
+  const { format: oddsFormat, setFormat: setOddsFormat } = useOddsFormat();
   const [modalOpen, setModalOpen] = useState(false);
   const { address, isConnected, status } = useConnection();
   const { disconnect } = useDisconnect();
@@ -56,6 +65,21 @@ export function Header() {
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+          <span className="hidden sm:inline">Odds</span>
+          <select
+            value={oddsFormat}
+            onChange={(e) => setOddsFormat(e.target.value as OddsFormat)}
+            aria-label="Odds format"
+            className="max-w-[9.5rem] rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs font-medium text-zinc-200 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+          >
+            {ODDS_FORMAT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <MyBetsLink variant="header" />
         {isConnected && address ? (
           <>
