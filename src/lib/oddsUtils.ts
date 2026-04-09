@@ -20,8 +20,15 @@ export type TopOddsLine = {
   isExpressForbidden: boolean;
 };
 
+/** First segment of Azuro `marketKey` (e.g. `"1-1-1"` → `"1"`). Family `"4"` is Over/Under. */
+function marketFamilyKey(marketKey: string): string {
+  const i = marketKey.indexOf("-");
+  return i === -1 ? marketKey : marketKey.slice(0, i);
+}
+
 /**
  * Picks Full Time Result (1X2) when present, otherwise the first "Match Winner" market (moneyline).
+ * Falls back to the first non–Over/Under market when possible so totals are not shown as the main line.
  */
 export function extractMainLineOdds(
   conditions: ConditionDetailedData[],
@@ -35,7 +42,10 @@ export function extractMainLineOdds(
     const matchWinner = markets.find((m) =>
       /match winner/i.test(m.name),
     );
-    const main = fullTime ?? matchWinner ?? markets[0];
+    const firstNonOu =
+      markets.find((m) => marketFamilyKey(m.marketKey) !== "4") ?? null;
+    const main =
+      fullTime ?? matchWinner ?? firstNonOu ?? markets[0];
     const firstCondition = main?.conditions[0];
     if (!firstCondition?.outcomes?.length) {
       return null;
@@ -49,6 +59,46 @@ export function extractMainLineOdds(
     }));
   } catch {
     return null;
+  }
+}
+
+/**
+ * Over/Under for the primary total line (first condition after toolkit ordering — lowest line).
+ */
+export function extractOverUnderOdds(
+  conditions: ConditionDetailedData[],
+): TopOddsLine[] | null {
+  if (!conditions.length) {
+    return null;
+  }
+  try {
+    const markets = groupConditionsByMarket(conditions);
+    const ou = markets.find((m) => marketFamilyKey(m.marketKey) === "4");
+    const firstCondition = ou?.conditions[0];
+    if (!firstCondition?.outcomes?.length) {
+      return null;
+    }
+    return firstCondition.outcomes.map((o) => ({
+      label: o.selectionName,
+      odds: o.odds,
+      outcomeId: o.outcomeId,
+      conditionId: firstCondition.conditionId,
+      isExpressForbidden: o.isExpressForbidden,
+    }));
+  } catch {
+    return null;
+  }
+}
+
+/** Distinct market types for this game (matches game detail grouping). */
+export function countGameMarkets(conditions: ConditionDetailedData[]): number {
+  if (!conditions.length) {
+    return 0;
+  }
+  try {
+    return groupConditionsByMarket(conditions).length;
+  } catch {
+    return 0;
   }
 }
 
