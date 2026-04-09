@@ -8,7 +8,7 @@ import {
   type GameData,
 } from "@azuro-org/toolkit";
 import { GameCard } from "@/components/GameCard";
-import { extractMainLineOdds, fetchTopOddsByGameId } from "@/lib/oddsUtils";
+import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { LiveGameCard } from "@/components/LiveGameCard";
 import { RetryCallout } from "@/components/RetryCallout";
 import { CHAIN_ID } from "@/lib/constants";
@@ -214,7 +214,7 @@ export async function HomePopularUpcomingSections() {
     ...upcomingGames.map((g) => g.gameId),
   ];
   const uniqueStaticIds = [...new Set(staticGameIds)];
-  let oddsByGameId = new Map<string, ReturnType<typeof extractMainLineOdds>>();
+  let oddsByGameId = new Map<string, GameOddsData>();
   try {
     oddsByGameId = await fetchTopOddsByGameId(uniqueStaticIds);
   } catch {
@@ -248,7 +248,8 @@ export async function HomePopularUpcomingSections() {
               <li key={game.gameId}>
                 <GameCard
                   game={game}
-                  topOdds={oddsByGameId.get(game.gameId) ?? null}
+                  topOdds={oddsByGameId.get(game.gameId)?.topOdds ?? null}
+                  extraMarketsCount={Math.max(0, (oddsByGameId.get(game.gameId)?.marketCount ?? 0) - 1)}
                 />
               </li>
             ))}
@@ -281,7 +282,8 @@ export async function HomePopularUpcomingSections() {
               <li key={game.gameId}>
                 <GameCard
                   game={game}
-                  topOdds={oddsByGameId.get(game.gameId) ?? null}
+                  topOdds={oddsByGameId.get(game.gameId)?.topOdds ?? null}
+                  extraMarketsCount={Math.max(0, (oddsByGameId.get(game.gameId)?.marketCount ?? 0) - 1)}
                 />
               </li>
             ))}

@@ -109,10 +109,15 @@ export function countGameMarkets(conditions: ConditionDetailedData[]): number {
   }
 }
 
+export type GameOddsData = {
+  topOdds: TopOddsLine[] | null;
+  marketCount: number;
+};
+
 export async function fetchTopOddsByGameId(
   gameIds: string[],
-): Promise<Map<string, ReturnType<typeof extractMainLineOdds>>> {
-  const result = new Map<string, ReturnType<typeof extractMainLineOdds>>();
+): Promise<Map<string, GameOddsData>> {
+  const result = new Map<string, GameOddsData>();
   if (!gameIds.length) {
     return result;
   }
@@ -135,19 +140,20 @@ export async function fetchTopOddsByGameId(
             byGameId.set(gid, [c]);
           }
         }
-        const batchResult = new Map<
-          string,
-          ReturnType<typeof extractMainLineOdds>
-        >();
+        const batchResult = new Map<string, GameOddsData>();
         for (const gid of batch) {
-          batchResult.set(gid, extractMainLineOdds(byGameId.get(gid) ?? []));
+          const conds = byGameId.get(gid) ?? [];
+          batchResult.set(gid, {
+            topOdds: extractMainLineOdds(conds),
+            marketCount: countGameMarkets(conds),
+          });
         }
         return batchResult;
       }),
     );
     for (const m of partialMaps) {
-      for (const [gid, odds] of m) {
-        result.set(gid, odds);
+      for (const [gid, data] of m) {
+        result.set(gid, data);
       }
     }
   }

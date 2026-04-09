@@ -2,7 +2,7 @@ import type { GameData } from "@azuro-org/toolkit";
 import Link from "next/link";
 import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { GameCard } from "@/components/GameCard";
-import { extractMainLineOdds, fetchTopOddsByGameId } from "@/lib/oddsUtils";
+import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
 import { fetchGamesForLeague } from "@/lib/sportGames";
 
@@ -36,7 +36,7 @@ export default async function SportCountryLeaguePage({ params }: Props) {
   const leagueName = games[0]?.league.name ?? titleFromSlug(leagueSlug);
 
   const oddsByGameId = loadError
-    ? new Map<string, ReturnType<typeof extractMainLineOdds>>()
+    ? new Map<string, GameOddsData>()
     : await fetchTopOddsByGameId(games.map((g) => g.gameId));
 
   games = [...games].sort((a, b) => +a.startsAt - +b.startsAt);
@@ -89,7 +89,8 @@ export default async function SportCountryLeaguePage({ params }: Props) {
             <li key={game.gameId}>
               <GameCard
                 game={game}
-                topOdds={oddsByGameId.get(game.gameId) ?? null}
+                topOdds={oddsByGameId.get(game.gameId)?.topOdds ?? null}
+                extraMarketsCount={Math.max(0, (oddsByGameId.get(game.gameId)?.marketCount ?? 0) - 1)}
               />
             </li>
           ))}
