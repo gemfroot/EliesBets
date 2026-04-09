@@ -55,7 +55,7 @@ export function useCoinToss() {
     query: { enabled: queryEnabled },
   });
 
-  const { data: nativeTokenConfig } = useReadContract({
+  const { data: chainTokenConfig } = useReadContract({
     address: coinToss,
     abi: coinTossAbi,
     functionName: "tokens",
@@ -132,7 +132,7 @@ export function useCoinToss() {
     coinTossAddress: coinToss,
     coinTossConfigured,
     vrfCost,
-    nativeTokenConfig,
+    chainTokenConfig,
     paused,
     lastRollHeads,
     data: minTotal,
