@@ -10,6 +10,7 @@ import {
 } from "@azuro-org/toolkit";
 import { GameDetailMarkets } from "@/components/GameDetailMarkets";
 import { GameDetailStatus } from "@/components/GameDetailStatus";
+import { RetryCallout } from "@/components/RetryCallout";
 import { CHAIN_ID } from "@/lib/constants";
 import { gameParticipantLine } from "@/lib/gameTitle";
 import type { Metadata } from "next";
@@ -115,11 +116,25 @@ export default async function GameDetailPage({ params }: Props) {
   const { id } = await params;
 
   let game: GameData | undefined;
+  let gameFetchError: string | null = null;
   try {
     const games = await getGamesByIds({ chainId: CHAIN_ID, gameIds: [id] });
     game = games[0];
-  } catch {
-    notFound();
+  } catch (e) {
+    gameFetchError =
+      e instanceof Error ? e.message : "Failed to load this game. Please try again.";
+  }
+
+  if (gameFetchError) {
+    return (
+      <div className="page-shell">
+        <RetryCallout
+          className="mt-8"
+          title="Could not load game"
+          description={gameFetchError}
+        />
+      </div>
+    );
   }
 
   if (!game) {
