@@ -1,11 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useBalance, useConnection, useDisconnect } from "wagmi";
 import { useState } from "react";
 import { formatUnits } from "viem";
-import { ConnectModal } from "@/components/ConnectModal";
 import { MyBetsLink } from "@/components/MyBetsLink";
+
+const ConnectModal = dynamic(
+  () =>
+    import("@/components/ConnectModal").then((m) => ({
+      default: m.ConnectModal,
+    })),
+  { ssr: false },
+);
 import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { SearchBar } from "@/components/SearchBar";
 import type { OddsFormat } from "@/lib/oddsFormat";
@@ -122,7 +130,9 @@ export function Header() {
         )}
       </div>
 
-      <ConnectModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      {modalOpen ? (
+        <ConnectModal open onClose={() => setModalOpen(false)} />
+      ) : null}
     </header>
   );
 }
