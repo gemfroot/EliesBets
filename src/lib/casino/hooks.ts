@@ -1,16 +1,25 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import type { Address } from "viem";
-import { useAccount, useChainId, useReadContract, useWriteContract } from "wagmi";
-import { bankAbi } from "@/lib/casino/abis/Bank";
-import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
+import type { PublicClient } from "viem";
+import { zeroAddress } from "viem";
+import { readContract } from "viem/actions";
+import { MAX_HOUSE_EGDE, coinTossAbi, defaultCasinoGameParams } from "@betswirl/sdk-core";
+import {
+  useAccount,
+  useChainId,
+  usePublicClient,
+  useReadContract,
+  useWriteContract,
+} from "wagmi";
 import {
   getCasinoBankAddress,
   getCasinoCoinTossAddress,
   isCasinoAddressConfigured,
 } from "@/lib/casino/addresses";
 import type { CasinoContracts, CasinoTxHash } from "@/lib/casino/types";
+
+const NATIVE_TOKEN = zeroAddress;
 
 export function useCasinoContracts(): CasinoContracts {
   const chainId = useChainId();
@@ -25,98 +34,80 @@ export function useCasinoContracts(): CasinoContracts {
   };
 }
 
-export function useBankBalanceOf(account?: Address) {
-  const { bank, bankConfigured } = useCasinoContracts();
-  const { address: connected } = useAccount();
-  const target = account ?? connected;
-
-  return useReadContract({
-    address: bank,
-    abi: bankAbi,
-    functionName: "balanceOf",
-    args: target ? [target] : undefined,
-    query: {
-      enabled: Boolean(bankConfigured && target),
-    },
-  });
-}
-
+/**
+ * Minimum total native amount for a single coin toss: Chainlink VRF fee plus at least 1 wei
+ * toward the bet (`msg.value` splits into VRF cost + `betAmount`).
+ */
 export function useCoinTossMinBet() {
   const { coinToss, coinTossConfigured } = useCasinoContracts();
 
-  return useReadContract({
+  const { data: vrfCost, isPending: vrfPending } = useReadContract({
     address: coinToss,
     abi: coinTossAbi,
-    functionName: "minBet",
+    functionName: "getChainlinkVRFCost",
+    args: [NATIVE_TOKEN, 1],
     query: {
       enabled: coinTossConfigured,
     },
   });
-}
 
-export function useBankDeposit() {
-  const { bank, bankConfigured } = useCasinoContracts();
-  const { writeContractAsync, ...rest } = useWriteContract();
-
-  const deposit = useCallback(
-    (valueWei: bigint): Promise<CasinoTxHash> =>
-      writeContractAsync({
-        address: bank,
-        abi: bankAbi,
-        functionName: "deposit",
-        value: valueWei,
-      }),
-    [bank, writeContractAsync],
-  );
+  const minTotal = useMemo(() => {
+    if (vrfCost === undefined) return undefined;
+    return vrfCost + BigInt(1);
+  }, [vrfCost]);
 
   return {
-    deposit,
-    canDeposit: bankConfigured,
-    ...rest,
+    data: minTotal,
+    isPending: vrfPending,
   };
 }
 
-export function useBankWithdraw() {
-  const { bank, bankConfigured } = useCasinoContracts();
-  const { writeContractAsync, ...rest } = useWriteContract();
-
-  const withdraw = useCallback(
-    (amount: bigint): Promise<CasinoTxHash> =>
-      writeContractAsync({
-        address: bank,
-        abi: bankAbi,
-        functionName: "withdraw",
-        args: [amount],
-      }),
-    [bank, writeContractAsync],
-  );
-
-  return {
-    withdraw,
-    canWithdraw: bankConfigured,
-    ...rest,
-  };
-}
-
-export function useCoinTossPlay() {
+export function useCoinTossWager() {
   const { coinToss, coinTossConfigured } = useCasinoContracts();
+  const { address: connected } = useAccount();
+  const publicClient = usePublicClient();
   const { writeContractAsync, ...rest } = useWriteContract();
 
-  const play = useCallback(
-    (betHeads: boolean, valueWei: bigint): Promise<CasinoTxHash> =>
-      writeContractAsync({
+  const placeWager = useCallback(
+    async (betHeads: boolean, valueWei: bigint): Promise<CasinoTxHash> => {
+      if (!publicClient) {
+        throw new Error("Wallet client not available");
+      }
+      const vrfCost = await readContract(publicClient as PublicClient, {
         address: coinToss,
         abi: coinTossAbi,
-        functionName: "play",
-        args: [betHeads],
+        functionName: "getChainlinkVRFCost",
+        args: [NATIVE_TOKEN, 1],
+      });
+      const betAmount = valueWei > vrfCost ? valueWei - vrfCost : BigInt(0);
+
+      return writeContractAsync({
+        address: coinToss,
+        abi: coinTossAbi,
+        functionName: "wager",
+        args: [
+          betHeads,
+          connected ?? zeroAddress,
+          zeroAddress,
+          {
+            token: NATIVE_TOKEN,
+            betAmount,
+            betCount: defaultCasinoGameParams.betCount,
+            stopGain: defaultCasinoGameParams.stopGain,
+            stopLoss: defaultCasinoGameParams.stopLoss,
+            maxHouseEdge: MAX_HOUSE_EGDE,
+          },
+        ],
         value: valueWei,
-      }),
-    [coinToss, writeContractAsync],
+      });
+    },
+    [coinToss, connected, publicClient, writeContractAsync],
   );
 
   return {
-    play,
-    canPlay: coinTossConfigured,
+    placeWager,
+    /** True when the coin toss contract address is known for this chain. */
+    canWager: coinTossConfigured,
     ...rest,
   };
 }

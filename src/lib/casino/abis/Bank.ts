@@ -1,31 +1,10 @@
 import type { Abi } from "viem";
+import { bankAbi as betSwirlBankAbi } from "@betswirl/sdk-core";
 
 /**
- * Bank vault ABI — keep in sync with the deployed Bank contract.
- * Regenerate from `artifacts/contracts/Bank.sol/Bank.json` (or equivalent) after deploy.
+ * BetSwirl Bank contract ABI (same on Polygon mainnet as other BetSwirl mainnets).
+ * Sourced from `@betswirl/sdk-core` — keep the dependency version aligned with protocol updates.
  */
-export const bankAbi = [
-  {
-    type: "function",
-    name: "deposit",
-    stateMutability: "payable",
-    inputs: [],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "withdraw",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "amount", type: "uint256", internalType: "uint256" }],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "balanceOf",
-    stateMutability: "view",
-    inputs: [{ name: "account", type: "address", internalType: "address" }],
-    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
-  },
-] as const satisfies Abi;
+export const bankAbi = betSwirlBankAbi as unknown as Abi;
 
-export type BankAbi = typeof bankAbi;
+export type BankAbi = typeof betSwirlBankAbi;
