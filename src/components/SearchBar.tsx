@@ -103,7 +103,7 @@ function buildItems(games: GamePayload[], q: string): SearchResultItem[] {
       items.push({
         id: `team-${tKey}`,
         kind: "team",
-        href: `/sports/${game.sport.slug}/${game.country.slug}/${game.league.slug}`,
+        href: `/games/${game.gameId}`,
         primary: p.name,
         secondary: `${game.league.name} · ${game.sport.name}`,
       });
@@ -133,6 +133,7 @@ export function SearchBar() {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [searchSettled, setSearchSettled] = useState(false);
 
   const trimmed = query.trim();
   const items = useMemo(() => {
@@ -152,10 +153,12 @@ export function SearchBar() {
         setGames([]);
         setFetchError(null);
         setLoading(false);
+        setSearchSettled(false);
       });
       return;
     }
 
+    setSearchSettled(false);
     const myId = ++searchRequestId.current;
     const t = window.setTimeout(() => {
       if (searchRequestId.current !== myId) {
@@ -192,6 +195,7 @@ export function SearchBar() {
             return;
           }
           setLoading(false);
+          setSearchSettled(true);
         });
     }, 280);
 
@@ -222,7 +226,10 @@ export function SearchBar() {
   const showPanel = Boolean(
     open &&
       trimmed.length >= MIN_QUERY &&
-      (showLoading || Boolean(showError) || items.length > 0),
+      (showLoading ||
+        Boolean(showError) ||
+        items.length > 0 ||
+        searchSettled),
   );
 
   const go = useCallback(
@@ -303,7 +310,7 @@ export function SearchBar() {
 
         <button
           type="button"
-          className="shrink-0 rounded-lg border border-zinc-700 bg-zinc-900/80 p-2 text-zinc-300 transition hover:bg-zinc-800 md:hidden"
+          className="flex h-11 min-h-[44px] w-11 min-w-[44px] shrink-0 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900/80 text-zinc-300 transition hover:bg-zinc-800 md:hidden"
           aria-expanded={mobileSearchOpen}
           aria-controls={inputId}
           aria-label={mobileSearchOpen ? "Close search" : "Open search"}
