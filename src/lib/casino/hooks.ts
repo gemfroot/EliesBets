@@ -34,6 +34,7 @@ import {
   getCasinoCoinTossAddress,
   getCasinoDiceAddress,
   getCasinoKenoAddress,
+  getCasinoPlinkoAddress,
   getCasinoRouletteAddress,
   getCasinoWheelAddress,
   isCasinoAddressConfigured,
@@ -455,6 +456,9 @@ function kenoRollFromDecodedLog(
 
 const wheelBetHistoryStorageKey = (chainId: number, wallet: `0x${string}`) =>
   `wheel.betHistory.v1:${chainId}:${wallet.toLowerCase()}`;
+
+const plinkoBetHistoryStorageKey = (chainId: number, wallet: `0x${string}`) =>
+  `plinko.betHistory.v1:${chainId}:${wallet.toLowerCase()}`;
 
 export interface WheelRollResult {
   id: bigint;
@@ -1739,13 +1743,17 @@ export type WheelBetData = {
   maxHouseEdge: number;
 };
 
+type WeightedWheelLikeHistoryKey = (chainId: number, wallet: `0x${string}`) => string;
+
 /**
- * Wheel game: loads segment configs via `configsCount` / `gameConfigs`, writes via `wager` on `@/lib/casino/abis/Wheel`.
+ * Shared logic for weighted games that use the same on-chain `Wheel` ABI (wheel + plinko contracts).
  */
-export function useWheel() {
+function useWeightedWheelLikeGame(
+  game: `0x${string}`,
+  gameConfigured: boolean,
+  historyStorageKey: WeightedWheelLikeHistoryKey,
+) {
   const chainId = useChainId();
-  const wheel = useMemo(() => getCasinoWheelAddress(chainId), [chainId]);
-  const wheelConfigured = isCasinoAddressConfigured(wheel);
   const { address: connected } = useAccount();
   const publicClient = usePublicClient();
   const {
@@ -1755,7 +1763,7 @@ export function useWheel() {
     ...writeRest
   } = useWriteContract();
 
-  const queryEnabled = wheelConfigured;
+  const queryEnabled = gameConfigured;
 
   const [vrfCost, setVrfCost] = useState<bigint | undefined>(undefined);
   const [vrfPending, setVrfPending] = useState(true);
@@ -1772,7 +1780,7 @@ export function useWheel() {
         setVrfPending(true);
         const cost = await fetchWheelVrfCostWithGasPrice(
           publicClient as PublicClient,
-          wheel,
+          game,
           connected!,
           defaultCasinoGameParams.betCount,
         );
@@ -1790,17 +1798,17 @@ export function useWheel() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [queryEnabled, publicClient, wheel, connected]);
+  }, [queryEnabled, publicClient, game, connected]);
 
   const { data: paused } = useReadContract({
-    address: wheel,
+    address: game,
     abi: wheelAbi,
     functionName: "paused",
     query: { enabled: queryEnabled },
   });
 
   const { data: chainTokenConfig } = useReadContract({
-    address: wheel,
+    address: game,
     abi: wheelAbi,
     functionName: "tokens",
     args: [NATIVE_TOKEN],
@@ -1808,7 +1816,7 @@ export function useWheel() {
   });
 
   const { data: configsCountRaw } = useReadContract({
-    address: wheel,
+    address: game,
     abi: wheelAbi,
     functionName: "configsCount",
     query: { enabled: queryEnabled },
@@ -1822,16 +1830,16 @@ export function useWheel() {
         : 0;
 
   const gameConfigContracts = useMemo(() => {
-    if (!wheelConfigured || configsCount <= 0) return [];
+    if (!gameConfigured || configsCount <= 0) return [];
     return Array.from({ length: configsCount }, (_, i) => ({
-      address: wheel,
+      address: game,
       abi: wheelAbi,
       functionName: "gameConfigs" as const,
       args: [i] as const,
     }));
-  }, [wheel, wheelConfigured, configsCount]);
+  }, [game, gameConfigured, configsCount]);
 
-  const { data: gameConfigsRaw, isPending: wheelConfigsLoading } = useReadContracts({
+  const { data: gameConfigsRaw, isPending: gameConfigsLoading } = useReadContracts({
     contracts: gameConfigContracts,
     query: {
       enabled: queryEnabled && configsCount > 0 && gameConfigContracts.length > 0,
@@ -1864,7 +1872,7 @@ export function useWheel() {
     },
   });
 
-  const wheelConfigs = gameConfigsRaw ?? [];
+  const gameConfigs = gameConfigsRaw ?? [];
 
   const [lastRoll, setLastRoll] = useState<WheelRollResult | null>(null);
   const rollCountRef = useRef(0);
@@ -1879,7 +1887,7 @@ export function useWheel() {
       setBetHistoryError(undefined);
       return;
     }
-    const storageKey = wheelBetHistoryStorageKey(chainId, connected);
+    const storageKey = historyStorageKey(chainId, connected);
     const stored = parseStoredWheelBetHistory(
       typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null,
     );
@@ -1901,7 +1909,7 @@ export function useWheel() {
             ? head - ROLL_EVENT_LOOKBACK_BLOCKS
             : BigInt(0);
         const logs = await getContractEvents(publicClient as PublicClient, {
-          address: wheel,
+          address: game,
           abi: wheelAbi,
           eventName: "Roll",
           args: { receiver: connected },
@@ -1940,22 +1948,22 @@ export function useWheel() {
     return () => {
       cancelled = true;
     };
-  }, [queryEnabled, publicClient, connected, wheel, chainId]);
+  }, [queryEnabled, publicClient, connected, game, chainId, historyStorageKey]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !connected) return;
     try {
       window.localStorage.setItem(
-        wheelBetHistoryStorageKey(chainId, connected),
+        historyStorageKey(chainId, connected),
         serializeWheelBetHistory(betHistory),
       );
     } catch {
       // ignore quota / private mode
     }
-  }, [betHistory, chainId, connected]);
+  }, [betHistory, chainId, connected, historyStorageKey]);
 
   useWatchContractEvent({
-    address: wheel,
+    address: game,
     abi: wheelAbi,
     eventName: "Roll",
     args: connected ? { receiver: connected } : undefined,
@@ -2005,32 +2013,32 @@ export function useWheel() {
 
       const vrf = await fetchWheelVrfCostWithGasPrice(
         publicClient as PublicClient,
-        wheel,
+        game,
         connected,
         betData.betCount,
       );
       const valueWei = betData.betAmount + vrf;
 
       return writeContractAsync({
-        address: wheel,
+        address: game,
         abi: wheelAbi,
         functionName: "wager",
         args: [configId, receiver, affiliate, betData],
         value: valueWei,
       });
     },
-    [wheel, connected, publicClient, writeContractAsync],
+    [game, connected, publicClient, writeContractAsync],
   );
 
-  const canWager = wheelConfigured && paused === false;
+  const canWager = gameConfigured && paused === false;
 
   return {
-    wheelAddress: wheel,
-    wheelConfigured,
+    gameAddress: game,
+    gameConfigured,
     vrfCost,
     chainTokenConfig,
-    wheelConfigs,
-    wheelConfigsLoading,
+    gameConfigs,
+    gameConfigsLoading,
     paused,
     lastRoll,
     betHistory,
@@ -2042,5 +2050,51 @@ export function useWheel() {
     placeWager,
     canWager,
     ...writeRest,
+  };
+}
+
+/**
+ * Wheel game: loads segment configs via `configsCount` / `gameConfigs`, writes via `wager` on `@/lib/casino/abis/Wheel`.
+ */
+export function useWheel() {
+  const chainId = useChainId();
+  const wheel = useMemo(() => getCasinoWheelAddress(chainId), [chainId]);
+  const wheelConfigured = isCasinoAddressConfigured(wheel);
+  const {
+    gameAddress: wheelAddress,
+    gameConfigured: wheelConfiguredOut,
+    gameConfigs: wheelConfigs,
+    gameConfigsLoading: wheelConfigsLoading,
+    ...rest
+  } = useWeightedWheelLikeGame(wheel, wheelConfigured, wheelBetHistoryStorageKey);
+  return {
+    wheelAddress,
+    wheelConfigured: wheelConfiguredOut,
+    wheelConfigs,
+    wheelConfigsLoading,
+    ...rest,
+  };
+}
+
+/**
+ * Plinko uses the same weighted-game contract ABI as Wheel; address comes from `getCasinoPlinkoAddress`.
+ */
+export function usePlinko() {
+  const chainId = useChainId();
+  const plinko = useMemo(() => getCasinoPlinkoAddress(chainId), [chainId]);
+  const plinkoConfigured = isCasinoAddressConfigured(plinko);
+  const {
+    gameAddress: plinkoAddress,
+    gameConfigured: plinkoConfiguredOut,
+    gameConfigs: plinkoConfigs,
+    gameConfigsLoading: plinkoConfigsLoading,
+    ...rest
+  } = useWeightedWheelLikeGame(plinko, plinkoConfigured, plinkoBetHistoryStorageKey);
+  return {
+    plinkoAddress,
+    plinkoConfigured: plinkoConfiguredOut,
+    plinkoConfigs,
+    plinkoConfigsLoading,
+    ...rest,
   };
 }
