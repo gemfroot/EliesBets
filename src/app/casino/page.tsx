@@ -31,10 +31,11 @@ const GAMES: readonly GameCard[] = [
     href: "/casino/coin-toss",
   },
   {
-    status: "soon",
+    status: "live",
     icon: "🎡",
     title: "Roulette",
     description: "Classic number bets with on-chain settlement.",
+    href: "/casino/roulette",
   },
   {
     status: "soon",
