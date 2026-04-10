@@ -45,10 +45,11 @@ const GAMES: readonly GameCard[] = [
     href: "/casino/keno",
   },
   {
-    status: "soon",
+    status: "live",
     icon: "🎰",
     title: "Wheel",
     description: "Spin the wheel—weighted segments, provably fair odds.",
+    href: "/casino/wheel",
   },
   {
     status: "soon",
