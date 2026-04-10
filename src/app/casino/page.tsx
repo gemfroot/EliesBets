@@ -38,10 +38,11 @@ const GAMES: readonly GameCard[] = [
     href: "/casino/roulette",
   },
   {
-    status: "soon",
+    status: "live",
     icon: "🎯",
     title: "Keno",
     description: "Pick your numbers and watch the draw unfold on-chain.",
+    href: "/casino/keno",
   },
   {
     status: "soon",
