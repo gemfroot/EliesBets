@@ -241,7 +241,8 @@ export interface RouletteRollResult {
   rolled: readonly number[];
   payout: bigint;
   totalBetAmount: bigint;
-  configId: number;
+  /** Encoded selection (`numbers` on the Roll event, uint40). */
+  numbers: bigint;
   timestamp: number;
 }
 
@@ -258,18 +259,25 @@ function parseStoredRouletteBetHistory(raw: string | null): RouletteRollResult[]
       const payout = o.payout;
       const totalBetAmount = o.totalBetAmount;
       const rolled = o.rolled;
-      const configId = o.configId;
+      const numbersRaw = o.numbers ?? o.configId;
       const timestamp = o.timestamp;
       if (typeof id !== "string" || typeof payout !== "string" || typeof totalBetAmount !== "string")
         continue;
       if (!Array.isArray(rolled) || rolled.some((x) => typeof x !== "number")) continue;
-      if (typeof configId !== "number" || typeof timestamp !== "number") continue;
+      if (
+        (typeof numbersRaw !== "string" && typeof numbersRaw !== "number") ||
+        typeof timestamp !== "number"
+      )
+        continue;
       out.push({
         id: BigInt(id),
         rolled: rolled as number[],
         payout: BigInt(payout),
         totalBetAmount: BigInt(totalBetAmount),
-        configId,
+        numbers:
+          typeof numbersRaw === "string"
+            ? BigInt(numbersRaw)
+            : BigInt(Math.trunc(numbersRaw as number)),
         timestamp,
       });
     }
@@ -286,7 +294,7 @@ function serializeRouletteBetHistory(rolls: RouletteRollResult[]): string {
       rolled: [...r.rolled],
       payout: r.payout.toString(),
       totalBetAmount: r.totalBetAmount.toString(),
-      configId: r.configId,
+      numbers: r.numbers.toString(),
       timestamp: r.timestamp,
     })),
   );
@@ -313,7 +321,7 @@ function rouletteRollFromDecodedLog(
     rolled?: readonly number[];
     payout?: bigint;
     totalBetAmount?: bigint;
-    configId?: number;
+    numbers?: bigint;
   },
   log: { blockNumber?: bigint | null; logIndex?: number | null },
 ): RouletteRollResult | null {
@@ -324,7 +332,7 @@ function rouletteRollFromDecodedLog(
     rolled: args.rolled,
     payout: args.payout ?? BigInt(0),
     totalBetAmount: args.totalBetAmount ?? BigInt(0),
-    configId: args.configId ?? 0,
+    numbers: args.numbers ?? BigInt(0),
     timestamp: ts,
   };
 }
@@ -1063,7 +1071,7 @@ export function useRoulette() {
               rolled?: readonly number[];
               payout?: bigint;
               totalBetAmount?: bigint;
-              configId?: number;
+              numbers?: bigint;
             },
             log,
           );
@@ -1116,7 +1124,7 @@ export function useRoulette() {
         rolled?: readonly number[];
         payout?: bigint;
         totalBetAmount?: bigint;
-        configId?: number;
+        numbers?: bigint;
       };
       if (!args.rolled || args.rolled.length === 0) return;
       rollCountRef.current += 1;
@@ -1125,7 +1133,7 @@ export function useRoulette() {
         rolled: args.rolled,
         payout: args.payout ?? BigInt(0),
         totalBetAmount: args.totalBetAmount ?? BigInt(0),
-        configId: args.configId ?? 0,
+        numbers: args.numbers ?? BigInt(0),
         timestamp: Date.now(),
       };
       setLastRoll(roll);
