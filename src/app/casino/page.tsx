@@ -52,10 +52,11 @@ const GAMES: readonly GameCard[] = [
     href: "/casino/wheel",
   },
   {
-    status: "soon",
+    status: "live",
     icon: "📍",
     title: "Plinko",
     description: "Drop the ball through pegs for on-chain random payouts.",
+    href: "/casino/plinko",
   },
 ];
 
