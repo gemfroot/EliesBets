@@ -26,6 +26,14 @@ export const BETSWIRL_DICE_POLYGON =
 export const BETSWIRL_DICE_AMOY =
   "0xE14E752c6Ef78fB54da5A28ff7C9f808534603e9" as const satisfies Address;
 
+/** BetSwirl Roulette — Polygon mainnet. */
+export const BETSWIRL_ROULETTE_POLYGON =
+  "0x6678e3B4AB2a8C8Cdd068F132C21293CcBda33cb" as const satisfies Address;
+
+/** BetSwirl Roulette — Polygon Amoy testnet. */
+export const BETSWIRL_ROULETTE_AMOY =
+  "0x5F628ccd0D5929B16fF6E239D8BB8C81F1b0feD9" as const satisfies Address;
+
 function addressFromEnv(value: string | undefined): Address | undefined {
   if (!value || !isAddress(value)) {
     return undefined;
@@ -56,6 +64,13 @@ const DICE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_GNOSIS),
 };
 
+const ROULETTE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
+  [polygon.id]:
+    addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_POLYGON) ?? BETSWIRL_ROULETTE_POLYGON,
+  [polygonAmoy.id]: BETSWIRL_ROULETTE_AMOY,
+  [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_GNOSIS),
+};
+
 export function getCasinoBankAddress(chainId: number): Address {
   const resolved = BANK_BY_CHAIN[chainId as CasinoChainId];
   return resolved ?? zeroAddress;
@@ -68,6 +83,11 @@ export function getCasinoCoinTossAddress(chainId: number): Address {
 
 export function getCasinoDiceAddress(chainId: number): Address {
   const resolved = DICE_BY_CHAIN[chainId as CasinoChainId];
+  return resolved ?? zeroAddress;
+}
+
+export function getCasinoRouletteAddress(chainId: number): Address {
+  const resolved = ROULETTE_BY_CHAIN[chainId as CasinoChainId];
   return resolved ?? zeroAddress;
 }
 
