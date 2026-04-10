@@ -20,10 +20,12 @@ import {
 } from "wagmi";
 import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
 import { diceAbi } from "@/lib/casino/abis/Dice";
+import { kenoAbi } from "@/lib/casino/abis/Keno";
 import { rouletteAbi } from "@/lib/casino/abis/Roulette";
 import {
   getCasinoCoinTossAddress,
   getCasinoDiceAddress,
+  getCasinoKenoAddress,
   getCasinoRouletteAddress,
   isCasinoAddressConfigured,
 } from "@/lib/casino/addresses";
@@ -337,6 +339,111 @@ function rouletteRollFromDecodedLog(
   };
 }
 
+const kenoBetHistoryStorageKey = (chainId: number, wallet: `0x${string}`) =>
+  `keno.betHistory.v1:${chainId}:${wallet.toLowerCase()}`;
+
+export interface KenoRollResult {
+  id: bigint;
+  /** Drawn numbers (on-chain uint40 values). */
+  rolled: readonly number[];
+  payout: bigint;
+  totalBetAmount: bigint;
+  /** Player selection encoded as uint40. */
+  numbers: bigint;
+  timestamp: number;
+}
+
+function parseStoredKenoBetHistory(raw: string | null): KenoRollResult[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const out: KenoRollResult[] = [];
+    for (const row of parsed) {
+      if (!row || typeof row !== "object") continue;
+      const o = row as Record<string, unknown>;
+      const id = o.id;
+      const payout = o.payout;
+      const totalBetAmount = o.totalBetAmount;
+      const rolled = o.rolled;
+      const numbersRaw = o.numbers;
+      const timestamp = o.timestamp;
+      if (typeof id !== "string" || typeof payout !== "string" || typeof totalBetAmount !== "string")
+        continue;
+      if (!Array.isArray(rolled) || rolled.some((x) => typeof x !== "number")) continue;
+      if (
+        (typeof numbersRaw !== "string" && typeof numbersRaw !== "number") ||
+        typeof timestamp !== "number"
+      )
+        continue;
+      out.push({
+        id: BigInt(id),
+        rolled: rolled as number[],
+        payout: BigInt(payout),
+        totalBetAmount: BigInt(totalBetAmount),
+        numbers:
+          typeof numbersRaw === "string"
+            ? BigInt(numbersRaw)
+            : BigInt(Math.trunc(numbersRaw as number)),
+        timestamp,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function serializeKenoBetHistory(rolls: KenoRollResult[]): string {
+  return JSON.stringify(
+    rolls.map((r) => ({
+      id: r.id.toString(),
+      rolled: [...r.rolled],
+      payout: r.payout.toString(),
+      totalBetAmount: r.totalBetAmount.toString(),
+      numbers: r.numbers.toString(),
+      timestamp: r.timestamp,
+    })),
+  );
+}
+
+function mergeKenoBetHistoryById(
+  existing: KenoRollResult[],
+  incoming: KenoRollResult[],
+): KenoRollResult[] {
+  const byId = new Map<string, KenoRollResult>();
+  for (const r of [...existing, ...incoming]) {
+    const id = r.id.toString();
+    const prev = byId.get(id);
+    byId.set(id, !prev || r.timestamp >= prev.timestamp ? r : prev);
+  }
+  return [...byId.values()]
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, MAX_BET_HISTORY);
+}
+
+function kenoRollFromDecodedLog(
+  args: {
+    id?: bigint;
+    rolled?: readonly number[];
+    payout?: bigint;
+    totalBetAmount?: bigint;
+    numbers?: bigint;
+  },
+  log: { blockNumber?: bigint | null; logIndex?: number | null },
+): KenoRollResult | null {
+  if (!args.rolled || args.rolled.length === 0) return null;
+  const ts = Number(rollSortKeyFromLog(log));
+  return {
+    id: args.id ?? BigInt(0),
+    rolled: args.rolled,
+    payout: args.payout ?? BigInt(0),
+    totalBetAmount: args.totalBetAmount ?? BigInt(0),
+    numbers: args.numbers ?? BigInt(0),
+    timestamp: ts,
+  };
+}
+
 /**
  * getChainlinkVRFCost uses tx.gasprice internally, which is 0 in a normal
  * eth_call. We must pass the current gasPrice to get the real cost.
@@ -418,6 +525,34 @@ async function fetchRouletteVrfCostWithGasPrice(
   if (!result.data) return BigInt(0);
   return decodeFunctionResult({
     abi: rouletteAbi,
+    functionName: "getChainlinkVRFCost",
+    data: result.data,
+  }) as bigint;
+}
+
+async function fetchKenoVrfCostWithGasPrice(
+  client: PublicClient,
+  contractAddress: `0x${string}`,
+  callerAddress: `0x${string}`,
+  betCount: number,
+): Promise<bigint> {
+  const gasPrice = await getGasPrice(client);
+  const buffered = (gasPrice * BigInt(120)) / BigInt(100);
+  const data = encodeFunctionData({
+    abi: kenoAbi,
+    functionName: "getChainlinkVRFCost",
+    args: [NATIVE_TOKEN, betCount],
+  });
+  const result = await client.call({
+    to: contractAddress,
+    data,
+    gasPrice: buffered,
+    account: callerAddress,
+    gas: BigInt(100_000),
+  });
+  if (!result.data) return BigInt(0);
+  return decodeFunctionResult({
+    abi: kenoAbi,
     functionName: "getChainlinkVRFCost",
     data: result.data,
   }) as bigint;
@@ -1182,6 +1317,270 @@ export function useRoulette() {
     rouletteConfigured,
     vrfCost,
     chainTokenConfig,
+    paused,
+    lastRoll,
+    betHistory,
+    betHistoryLoading,
+    betHistoryError,
+    data: minTotal,
+    isMinBetPending: vrfPending,
+    isPending: writePending,
+    placeWager,
+    canWager,
+    ...writeRest,
+  };
+}
+
+/** BetData tuple passed to `wager` on the Keno contract (matches `IGamePlayer.BetData`). */
+export type KenoBetData = {
+  token: `0x${string}`;
+  betAmount: bigint;
+  betCount: number;
+  stopGain: bigint;
+  stopLoss: bigint;
+  maxHouseEdge: number;
+};
+
+/**
+ * Keno game: reads payout table via `gains`, writes via `wager` on `@/lib/casino/abis/Keno`.
+ */
+export function useKeno() {
+  const chainId = useChainId();
+  const keno = useMemo(() => getCasinoKenoAddress(chainId), [chainId]);
+  const kenoConfigured = isCasinoAddressConfigured(keno);
+  const { address: connected } = useAccount();
+  const publicClient = usePublicClient();
+  const {
+    writeContractAsync,
+    data: _writeData,
+    isPending: writePending,
+    ...writeRest
+  } = useWriteContract();
+
+  const queryEnabled = kenoConfigured;
+
+  const [vrfCost, setVrfCost] = useState<bigint | undefined>(undefined);
+  const [vrfPending, setVrfPending] = useState(true);
+
+  useEffect(() => {
+    if (!queryEnabled || !publicClient || !connected) {
+      setVrfCost(undefined);
+      setVrfPending(false);
+      return;
+    }
+    let cancelled = false;
+    async function poll() {
+      try {
+        setVrfPending(true);
+        const cost = await fetchKenoVrfCostWithGasPrice(
+          publicClient as PublicClient,
+          keno,
+          connected!,
+          defaultCasinoGameParams.betCount,
+        );
+        if (!cancelled) {
+          setVrfCost(cost);
+          setVrfPending(false);
+        }
+      } catch {
+        if (!cancelled) setVrfPending(false);
+      }
+    }
+    poll();
+    const id = setInterval(poll, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [queryEnabled, publicClient, keno, connected]);
+
+  const { data: paused } = useReadContract({
+    address: keno,
+    abi: kenoAbi,
+    functionName: "paused",
+    query: { enabled: queryEnabled },
+  });
+
+  const { data: chainTokenConfig } = useReadContract({
+    address: keno,
+    abi: kenoAbi,
+    functionName: "tokens",
+    args: [NATIVE_TOKEN],
+    query: { enabled: queryEnabled },
+  });
+
+  const { data: kenoConfig } = useReadContract({
+    address: keno,
+    abi: kenoAbi,
+    functionName: "gains",
+    args: [NATIVE_TOKEN],
+    query: { enabled: queryEnabled },
+  });
+
+  const [lastRoll, setLastRoll] = useState<KenoRollResult | null>(null);
+  const rollCountRef = useRef(0);
+  const [betHistory, setBetHistory] = useState<KenoRollResult[]>([]);
+  const [betHistoryLoading, setBetHistoryLoading] = useState(false);
+  const [betHistoryError, setBetHistoryError] = useState<Error | undefined>(undefined);
+
+  useEffect(() => {
+    if (!queryEnabled || !publicClient || !connected) {
+      setBetHistory([]);
+      setBetHistoryLoading(false);
+      setBetHistoryError(undefined);
+      return;
+    }
+    const storageKey = kenoBetHistoryStorageKey(chainId, connected);
+    const stored = parseStoredKenoBetHistory(
+      typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null,
+    );
+    if (stored.length > 0) {
+      setBetHistory(stored);
+    } else {
+      setBetHistory([]);
+    }
+
+    let cancelled = false;
+    setBetHistoryLoading(true);
+    setBetHistoryError(undefined);
+
+    async function loadFromChain() {
+      try {
+        const head = await getBlockNumber(publicClient as PublicClient);
+        const from =
+          head > ROLL_EVENT_LOOKBACK_BLOCKS
+            ? head - ROLL_EVENT_LOOKBACK_BLOCKS
+            : BigInt(0);
+        const logs = await getContractEvents(publicClient as PublicClient, {
+          address: keno,
+          abi: kenoAbi,
+          eventName: "Roll",
+          args: { receiver: connected },
+          fromBlock: from,
+          toBlock: head,
+        });
+        const rolls: KenoRollResult[] = [];
+        for (const log of logs) {
+          if (!("args" in log) || !log.args || typeof log.args !== "object") continue;
+          const r = kenoRollFromDecodedLog(
+            log.args as {
+              id?: bigint;
+              rolled?: readonly number[];
+              payout?: bigint;
+              totalBetAmount?: bigint;
+              numbers?: bigint;
+            },
+            log,
+          );
+          if (r) rolls.push(r);
+        }
+        if (cancelled) return;
+        setBetHistory((prev) => mergeKenoBetHistoryById(prev, rolls));
+      } catch (e) {
+        if (!cancelled) {
+          setBetHistoryError(
+            e instanceof Error ? e : new Error("Failed to load bet history"),
+          );
+        }
+      } finally {
+        if (!cancelled) setBetHistoryLoading(false);
+      }
+    }
+
+    void loadFromChain();
+    return () => {
+      cancelled = true;
+    };
+  }, [queryEnabled, publicClient, connected, keno, chainId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !connected) return;
+    try {
+      window.localStorage.setItem(
+        kenoBetHistoryStorageKey(chainId, connected),
+        serializeKenoBetHistory(betHistory),
+      );
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [betHistory, chainId, connected]);
+
+  useWatchContractEvent({
+    address: keno,
+    abi: kenoAbi,
+    eventName: "Roll",
+    args: connected ? { receiver: connected } : undefined,
+    enabled: queryEnabled && Boolean(connected),
+    onLogs(logs) {
+      const last = logs[logs.length - 1];
+      if (!last || !("args" in last) || !last.args || typeof last.args !== "object") {
+        return;
+      }
+      const args = last.args as {
+        id?: bigint;
+        rolled?: readonly number[];
+        payout?: bigint;
+        totalBetAmount?: bigint;
+        numbers?: bigint;
+      };
+      if (!args.rolled || args.rolled.length === 0) return;
+      rollCountRef.current += 1;
+      const roll: KenoRollResult = {
+        id: args.id ?? BigInt(0),
+        rolled: args.rolled,
+        payout: args.payout ?? BigInt(0),
+        totalBetAmount: args.totalBetAmount ?? BigInt(0),
+        numbers: args.numbers ?? BigInt(0),
+        timestamp: Date.now(),
+      };
+      setLastRoll(roll);
+      setBetHistory((prev) => mergeKenoBetHistoryById(prev, [roll]));
+    },
+  });
+
+  const minTotal = useMemo(() => {
+    if (typeof vrfCost !== "bigint") return undefined;
+    return vrfCost + BigInt(1);
+  }, [vrfCost]);
+
+  const placeWager = useCallback(
+    async (
+      encodedNumbers: bigint,
+      receiver: `0x${string}`,
+      affiliate: `0x${string}`,
+      betData: KenoBetData,
+    ): Promise<CasinoTxHash> => {
+      if (!publicClient || !connected) {
+        throw new Error("Wallet not connected");
+      }
+
+      const vrf = await fetchKenoVrfCostWithGasPrice(
+        publicClient as PublicClient,
+        keno,
+        connected,
+        betData.betCount,
+      );
+      const valueWei = betData.betAmount + vrf;
+
+      return writeContractAsync({
+        address: keno,
+        abi: kenoAbi,
+        functionName: "wager",
+        args: [encodedNumbers, receiver, affiliate, betData],
+        value: valueWei,
+      });
+    },
+    [keno, connected, publicClient, writeContractAsync],
+  );
+
+  const canWager = kenoConfigured && paused === false;
+
+  return {
+    kenoAddress: keno,
+    kenoConfigured,
+    vrfCost,
+    chainTokenConfig,
+    kenoConfig,
     paused,
     lastRoll,
     betHistory,
