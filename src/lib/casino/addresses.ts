@@ -42,6 +42,22 @@ export const BETSWIRL_KENO_POLYGON =
 export const BETSWIRL_KENO_AMOY =
   "0x77A654D0895baF09c42314FBb4b18822Ec3c1DD0" as const satisfies Address;
 
+/** BetSwirl Wheel — Polygon mainnet. */
+export const BETSWIRL_WHEEL_POLYGON =
+  "0xdec2A4f75c5fAE4a09c83975681CE1Dd1dff764b" as const satisfies Address;
+
+/** BetSwirl Wheel — Polygon Amoy testnet. */
+export const BETSWIRL_WHEEL_AMOY =
+  "0xd300a3757dDBb3Eafb8fb3e401a5eb60e4a571b1" as const satisfies Address;
+
+/** BetSwirl Plinko — Polygon mainnet. */
+export const BETSWIRL_PLINKO_POLYGON =
+  "0xdec2A4f75c5fAE4a09c83975681CE1Dd1dff764b" as const satisfies Address;
+
+/** BetSwirl Plinko — Polygon Amoy testnet. */
+export const BETSWIRL_PLINKO_AMOY =
+  "0xd300a3757dDBb3Eafb8fb3e401a5eb60e4a571b1" as const satisfies Address;
+
 function addressFromEnv(value: string | undefined): Address | undefined {
   if (!value || !isAddress(value)) {
     return undefined;
@@ -85,6 +101,18 @@ const KENO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_GNOSIS),
 };
 
+const WHEEL_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
+  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_POLYGON) ?? BETSWIRL_WHEEL_POLYGON,
+  [polygonAmoy.id]: BETSWIRL_WHEEL_AMOY,
+  [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_GNOSIS),
+};
+
+const PLINKO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
+  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_POLYGON) ?? BETSWIRL_PLINKO_POLYGON,
+  [polygonAmoy.id]: BETSWIRL_PLINKO_AMOY,
+  [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_GNOSIS),
+};
+
 export function getCasinoBankAddress(chainId: number): Address {
   const resolved = BANK_BY_CHAIN[chainId as CasinoChainId];
   return resolved ?? zeroAddress;
@@ -107,6 +135,16 @@ export function getCasinoRouletteAddress(chainId: number): Address {
 
 export function getCasinoKenoAddress(chainId: number): Address {
   const resolved = KENO_BY_CHAIN[chainId as CasinoChainId];
+  return resolved ?? zeroAddress;
+}
+
+export function getCasinoWheelAddress(chainId: number): Address {
+  const resolved = WHEEL_BY_CHAIN[chainId as CasinoChainId];
+  return resolved ?? zeroAddress;
+}
+
+export function getCasinoPlinkoAddress(chainId: number): Address {
+  const resolved = PLINKO_BY_CHAIN[chainId as CasinoChainId];
   return resolved ?? zeroAddress;
 }
 
