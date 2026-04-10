@@ -9,12 +9,19 @@ import {
   zeroAddress,
 } from "viem";
 import { getBlockNumber, getContractEvents, getGasPrice } from "viem/actions";
-import { MAX_HOUSE_EGDE, defaultCasinoGameParams } from "@betswirl/sdk-core";
+import {
+  MAX_HOUSE_EGDE,
+  defaultCasinoGameParams,
+  parseRawWeightedGameConfiguration,
+  type CasinoChainId,
+  type WeightedGameConfiguration,
+} from "@betswirl/sdk-core";
 import {
   useAccount,
   useChainId,
   usePublicClient,
   useReadContract,
+  useReadContracts,
   useWatchContractEvent,
   useWriteContract,
 } from "wagmi";
@@ -22,11 +29,13 @@ import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
 import { diceAbi } from "@/lib/casino/abis/Dice";
 import { kenoAbi } from "@/lib/casino/abis/Keno";
 import { rouletteAbi } from "@/lib/casino/abis/Roulette";
+import { wheelAbi } from "@/lib/casino/abis/Wheel";
 import {
   getCasinoCoinTossAddress,
   getCasinoDiceAddress,
   getCasinoKenoAddress,
   getCasinoRouletteAddress,
+  getCasinoWheelAddress,
   isCasinoAddressConfigured,
 } from "@/lib/casino/addresses";
 import type { CasinoTxHash } from "@/lib/casino/types";
@@ -444,6 +453,103 @@ function kenoRollFromDecodedLog(
   };
 }
 
+const wheelBetHistoryStorageKey = (chainId: number, wallet: `0x${string}`) =>
+  `wheel.betHistory.v1:${chainId}:${wallet.toLowerCase()}`;
+
+export interface WheelRollResult {
+  id: bigint;
+  /** Segment indices from the `Roll` event (`uint8[]`). */
+  rolled: readonly number[];
+  payout: bigint;
+  totalBetAmount: bigint;
+  configId: number;
+  timestamp: number;
+}
+
+function parseStoredWheelBetHistory(raw: string | null): WheelRollResult[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const out: WheelRollResult[] = [];
+    for (const row of parsed) {
+      if (!row || typeof row !== "object") continue;
+      const o = row as Record<string, unknown>;
+      const id = o.id;
+      const payout = o.payout;
+      const totalBetAmount = o.totalBetAmount;
+      const rolled = o.rolled;
+      const configId = o.configId;
+      const timestamp = o.timestamp;
+      if (typeof id !== "string" || typeof payout !== "string" || typeof totalBetAmount !== "string")
+        continue;
+      if (!Array.isArray(rolled) || rolled.some((x) => typeof x !== "number")) continue;
+      if (typeof configId !== "number" || typeof timestamp !== "number") continue;
+      out.push({
+        id: BigInt(id),
+        rolled: rolled as number[],
+        payout: BigInt(payout),
+        totalBetAmount: BigInt(totalBetAmount),
+        configId,
+        timestamp,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function serializeWheelBetHistory(rolls: WheelRollResult[]): string {
+  return JSON.stringify(
+    rolls.map((r) => ({
+      id: r.id.toString(),
+      rolled: [...r.rolled],
+      payout: r.payout.toString(),
+      totalBetAmount: r.totalBetAmount.toString(),
+      configId: r.configId,
+      timestamp: r.timestamp,
+    })),
+  );
+}
+
+function mergeWheelBetHistoryById(
+  existing: WheelRollResult[],
+  incoming: WheelRollResult[],
+): WheelRollResult[] {
+  const byId = new Map<string, WheelRollResult>();
+  for (const r of [...existing, ...incoming]) {
+    const id = r.id.toString();
+    const prev = byId.get(id);
+    byId.set(id, !prev || r.timestamp >= prev.timestamp ? r : prev);
+  }
+  return [...byId.values()]
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, MAX_BET_HISTORY);
+}
+
+function wheelRollFromDecodedLog(
+  args: {
+    id?: bigint;
+    rolled?: readonly number[];
+    payout?: bigint;
+    totalBetAmount?: bigint;
+    configId?: number;
+  },
+  log: { blockNumber?: bigint | null; logIndex?: number | null },
+): WheelRollResult | null {
+  if (!args.rolled || args.rolled.length === 0) return null;
+  const ts = Number(rollSortKeyFromLog(log));
+  return {
+    id: args.id ?? BigInt(0),
+    rolled: args.rolled,
+    payout: args.payout ?? BigInt(0),
+    totalBetAmount: args.totalBetAmount ?? BigInt(0),
+    configId: args.configId ?? 0,
+    timestamp: ts,
+  };
+}
+
 /**
  * getChainlinkVRFCost uses tx.gasprice internally, which is 0 in a normal
  * eth_call. We must pass the current gasPrice to get the real cost.
@@ -553,6 +659,34 @@ async function fetchKenoVrfCostWithGasPrice(
   if (!result.data) return BigInt(0);
   return decodeFunctionResult({
     abi: kenoAbi,
+    functionName: "getChainlinkVRFCost",
+    data: result.data,
+  }) as bigint;
+}
+
+async function fetchWheelVrfCostWithGasPrice(
+  client: PublicClient,
+  contractAddress: `0x${string}`,
+  callerAddress: `0x${string}`,
+  betCount: number,
+): Promise<bigint> {
+  const gasPrice = await getGasPrice(client);
+  const buffered = (gasPrice * BigInt(120)) / BigInt(100);
+  const data = encodeFunctionData({
+    abi: wheelAbi,
+    functionName: "getChainlinkVRFCost",
+    args: [NATIVE_TOKEN, betCount],
+  });
+  const result = await client.call({
+    to: contractAddress,
+    data,
+    gasPrice: buffered,
+    account: callerAddress,
+    gas: BigInt(100_000),
+  });
+  if (!result.data) return BigInt(0);
+  return decodeFunctionResult({
+    abi: wheelAbi,
     functionName: "getChainlinkVRFCost",
     data: result.data,
   }) as bigint;
@@ -1581,6 +1715,322 @@ export function useKeno() {
     vrfCost,
     chainTokenConfig,
     kenoConfig,
+    paused,
+    lastRoll,
+    betHistory,
+    betHistoryLoading,
+    betHistoryError,
+    data: minTotal,
+    isMinBetPending: vrfPending,
+    isPending: writePending,
+    placeWager,
+    canWager,
+    ...writeRest,
+  };
+}
+
+/** BetData tuple passed to `wager` on the Wheel contract (matches `IGamePlayer.BetData`). */
+export type WheelBetData = {
+  token: `0x${string}`;
+  betAmount: bigint;
+  betCount: number;
+  stopGain: bigint;
+  stopLoss: bigint;
+  maxHouseEdge: number;
+};
+
+/**
+ * Wheel game: loads segment configs via `configsCount` / `gameConfigs`, writes via `wager` on `@/lib/casino/abis/Wheel`.
+ */
+export function useWheel() {
+  const chainId = useChainId();
+  const wheel = useMemo(() => getCasinoWheelAddress(chainId), [chainId]);
+  const wheelConfigured = isCasinoAddressConfigured(wheel);
+  const { address: connected } = useAccount();
+  const publicClient = usePublicClient();
+  const {
+    writeContractAsync,
+    data: _writeData,
+    isPending: writePending,
+    ...writeRest
+  } = useWriteContract();
+
+  const queryEnabled = wheelConfigured;
+
+  const [vrfCost, setVrfCost] = useState<bigint | undefined>(undefined);
+  const [vrfPending, setVrfPending] = useState(true);
+
+  useEffect(() => {
+    if (!queryEnabled || !publicClient || !connected) {
+      setVrfCost(undefined);
+      setVrfPending(false);
+      return;
+    }
+    let cancelled = false;
+    async function poll() {
+      try {
+        setVrfPending(true);
+        const cost = await fetchWheelVrfCostWithGasPrice(
+          publicClient as PublicClient,
+          wheel,
+          connected!,
+          defaultCasinoGameParams.betCount,
+        );
+        if (!cancelled) {
+          setVrfCost(cost);
+          setVrfPending(false);
+        }
+      } catch {
+        if (!cancelled) setVrfPending(false);
+      }
+    }
+    poll();
+    const id = setInterval(poll, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [queryEnabled, publicClient, wheel, connected]);
+
+  const { data: paused } = useReadContract({
+    address: wheel,
+    abi: wheelAbi,
+    functionName: "paused",
+    query: { enabled: queryEnabled },
+  });
+
+  const { data: chainTokenConfig } = useReadContract({
+    address: wheel,
+    abi: wheelAbi,
+    functionName: "tokens",
+    args: [NATIVE_TOKEN],
+    query: { enabled: queryEnabled },
+  });
+
+  const { data: configsCountRaw } = useReadContract({
+    address: wheel,
+    abi: wheelAbi,
+    functionName: "configsCount",
+    query: { enabled: queryEnabled },
+  });
+
+  const configsCount =
+    typeof configsCountRaw === "bigint"
+      ? Number(configsCountRaw)
+      : typeof configsCountRaw === "number"
+        ? configsCountRaw
+        : 0;
+
+  const gameConfigContracts = useMemo(() => {
+    if (!wheelConfigured || configsCount <= 0) return [];
+    return Array.from({ length: configsCount }, (_, i) => ({
+      address: wheel,
+      abi: wheelAbi,
+      functionName: "gameConfigs" as const,
+      args: [i] as const,
+    }));
+  }, [wheel, wheelConfigured, configsCount]);
+
+  const { data: gameConfigsRaw, isPending: wheelConfigsLoading } = useReadContracts({
+    contracts: gameConfigContracts,
+    query: {
+      enabled: queryEnabled && configsCount > 0 && gameConfigContracts.length > 0,
+      select: (results) => {
+        const casinoChainId = chainId as CasinoChainId;
+        const parsed: WeightedGameConfiguration[] = [];
+        for (let i = 0; i < results.length; i++) {
+          const row = results[i];
+          if (row.status !== "success" || row.result == null) continue;
+          const tuple = row.result as readonly [
+            readonly bigint[],
+            readonly bigint[],
+            bigint,
+            number,
+          ];
+          const raw = {
+            weightRanges: [...tuple[0]],
+            multipliers: [...tuple[1]],
+            maxMultiplier: tuple[2],
+            gameId: tuple[3],
+          };
+          try {
+            parsed.push(parseRawWeightedGameConfiguration(raw, i, casinoChainId));
+          } catch {
+            // skip malformed rows
+          }
+        }
+        return parsed;
+      },
+    },
+  });
+
+  const wheelConfigs = gameConfigsRaw ?? [];
+
+  const [lastRoll, setLastRoll] = useState<WheelRollResult | null>(null);
+  const rollCountRef = useRef(0);
+  const [betHistory, setBetHistory] = useState<WheelRollResult[]>([]);
+  const [betHistoryLoading, setBetHistoryLoading] = useState(false);
+  const [betHistoryError, setBetHistoryError] = useState<Error | undefined>(undefined);
+
+  useEffect(() => {
+    if (!queryEnabled || !publicClient || !connected) {
+      setBetHistory([]);
+      setBetHistoryLoading(false);
+      setBetHistoryError(undefined);
+      return;
+    }
+    const storageKey = wheelBetHistoryStorageKey(chainId, connected);
+    const stored = parseStoredWheelBetHistory(
+      typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null,
+    );
+    if (stored.length > 0) {
+      setBetHistory(stored);
+    } else {
+      setBetHistory([]);
+    }
+
+    let cancelled = false;
+    setBetHistoryLoading(true);
+    setBetHistoryError(undefined);
+
+    async function loadFromChain() {
+      try {
+        const head = await getBlockNumber(publicClient as PublicClient);
+        const from =
+          head > ROLL_EVENT_LOOKBACK_BLOCKS
+            ? head - ROLL_EVENT_LOOKBACK_BLOCKS
+            : BigInt(0);
+        const logs = await getContractEvents(publicClient as PublicClient, {
+          address: wheel,
+          abi: wheelAbi,
+          eventName: "Roll",
+          args: { receiver: connected },
+          fromBlock: from,
+          toBlock: head,
+        });
+        const rolls: WheelRollResult[] = [];
+        for (const log of logs) {
+          if (!("args" in log) || !log.args || typeof log.args !== "object") continue;
+          const r = wheelRollFromDecodedLog(
+            log.args as {
+              id?: bigint;
+              rolled?: readonly number[];
+              payout?: bigint;
+              totalBetAmount?: bigint;
+              configId?: number;
+            },
+            log,
+          );
+          if (r) rolls.push(r);
+        }
+        if (cancelled) return;
+        setBetHistory((prev) => mergeWheelBetHistoryById(prev, rolls));
+      } catch (e) {
+        if (!cancelled) {
+          setBetHistoryError(
+            e instanceof Error ? e : new Error("Failed to load bet history"),
+          );
+        }
+      } finally {
+        if (!cancelled) setBetHistoryLoading(false);
+      }
+    }
+
+    void loadFromChain();
+    return () => {
+      cancelled = true;
+    };
+  }, [queryEnabled, publicClient, connected, wheel, chainId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !connected) return;
+    try {
+      window.localStorage.setItem(
+        wheelBetHistoryStorageKey(chainId, connected),
+        serializeWheelBetHistory(betHistory),
+      );
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [betHistory, chainId, connected]);
+
+  useWatchContractEvent({
+    address: wheel,
+    abi: wheelAbi,
+    eventName: "Roll",
+    args: connected ? { receiver: connected } : undefined,
+    enabled: queryEnabled && Boolean(connected),
+    onLogs(logs) {
+      const last = logs[logs.length - 1];
+      if (!last || !("args" in last) || !last.args || typeof last.args !== "object") {
+        return;
+      }
+      const args = last.args as {
+        id?: bigint;
+        rolled?: readonly number[];
+        payout?: bigint;
+        totalBetAmount?: bigint;
+        configId?: number;
+      };
+      if (!args.rolled || args.rolled.length === 0) return;
+      rollCountRef.current += 1;
+      const roll: WheelRollResult = {
+        id: args.id ?? BigInt(0),
+        rolled: args.rolled,
+        payout: args.payout ?? BigInt(0),
+        totalBetAmount: args.totalBetAmount ?? BigInt(0),
+        configId: args.configId ?? 0,
+        timestamp: Date.now(),
+      };
+      setLastRoll(roll);
+      setBetHistory((prev) => mergeWheelBetHistoryById(prev, [roll]));
+    },
+  });
+
+  const minTotal = useMemo(() => {
+    if (typeof vrfCost !== "bigint") return undefined;
+    return vrfCost + BigInt(1);
+  }, [vrfCost]);
+
+  const placeWager = useCallback(
+    async (
+      configId: number,
+      receiver: `0x${string}`,
+      affiliate: `0x${string}`,
+      betData: WheelBetData,
+    ): Promise<CasinoTxHash> => {
+      if (!publicClient || !connected) {
+        throw new Error("Wallet not connected");
+      }
+
+      const vrf = await fetchWheelVrfCostWithGasPrice(
+        publicClient as PublicClient,
+        wheel,
+        connected,
+        betData.betCount,
+      );
+      const valueWei = betData.betAmount + vrf;
+
+      return writeContractAsync({
+        address: wheel,
+        abi: wheelAbi,
+        functionName: "wager",
+        args: [configId, receiver, affiliate, betData],
+        value: valueWei,
+      });
+    },
+    [wheel, connected, publicClient, writeContractAsync],
+  );
+
+  const canWager = wheelConfigured && paused === false;
+
+  return {
+    wheelAddress: wheel,
+    wheelConfigured,
+    vrfCost,
+    chainTokenConfig,
+    wheelConfigs,
+    wheelConfigsLoading,
     paused,
     lastRoll,
     betHistory,
