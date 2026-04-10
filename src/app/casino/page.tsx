@@ -34,13 +34,25 @@ const GAMES: readonly GameCard[] = [
     status: "soon",
     icon: "🎡",
     title: "Roulette",
-    description: "Classic wheel action with on-chain settlement.",
+    description: "Classic number bets with on-chain settlement.",
+  },
+  {
+    status: "soon",
+    icon: "🎯",
+    title: "Keno",
+    description: "Pick your numbers and watch the draw unfold on-chain.",
   },
   {
     status: "soon",
     icon: "🎰",
-    title: "Slots",
-    description: "Spin the reels—wallet-native play when this title ships.",
+    title: "Wheel",
+    description: "Spin the wheel—weighted segments, provably fair odds.",
+  },
+  {
+    status: "soon",
+    icon: "📍",
+    title: "Plinko",
+    description: "Drop the ball through pegs for on-chain random payouts.",
   },
 ];
 

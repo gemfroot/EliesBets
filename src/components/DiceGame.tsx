@@ -230,9 +230,8 @@ export function DiceGame() {
         <header className="mb-8 lg:mb-10">
           <h1 className="type-display">Dice</h1>
           <p className="type-muted mt-1 max-w-2xl">
-            Pick a cap from {CAP_MIN}–{CAP_MAX}, stake native currency, and roll. You win if the
-            result is above your cap—higher caps mean better odds and lower multipliers. Settled
-            on-chain with Chainlink VRF.
+            Pick a number from {CAP_MIN}–{CAP_MAX} and roll under it. Higher numbers mean better
+            odds but lower multipliers. Settled on-chain with Chainlink VRF.
           </p>
         </header>
 
@@ -318,7 +317,7 @@ export function DiceGame() {
 
                 <div>
                   <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
-                    <p className="type-overline">Cap (roll must be &gt; cap to win)</p>
+                    <p className="type-overline">Roll under (pick your target)</p>
                     <span className="font-mono text-sm font-semibold tabular-nums text-zinc-200">
                       {cap}
                     </span>
@@ -466,8 +465,8 @@ export function DiceGame() {
                   <div className="type-caption mt-3 space-y-3 border-t border-zinc-800/80 pt-3 text-zinc-500">
                     <ol className="list-decimal space-y-2 pl-4 text-zinc-400">
                       <li>
-                        Set your cap ({CAP_MIN}–{CAP_MAX}) and stake. The contract uses part of
-                        your payment for the bet and reserves the rest for VRF and settlement.
+                        Pick a number ({CAP_MIN}–{CAP_MAX}) and stake. A random number 1–100 is
+                        drawn on-chain. You win if the result is below your number.
                       </li>
                       <li>
                         Confirm in your wallet. The roll uses Chainlink VRF and resolves in a few

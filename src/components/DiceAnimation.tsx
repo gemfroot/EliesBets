@@ -79,12 +79,12 @@ export function DiceAnimation({
 
       <p id={labelId} className="type-overline mb-4 text-center">
         {phase === "idle" && "Set your cap and stake"}
-        {phase === "picking" && "Roll under your cap to win"}
+        {phase === "picking" && "Roll below your number to win"}
         {phase === "rolling" && "Rolling…"}
         {phase === "result" && (outcomeRoll != null ? "Result" : "Settled")}
       </p>
 
-      {/* 1–100 scale: cap marks the win threshold (roll must be > cap) */}
+      {/* 1–100 scale: you win if the rolled number is below your cap */}
       <div
         className="relative w-full max-w-[min(22rem,92vw)]"
         aria-hidden={phase === "result" ? false : true}
@@ -113,7 +113,7 @@ export function DiceAnimation({
           ) : null}
         </div>
         <p className="type-caption mt-2 text-center text-zinc-600">
-          Win if the roll is <span className="text-zinc-400">strictly above</span> your cap.
+          Win if the roll is <span className="text-zinc-400">below</span> your target number.
         </p>
       </div>
 
@@ -161,7 +161,7 @@ export function DiceAnimation({
         <p className="type-caption mt-6 max-w-xs text-center text-zinc-600">
           {phase === "rolling"
             ? "Waiting for Chainlink VRF to settle the roll."
-            : "Higher caps mean better odds and lower multipliers."}
+            : "Higher numbers mean better odds but lower multipliers."}
         </p>
       )}
     </div>
