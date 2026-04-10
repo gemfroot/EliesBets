@@ -20,9 +20,11 @@ import {
 } from "wagmi";
 import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
 import { diceAbi } from "@/lib/casino/abis/Dice";
+import { rouletteAbi } from "@/lib/casino/abis/Roulette";
 import {
   getCasinoCoinTossAddress,
   getCasinoDiceAddress,
+  getCasinoRouletteAddress,
   isCasinoAddressConfigured,
 } from "@/lib/casino/addresses";
 import type { CasinoTxHash } from "@/lib/casino/types";
@@ -231,6 +233,102 @@ function diceRollFromDecodedLog(
   };
 }
 
+const rouletteBetHistoryStorageKey = (chainId: number, wallet: `0x${string}`) =>
+  `roulette.betHistory.v1:${chainId}:${wallet.toLowerCase()}`;
+
+export interface RouletteRollResult {
+  id: bigint;
+  rolled: readonly number[];
+  payout: bigint;
+  totalBetAmount: bigint;
+  configId: number;
+  timestamp: number;
+}
+
+function parseStoredRouletteBetHistory(raw: string | null): RouletteRollResult[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const out: RouletteRollResult[] = [];
+    for (const row of parsed) {
+      if (!row || typeof row !== "object") continue;
+      const o = row as Record<string, unknown>;
+      const id = o.id;
+      const payout = o.payout;
+      const totalBetAmount = o.totalBetAmount;
+      const rolled = o.rolled;
+      const configId = o.configId;
+      const timestamp = o.timestamp;
+      if (typeof id !== "string" || typeof payout !== "string" || typeof totalBetAmount !== "string")
+        continue;
+      if (!Array.isArray(rolled) || rolled.some((x) => typeof x !== "number")) continue;
+      if (typeof configId !== "number" || typeof timestamp !== "number") continue;
+      out.push({
+        id: BigInt(id),
+        rolled: rolled as number[],
+        payout: BigInt(payout),
+        totalBetAmount: BigInt(totalBetAmount),
+        configId,
+        timestamp,
+      });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function serializeRouletteBetHistory(rolls: RouletteRollResult[]): string {
+  return JSON.stringify(
+    rolls.map((r) => ({
+      id: r.id.toString(),
+      rolled: [...r.rolled],
+      payout: r.payout.toString(),
+      totalBetAmount: r.totalBetAmount.toString(),
+      configId: r.configId,
+      timestamp: r.timestamp,
+    })),
+  );
+}
+
+function mergeRouletteBetHistoryById(
+  existing: RouletteRollResult[],
+  incoming: RouletteRollResult[],
+): RouletteRollResult[] {
+  const byId = new Map<string, RouletteRollResult>();
+  for (const r of [...existing, ...incoming]) {
+    const id = r.id.toString();
+    const prev = byId.get(id);
+    byId.set(id, !prev || r.timestamp >= prev.timestamp ? r : prev);
+  }
+  return [...byId.values()]
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, MAX_BET_HISTORY);
+}
+
+function rouletteRollFromDecodedLog(
+  args: {
+    id?: bigint;
+    rolled?: readonly number[];
+    payout?: bigint;
+    totalBetAmount?: bigint;
+    configId?: number;
+  },
+  log: { blockNumber?: bigint | null; logIndex?: number | null },
+): RouletteRollResult | null {
+  if (!args.rolled || args.rolled.length === 0) return null;
+  const ts = Number(rollSortKeyFromLog(log));
+  return {
+    id: args.id ?? BigInt(0),
+    rolled: args.rolled,
+    payout: args.payout ?? BigInt(0),
+    totalBetAmount: args.totalBetAmount ?? BigInt(0),
+    configId: args.configId ?? 0,
+    timestamp: ts,
+  };
+}
+
 /**
  * getChainlinkVRFCost uses tx.gasprice internally, which is 0 in a normal
  * eth_call. We must pass the current gasPrice to get the real cost.
@@ -285,6 +383,33 @@ async function fetchDiceVrfCostWithGasPrice(
   if (!result.data) return BigInt(0);
   return decodeFunctionResult({
     abi: diceAbi,
+    functionName: "getChainlinkVRFCost",
+    data: result.data,
+  }) as bigint;
+}
+
+async function fetchRouletteVrfCostWithGasPrice(
+  client: PublicClient,
+  contractAddress: `0x${string}`,
+  callerAddress: `0x${string}`,
+): Promise<bigint> {
+  const gasPrice = await getGasPrice(client);
+  const buffered = (gasPrice * BigInt(120)) / BigInt(100);
+  const data = encodeFunctionData({
+    abi: rouletteAbi,
+    functionName: "getChainlinkVRFCost",
+    args: [NATIVE_TOKEN, 1],
+  });
+  const result = await client.call({
+    to: contractAddress,
+    data,
+    gasPrice: buffered,
+    account: callerAddress,
+    gas: BigInt(100_000),
+  });
+  if (!result.data) return BigInt(0);
+  return decodeFunctionResult({
+    abi: rouletteAbi,
     functionName: "getChainlinkVRFCost",
     data: result.data,
   }) as bigint;
@@ -794,6 +919,259 @@ export function useDice() {
   return {
     diceAddress: dice,
     diceConfigured,
+    vrfCost,
+    chainTokenConfig,
+    paused,
+    lastRoll,
+    betHistory,
+    betHistoryLoading,
+    betHistoryError,
+    data: minTotal,
+    isMinBetPending: vrfPending,
+    isPending: writePending,
+    placeWager,
+    canWager,
+    ...writeRest,
+  };
+}
+
+/** BetData tuple passed to `wager` on the Roulette contract (matches `IGamePlayer.BetData`). */
+export type RouletteBetData = {
+  token: `0x${string}`;
+  betAmount: bigint;
+  betCount: number;
+  stopGain: bigint;
+  stopLoss: bigint;
+  maxHouseEdge: number;
+};
+
+/**
+ * Roulette game: reads and writes use the on-chain ABI in `@/lib/casino/abis/Roulette`.
+ */
+export function useRoulette() {
+  const chainId = useChainId();
+  const roulette = useMemo(() => getCasinoRouletteAddress(chainId), [chainId]);
+  const rouletteConfigured = isCasinoAddressConfigured(roulette);
+  const { address: connected } = useAccount();
+  const publicClient = usePublicClient();
+  const {
+    writeContractAsync,
+    data: _writeData,
+    isPending: writePending,
+    ...writeRest
+  } = useWriteContract();
+
+  const queryEnabled = rouletteConfigured;
+
+  const [vrfCost, setVrfCost] = useState<bigint | undefined>(undefined);
+  const [vrfPending, setVrfPending] = useState(true);
+
+  useEffect(() => {
+    if (!queryEnabled || !publicClient || !connected) {
+      setVrfCost(undefined);
+      setVrfPending(false);
+      return;
+    }
+    let cancelled = false;
+    async function poll() {
+      try {
+        setVrfPending(true);
+        const cost = await fetchRouletteVrfCostWithGasPrice(
+          publicClient as PublicClient,
+          roulette,
+          connected!,
+        );
+        if (!cancelled) {
+          setVrfCost(cost);
+          setVrfPending(false);
+        }
+      } catch {
+        if (!cancelled) setVrfPending(false);
+      }
+    }
+    poll();
+    const id = setInterval(poll, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [queryEnabled, publicClient, roulette, connected]);
+
+  const { data: paused } = useReadContract({
+    address: roulette,
+    abi: rouletteAbi,
+    functionName: "paused",
+    query: { enabled: queryEnabled },
+  });
+
+  const { data: chainTokenConfig } = useReadContract({
+    address: roulette,
+    abi: rouletteAbi,
+    functionName: "tokens",
+    args: [NATIVE_TOKEN],
+    query: { enabled: queryEnabled },
+  });
+
+  const [lastRoll, setLastRoll] = useState<RouletteRollResult | null>(null);
+  const rollCountRef = useRef(0);
+  const [betHistory, setBetHistory] = useState<RouletteRollResult[]>([]);
+  const [betHistoryLoading, setBetHistoryLoading] = useState(false);
+  const [betHistoryError, setBetHistoryError] = useState<Error | undefined>(undefined);
+
+  useEffect(() => {
+    if (!queryEnabled || !publicClient || !connected) {
+      setBetHistory([]);
+      setBetHistoryLoading(false);
+      setBetHistoryError(undefined);
+      return;
+    }
+    const storageKey = rouletteBetHistoryStorageKey(chainId, connected);
+    const stored = parseStoredRouletteBetHistory(
+      typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null,
+    );
+    if (stored.length > 0) {
+      setBetHistory(stored);
+    } else {
+      setBetHistory([]);
+    }
+
+    let cancelled = false;
+    setBetHistoryLoading(true);
+    setBetHistoryError(undefined);
+
+    async function loadFromChain() {
+      try {
+        const head = await getBlockNumber(publicClient as PublicClient);
+        const from =
+          head > ROLL_EVENT_LOOKBACK_BLOCKS
+            ? head - ROLL_EVENT_LOOKBACK_BLOCKS
+            : BigInt(0);
+        const logs = await getContractEvents(publicClient as PublicClient, {
+          address: roulette,
+          abi: rouletteAbi,
+          eventName: "Roll",
+          args: { receiver: connected },
+          fromBlock: from,
+          toBlock: head,
+        });
+        const rolls: RouletteRollResult[] = [];
+        for (const log of logs) {
+          if (!("args" in log) || !log.args || typeof log.args !== "object") continue;
+          const r = rouletteRollFromDecodedLog(
+            log.args as {
+              id?: bigint;
+              rolled?: readonly number[];
+              payout?: bigint;
+              totalBetAmount?: bigint;
+              configId?: number;
+            },
+            log,
+          );
+          if (r) rolls.push(r);
+        }
+        if (cancelled) return;
+        setBetHistory((prev) => mergeRouletteBetHistoryById(prev, rolls));
+      } catch (e) {
+        if (!cancelled) {
+          setBetHistoryError(
+            e instanceof Error ? e : new Error("Failed to load bet history"),
+          );
+        }
+      } finally {
+        if (!cancelled) setBetHistoryLoading(false);
+      }
+    }
+
+    void loadFromChain();
+    return () => {
+      cancelled = true;
+    };
+  }, [queryEnabled, publicClient, connected, roulette, chainId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !connected) return;
+    try {
+      window.localStorage.setItem(
+        rouletteBetHistoryStorageKey(chainId, connected),
+        serializeRouletteBetHistory(betHistory),
+      );
+    } catch {
+      // ignore quota / private mode
+    }
+  }, [betHistory, chainId, connected]);
+
+  useWatchContractEvent({
+    address: roulette,
+    abi: rouletteAbi,
+    eventName: "Roll",
+    args: connected ? { receiver: connected } : undefined,
+    enabled: queryEnabled && Boolean(connected),
+    onLogs(logs) {
+      const last = logs[logs.length - 1];
+      if (!last || !("args" in last) || !last.args || typeof last.args !== "object") {
+        return;
+      }
+      const args = last.args as {
+        id?: bigint;
+        rolled?: readonly number[];
+        payout?: bigint;
+        totalBetAmount?: bigint;
+        configId?: number;
+      };
+      if (!args.rolled || args.rolled.length === 0) return;
+      rollCountRef.current += 1;
+      const roll: RouletteRollResult = {
+        id: args.id ?? BigInt(0),
+        rolled: args.rolled,
+        payout: args.payout ?? BigInt(0),
+        totalBetAmount: args.totalBetAmount ?? BigInt(0),
+        configId: args.configId ?? 0,
+        timestamp: Date.now(),
+      };
+      setLastRoll(roll);
+      setBetHistory((prev) => mergeRouletteBetHistoryById(prev, [roll]));
+    },
+  });
+
+  const minTotal = useMemo(() => {
+    if (typeof vrfCost !== "bigint") return undefined;
+    return vrfCost + BigInt(1);
+  }, [vrfCost]);
+
+  const placeWager = useCallback(
+    async (
+      encodedNumbers: bigint,
+      receiver: `0x${string}`,
+      affiliate: `0x${string}`,
+      betData: RouletteBetData,
+    ): Promise<CasinoTxHash> => {
+      if (!publicClient || !connected) {
+        throw new Error("Wallet not connected");
+      }
+
+      const vrf = await fetchRouletteVrfCostWithGasPrice(
+        publicClient as PublicClient,
+        roulette,
+        connected,
+      );
+      const valueWei = betData.betAmount + vrf;
+
+      return writeContractAsync({
+        address: roulette,
+        abi: rouletteAbi,
+        functionName: "wager",
+        args: [encodedNumbers, receiver, affiliate, betData],
+        value: valueWei,
+      });
+    },
+    [roulette, connected, publicClient, writeContractAsync],
+  );
+
+  const canWager = rouletteConfigured && paused === false;
+
+  return {
+    rouletteAddress: roulette,
+    rouletteConfigured,
     vrfCost,
     chainTokenConfig,
     paused,
