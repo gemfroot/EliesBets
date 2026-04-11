@@ -3,16 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BP_VALUE } from "@betswirl/sdk-core";
-import { formatEther, parseEther } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
-import { polygonAmoy } from "viem/chains";
+import { avalanche } from "viem/chains";
 import { CoinFlipAnimation, type CoinFlipPhase } from "@/components/CoinFlipAnimation";
 import { useCoinToss } from "@/lib/casino/hooks";
-import { CASINO_CHAIN_IDS } from "@/lib/casino/addresses";
+import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
 
 type GamePhase = CoinFlipPhase;
 
-const STAKE_PRESET_ETH = ["0.01", "0.05", "0.1", "0.5", "1"] as const;
 const BET_HISTORY_DISPLAY_CAP = 12;
 
 const PHASE_LABEL: Record<GamePhase, string> = {
@@ -26,7 +25,19 @@ const CHAIN_NAMES: Record<number, string> = {
   137: "Polygon",
   80002: "Polygon Amoy",
   100: "Gnosis",
+  43114: "Avalanche",
+  43113: "Avalanche Fuji",
 };
+
+const STAKE_PRESETS_BY_SYMBOL: Record<string, string[]> = {
+  AVAX: ["0.1", "0.5", "1", "5"],
+  USDC: ["1", "5", "10", "25"],
+  USDt: ["1", "5", "10", "25"],
+  LINK: ["0.01", "0.05", "0.1", "0.5"],
+  POL: ["1", "5", "10", "50"],
+  xDAI: ["1", "5", "10", "50"],
+};
+const DEFAULT_PRESETS = ["0.01", "0.05", "0.1", "0.5", "1"];
 
 function formatCasinoTxError(error: Error): string {
   const e = error as Error & { shortMessage?: string };
@@ -44,11 +55,21 @@ export function CoinTossGame() {
   const { isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+
+  const availableTokens = useMemo(() => getBetTokens(chainId), [chainId]);
+  const [selectedTokenIdx, setSelectedTokenIdx] = useState(0);
+  const selectedToken: BetToken = availableTokens[selectedTokenIdx] ?? availableTokens[0];
+
+  useEffect(() => {
+    setSelectedTokenIdx(0);
+  }, [chainId]);
+
   const {
     data: minBet,
     isMinBetPending: minBetLoading,
     vrfCost,
     chainTokenConfig,
+    betToken,
     placeWager,
     canWager,
     isPending,
@@ -58,7 +79,9 @@ export function CoinTossGame() {
     betHistory,
     betHistoryLoading,
     betHistoryError,
-  } = useCoinToss();
+  } = useCoinToss(selectedToken);
+
+  const stakePresets = STAKE_PRESETS_BY_SYMBOL[betToken.symbol] ?? DEFAULT_PRESETS;
 
   const [betHeads, setBetHeads] = useState(true);
   const [amount, setAmount] = useState("");
@@ -71,6 +94,11 @@ export function CoinTossGame() {
   const rollSnapshotRef = useRef<number>(0);
 
   const isSupportedChain = (CASINO_CHAIN_IDS as readonly number[]).includes(chainId);
+
+  const fmt = useCallback(
+    (wei: bigint) => formatUnits(wei, betToken.decimals),
+    [betToken.decimals],
+  );
 
   const { data: receipt, isLoading: receiptLoading } = useWaitForTransactionReceipt({
     hash: txHash,
@@ -96,11 +124,11 @@ export function CoinTossGame() {
     const zero = BigInt(0);
     if (!t) return { ok: false as const, wei: zero };
     try {
-      return { ok: true as const, wei: parseEther(t) };
+      return { ok: true as const, wei: parseUnits(t, betToken.decimals) };
     } catch {
       return { ok: false as const, wei: zero };
     }
-  }, [amount]);
+  }, [amount, betToken.decimals]);
 
   const amountError =
     amount.trim() !== "" && !parsedAmount.ok
@@ -224,10 +252,10 @@ export function CoinTossGame() {
             </span>
             <button
               type="button"
-              onClick={() => switchChain?.({ chainId: polygonAmoy.id })}
+              onClick={() => switchChain?.({ chainId: avalanche.id })}
               className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-500"
             >
-              Switch to Polygon Amoy
+              Switch to Avalanche
             </button>
           </div>
         ) : isConnected && isSupportedChain ? (
@@ -253,6 +281,8 @@ export function CoinTossGame() {
               outcome={outcome}
               betHeads={frozenBetHeads}
               payoutWei={payoutWei}
+              tokenSymbol={betToken.symbol}
+              tokenDecimals={betToken.decimals}
               className="w-full"
             />
           </div>
@@ -333,12 +363,38 @@ export function CoinTossGame() {
                   </div>
                 </div>
 
+                {availableTokens.length > 1 && (
+                  <div>
+                    <p className="type-overline mb-2">Token</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availableTokens.map((t, idx) => (
+                        <button
+                          key={t.address}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTokenIdx(idx);
+                            setAmount("");
+                            if (phase !== "idle") setPhase("idle");
+                          }}
+                          className={`min-h-[40px] rounded-lg border px-4 py-1.5 text-sm font-medium transition ${
+                            idx === selectedTokenIdx
+                              ? "border-emerald-600 bg-emerald-950/50 text-emerald-100"
+                              : "border-zinc-700 bg-zinc-950 text-zinc-400 hover:border-zinc-600"
+                          }`}
+                        >
+                          {t.symbol}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label htmlFor="coin-toss-amount" className="type-overline mb-2 block">
-                    Stake
+                    Stake ({betToken.symbol})
                   </label>
                   <div className="mb-2 flex flex-wrap gap-2">
-                    {STAKE_PRESET_ETH.map((preset) => (
+                    {stakePresets.map((preset) => (
                       <button
                         key={preset}
                         type="button"
@@ -363,7 +419,7 @@ export function CoinTossGame() {
                   />
                   {parsedAmount.ok && parsedAmount.wei > BigInt(0) && vrfWei !== undefined ? (
                     <p className="type-caption mt-1.5 text-zinc-500">
-                      Open How it works below for how your payment is split.
+                      VRF fee: ~{formatUnits(vrfWei, 18)} (paid in native gas token).
                     </p>
                   ) : null}
                   {amountError ? (
@@ -371,15 +427,14 @@ export function CoinTossGame() {
                   ) : null}
                   {belowMin ? (
                     <p className="type-caption mt-1.5 text-amber-300">
-                      Minimum stake is {formatEther(minBetWei)} (covers required fees and minimum
-                      bet).
+                      Minimum bet is {fmt(minBetWei)} {betToken.symbol}.
                     </p>
                   ) : null}
                   {minBetLoading ? (
                     <p className="type-caption mt-1.5 text-zinc-600">Loading minimum…</p>
                   ) : canWager && minBet !== undefined ? (
                     <p className="type-caption mt-1.5 text-zinc-500">
-                      Minimum stake {formatEther(minBetWei)} · Enter an amount to continue.
+                      Minimum bet {fmt(minBetWei)} {betToken.symbol} · Enter an amount to continue.
                     </p>
                   ) : null}
                 </div>
@@ -429,8 +484,8 @@ export function CoinTossGame() {
                                   {landedHeads ? "Heads" : "Tails"}
                                 </span>
                                 <span className="font-mono text-xs text-zinc-400">
-                                  Bet {formatEther(row.totalBetAmount)} · Payout{" "}
-                                  {formatEther(row.payout)}
+                                  Bet {fmt(row.totalBetAmount)} · Payout{" "}
+                                  {fmt(row.payout)} {betToken.symbol}
                                 </span>
                               </li>
                             );
@@ -475,29 +530,28 @@ export function CoinTossGame() {
                     </ol>
                     {parsedAmount.ok && parsedAmount.wei > BigInt(0) && vrfWei !== undefined ? (
                       <div className="space-y-1 border-t border-zinc-800/80 pt-3">
-                        <p className="text-zinc-400">VRF (randomness) breakdown</p>
-                        <p>
-                          Payment total:{" "}
-                          <span className="font-mono text-zinc-300">
-                            {formatEther(parsedAmount.wei)}
-                          </span>
-                        </p>
-                        <p>
-                          VRF fee:{" "}
-                          <span className="font-mono text-zinc-300">{formatEther(vrfWei)}</span>
-                        </p>
+                        <p className="text-zinc-400">Cost breakdown</p>
                         <p>
                           Bet amount:{" "}
                           <span className="font-mono text-zinc-300">
-                            {formatEther(
-                              parsedAmount.wei > vrfWei ? parsedAmount.wei - vrfWei : BigInt(0),
-                            )}
+                            {fmt(parsedAmount.wei)} {betToken.symbol}
                           </span>
                         </p>
+                        <p>
+                          VRF fee (paid in native gas token):{" "}
+                          <span className="font-mono text-zinc-300">
+                            {formatUnits(vrfWei, 18)}
+                          </span>
+                        </p>
+                        {!betToken.isNative && (
+                          <p className="text-xs text-zinc-500">
+                            An ERC-20 approve transaction will precede the bet.
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <p className="border-t border-zinc-800/80 pt-3 text-zinc-600">
-                        Enter a stake above to see the VRF fee breakdown for your payment.
+                        Enter a stake above to see the cost breakdown.
                       </p>
                     )}
                   </div>
@@ -529,7 +583,11 @@ export function CoinTossGame() {
                     disabled={!canSubmit}
                     className="w-full min-h-[48px] rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isPending ? "Confirm in wallet…" : "Flip"}
+                    {isPending
+                      ? "Confirm in wallet…"
+                      : !betToken.isNative
+                        ? "Approve & Flip"
+                        : "Flip"}
                   </button>
                 )}
               </fieldset>

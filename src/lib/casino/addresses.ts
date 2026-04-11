@@ -1,6 +1,51 @@
 import type { Address } from "viem";
 import { isAddress, zeroAddress } from "viem";
-import { gnosis, polygon, polygonAmoy } from "viem/chains";
+import { gnosis, polygon, polygonAmoy, avalanche, avalancheFuji } from "viem/chains";
+
+// ---------------------------------------------------------------------------
+// Bet token type — drives the token selector and formatting logic
+// ---------------------------------------------------------------------------
+
+export type BetToken = {
+  address: Address;
+  symbol: string;
+  decimals: number;
+  isNative: boolean;
+};
+
+const BET_TOKENS_BY_CHAIN: Partial<Record<number, BetToken[]>> = {
+  [polygon.id]: [
+    { address: zeroAddress, symbol: "POL", decimals: 18, isNative: true },
+  ],
+  [polygonAmoy.id]: [
+    { address: zeroAddress, symbol: "POL", decimals: 18, isNative: true },
+  ],
+  [gnosis.id]: [
+    { address: zeroAddress, symbol: "xDAI", decimals: 18, isNative: true },
+  ],
+  [avalanche.id]: [
+    { address: zeroAddress, symbol: "AVAX", decimals: 18, isNative: true },
+    { address: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E", symbol: "USDC", decimals: 6, isNative: false },
+    { address: "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7", symbol: "USDt", decimals: 6, isNative: false },
+  ],
+  [avalancheFuji.id]: [
+    { address: "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846", symbol: "LINK", decimals: 18, isNative: false },
+  ],
+};
+
+export function getBetTokens(chainId: number): BetToken[] {
+  return BET_TOKENS_BY_CHAIN[chainId] ?? [
+    { address: zeroAddress, symbol: "ETH", decimals: 18, isNative: true },
+  ];
+}
+
+export function getDefaultBetToken(chainId: number): BetToken {
+  return getBetTokens(chainId)[0];
+}
+
+// ---------------------------------------------------------------------------
+// Contract addresses
+// ---------------------------------------------------------------------------
 
 /** BetSwirl Bank — mainnet (all chains share this address). */
 export const BETSWIRL_BANK_MAINNET =
@@ -58,6 +103,22 @@ export const BETSWIRL_PLINKO_POLYGON =
 export const BETSWIRL_PLINKO_AMOY =
   "0xd300a3757dDBb3Eafb8fb3e401a5eb60e4a571b1" as const satisfies Address;
 
+/** Our Bank — Avalanche mainnet. */
+export const OUR_BANK_AVALANCHE =
+  "0x08b4E4cea2768aDc91b4c7Ec14150733AEdD3A3B" as const satisfies Address;
+
+/** Our CoinToss — Avalanche mainnet. */
+export const OUR_COIN_TOSS_AVALANCHE =
+  "0x423D077cA13b463eb890B7f278F5A20f258B2b50" as const satisfies Address;
+
+/** Our forked Bank — Avalanche Fuji testnet. */
+export const OUR_BANK_FUJI =
+  "0xa630496e3d1ff7353768cc7f94b2881500dd8010" as const satisfies Address;
+
+/** Our forked CoinToss — Avalanche Fuji testnet. */
+export const OUR_COIN_TOSS_FUJI =
+  "0x06458ff96e9d9ba5a4c9848ff97681f5c8af7382" as const satisfies Address;
+
 function addressFromEnv(value: string | undefined): Address | undefined {
   if (!value || !isAddress(value)) {
     return undefined;
@@ -65,7 +126,9 @@ function addressFromEnv(value: string | undefined): Address | undefined {
   return value;
 }
 
-export const CASINO_CHAIN_IDS = [polygon.id, polygonAmoy.id, gnosis.id] as const;
+export const CASINO_CHAIN_IDS = [
+  polygon.id, polygonAmoy.id, gnosis.id, avalanche.id, avalancheFuji.id,
+] as const;
 
 export type CasinoChainId = (typeof CASINO_CHAIN_IDS)[number];
 
@@ -73,6 +136,8 @@ const BANK_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_BANK_POLYGON) ?? BETSWIRL_BANK_MAINNET,
   [polygonAmoy.id]: BETSWIRL_BANK_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_BANK_GNOSIS),
+  [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_BANK_AVALANCHE) ?? OUR_BANK_AVALANCHE,
+  [avalancheFuji.id]: OUR_BANK_FUJI,
 };
 
 const COIN_TOSS_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
@@ -80,12 +145,16 @@ const COIN_TOSS_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
     addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_POLYGON) ?? BETSWIRL_COIN_TOSS_POLYGON,
   [polygonAmoy.id]: BETSWIRL_COIN_TOSS_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_GNOSIS),
+  [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_AVALANCHE) ?? OUR_COIN_TOSS_AVALANCHE,
+  [avalancheFuji.id]: OUR_COIN_TOSS_FUJI,
 };
 
 const DICE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_POLYGON) ?? BETSWIRL_DICE_POLYGON,
   [polygonAmoy.id]: BETSWIRL_DICE_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_GNOSIS),
+  [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_AVALANCHE),
+  [avalancheFuji.id]: undefined,
 };
 
 const ROULETTE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
@@ -93,24 +162,32 @@ const ROULETTE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
     addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_POLYGON) ?? BETSWIRL_ROULETTE_POLYGON,
   [polygonAmoy.id]: BETSWIRL_ROULETTE_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_GNOSIS),
+  [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_AVALANCHE),
+  [avalancheFuji.id]: undefined,
 };
 
 const KENO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_POLYGON) ?? BETSWIRL_KENO_POLYGON,
   [polygonAmoy.id]: BETSWIRL_KENO_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_GNOSIS),
+  [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_AVALANCHE),
+  [avalancheFuji.id]: undefined,
 };
 
 const WHEEL_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_POLYGON) ?? BETSWIRL_WHEEL_POLYGON,
   [polygonAmoy.id]: BETSWIRL_WHEEL_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_GNOSIS),
+  [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_AVALANCHE),
+  [avalancheFuji.id]: undefined,
 };
 
 const PLINKO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_POLYGON) ?? BETSWIRL_PLINKO_POLYGON,
   [polygonAmoy.id]: BETSWIRL_PLINKO_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_GNOSIS),
+  [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_AVALANCHE),
+  [avalancheFuji.id]: undefined,
 };
 
 export function getCasinoBankAddress(chainId: number): Address {

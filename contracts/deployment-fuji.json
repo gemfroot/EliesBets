@@ -1,0 +1,14 @@
+{
+  "network": "avalanche-fuji",
+  "chainId": 43113,
+  "deployer": "0x3f815331b78AFE9c50Fb8D41bAE4d6a06fC8575B",
+  "bank": "0xa630496e3d1ff7353768cc7f94b2881500dd8010",
+  "coinToss": "0x06458ff96e9d9ba5a4c9848ff97681f5c8af7382",
+  "betToken": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
+  "betTokenSymbol": "LINK",
+  "vrfCoordinator": "0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE",
+  "vrfWrapper": "0x327B83F409E1D5f13985c6d0584420FA648f1F56",
+  "wavax": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
+  "deployedAt": "2026-04-10T16:31:09.629Z",
+  "redeployedAt": "2026-04-10T17:19:15.490Z"
+}

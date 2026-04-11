@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, type CSSProperties } from "react";
-import { formatEther } from "viem";
+import { formatUnits } from "viem";
 
 export type CoinFlipPhase = "idle" | "picking" | "flipping" | "result";
 
@@ -11,8 +11,12 @@ type CoinFlipAnimationProps = {
   outcome?: "heads" | "tails" | null;
   /** Whether the player bet on heads (for result summary) */
   betHeads?: boolean;
-  /** Gross payout from the Roll event (wei), when known */
+  /** Gross payout from the Roll event (smallest unit), when known */
   payoutWei?: bigint | null;
+  /** Token symbol for display */
+  tokenSymbol?: string;
+  /** Token decimals for formatting */
+  tokenDecimals?: number;
   className?: string;
 };
 
@@ -23,6 +27,8 @@ export function CoinFlipAnimation({
   outcome = null,
   betHeads = true,
   payoutWei = null,
+  tokenSymbol = "POL",
+  tokenDecimals = 18,
   className = "",
 }: CoinFlipAnimationProps) {
   const labelId = useId();
@@ -124,7 +130,7 @@ export function CoinFlipAnimation({
                     <>
                       Won{" "}
                       <span className="font-mono tabular-nums">
-                        {formatEther(payoutWei)} POL
+                        {formatUnits(payoutWei, tokenDecimals)} {tokenSymbol}
                       </span>
                     </>
                   ) : (
@@ -146,7 +152,7 @@ export function CoinFlipAnimation({
         <p className="type-caption mt-6 max-w-xs text-center text-zinc-600">
           {phase === "flipping"
             ? "Waiting for the network to settle the flip."
-            : "Pick a side and stake POL to flip."}
+            : `Pick a side and stake ${tokenSymbol} to flip.`}
         </p>
       )}
     </div>

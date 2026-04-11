@@ -6,7 +6,6 @@ import {
   decodeFunctionResult,
   encodeFunctionData,
   isAddress,
-  zeroAddress,
 } from "viem";
 import { getBlockNumber, getContractEvents, getGasPrice } from "viem/actions";
 import {
@@ -41,7 +40,9 @@ import {
 } from "@/lib/casino/addresses";
 import type { CasinoTxHash } from "@/lib/casino/types";
 
-const NATIVE_TOKEN = zeroAddress;
+import type { Address } from "viem";
+import type { BetToken } from "@/lib/casino/addresses";
+import { getDefaultBetToken } from "@/lib/casino/addresses";
 
 /** ~46 days at ~2s block time; caps RPC log query range. */
 const ROLL_EVENT_LOOKBACK_BLOCKS = BigInt(2_000_000);
@@ -555,142 +556,38 @@ function wheelRollFromDecodedLog(
 }
 
 /**
- * getChainlinkVRFCost uses tx.gasprice internally, which is 0 in a normal
- * eth_call. We must pass the current gasPrice to get the real cost.
+ * Generic VRF cost fetcher. getChainlinkVRFCost uses tx.gasprice internally,
+ * which is 0 in a normal eth_call, so we pass the current gasPrice explicitly.
+ * Works for any game ABI that has getChainlinkVRFCost(address,uint16).
  */
-async function fetchVrfCostWithGasPrice(
+async function fetchVrfCost(
   client: PublicClient,
-  contractAddress: `0x${string}`,
-  callerAddress: `0x${string}`,
+  contractAddress: Address,
+  callerAddress: Address,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  abi: any,
+  tokenAddress: Address,
+  betCount: number = 1,
 ): Promise<bigint> {
   const gasPrice = await getGasPrice(client);
-  // 20% buffer so the tx doesn't revert if gas spikes between read and submit
-  const buffered = (gasPrice * BigInt(120)) / BigInt(100);
+  const minGasPrice = BigInt(25_000_000_000);
+  const effective = gasPrice > minGasPrice ? gasPrice : minGasPrice;
+  const buffered = (effective * BigInt(120)) / BigInt(100);
   const data = encodeFunctionData({
-    abi: coinTossAbi,
+    abi,
     functionName: "getChainlinkVRFCost",
-    args: [NATIVE_TOKEN, 1],
+    args: [tokenAddress, betCount],
   });
   const result = await client.call({
     to: contractAddress,
     data,
     gasPrice: buffered,
     account: callerAddress,
-    gas: BigInt(100_000),
+    gas: BigInt(500_000),
   });
   if (!result.data) return BigInt(0);
   return decodeFunctionResult({
-    abi: coinTossAbi,
-    functionName: "getChainlinkVRFCost",
-    data: result.data,
-  }) as bigint;
-}
-
-async function fetchDiceVrfCostWithGasPrice(
-  client: PublicClient,
-  contractAddress: `0x${string}`,
-  callerAddress: `0x${string}`,
-): Promise<bigint> {
-  const gasPrice = await getGasPrice(client);
-  const buffered = (gasPrice * BigInt(120)) / BigInt(100);
-  const data = encodeFunctionData({
-    abi: diceAbi,
-    functionName: "getChainlinkVRFCost",
-    args: [NATIVE_TOKEN, 1],
-  });
-  const result = await client.call({
-    to: contractAddress,
-    data,
-    gasPrice: buffered,
-    account: callerAddress,
-    gas: BigInt(100_000),
-  });
-  if (!result.data) return BigInt(0);
-  return decodeFunctionResult({
-    abi: diceAbi,
-    functionName: "getChainlinkVRFCost",
-    data: result.data,
-  }) as bigint;
-}
-
-async function fetchRouletteVrfCostWithGasPrice(
-  client: PublicClient,
-  contractAddress: `0x${string}`,
-  callerAddress: `0x${string}`,
-): Promise<bigint> {
-  const gasPrice = await getGasPrice(client);
-  const buffered = (gasPrice * BigInt(120)) / BigInt(100);
-  const data = encodeFunctionData({
-    abi: rouletteAbi,
-    functionName: "getChainlinkVRFCost",
-    args: [NATIVE_TOKEN, 1],
-  });
-  const result = await client.call({
-    to: contractAddress,
-    data,
-    gasPrice: buffered,
-    account: callerAddress,
-    gas: BigInt(100_000),
-  });
-  if (!result.data) return BigInt(0);
-  return decodeFunctionResult({
-    abi: rouletteAbi,
-    functionName: "getChainlinkVRFCost",
-    data: result.data,
-  }) as bigint;
-}
-
-async function fetchKenoVrfCostWithGasPrice(
-  client: PublicClient,
-  contractAddress: `0x${string}`,
-  callerAddress: `0x${string}`,
-  betCount: number,
-): Promise<bigint> {
-  const gasPrice = await getGasPrice(client);
-  const buffered = (gasPrice * BigInt(120)) / BigInt(100);
-  const data = encodeFunctionData({
-    abi: kenoAbi,
-    functionName: "getChainlinkVRFCost",
-    args: [NATIVE_TOKEN, betCount],
-  });
-  const result = await client.call({
-    to: contractAddress,
-    data,
-    gasPrice: buffered,
-    account: callerAddress,
-    gas: BigInt(100_000),
-  });
-  if (!result.data) return BigInt(0);
-  return decodeFunctionResult({
-    abi: kenoAbi,
-    functionName: "getChainlinkVRFCost",
-    data: result.data,
-  }) as bigint;
-}
-
-async function fetchWheelVrfCostWithGasPrice(
-  client: PublicClient,
-  contractAddress: `0x${string}`,
-  callerAddress: `0x${string}`,
-  betCount: number,
-): Promise<bigint> {
-  const gasPrice = await getGasPrice(client);
-  const buffered = (gasPrice * BigInt(120)) / BigInt(100);
-  const data = encodeFunctionData({
-    abi: wheelAbi,
-    functionName: "getChainlinkVRFCost",
-    args: [NATIVE_TOKEN, betCount],
-  });
-  const result = await client.call({
-    to: contractAddress,
-    data,
-    gasPrice: buffered,
-    account: callerAddress,
-    gas: BigInt(100_000),
-  });
-  if (!result.data) return BigInt(0);
-  return decodeFunctionResult({
-    abi: wheelAbi,
+    abi,
     functionName: "getChainlinkVRFCost",
     data: result.data,
   }) as bigint;
@@ -698,9 +595,11 @@ async function fetchWheelVrfCostWithGasPrice(
 
 /**
  * Coin toss game: reads and writes use the on-chain ABI in `@/lib/casino/abis/CoinToss`.
+ * Accepts an optional betToken; defaults to the chain's default token.
  */
-export function useCoinToss() {
+export function useCoinToss(betToken?: BetToken) {
   const chainId = useChainId();
+  const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const coinToss = useMemo(() => getCasinoCoinTossAddress(chainId), [chainId]);
   const coinTossConfigured = isCasinoAddressConfigured(coinToss);
   const { address: connected } = useAccount();
@@ -714,7 +613,6 @@ export function useCoinToss() {
 
   const queryEnabled = coinTossConfigured;
 
-  // VRF cost with gas price context — polled every 30s
   const [vrfCost, setVrfCost] = useState<bigint | undefined>(undefined);
   const [vrfPending, setVrfPending] = useState(true);
 
@@ -728,10 +626,12 @@ export function useCoinToss() {
     async function poll() {
       try {
         setVrfPending(true);
-        const cost = await fetchVrfCostWithGasPrice(
+        const cost = await fetchVrfCost(
           publicClient as PublicClient,
           coinToss,
           connected!,
+          coinTossAbi,
+          token.address,
         );
         if (!cancelled) {
           setVrfCost(cost);
@@ -747,7 +647,7 @@ export function useCoinToss() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [queryEnabled, publicClient, coinToss, connected]);
+  }, [queryEnabled, publicClient, coinToss, connected, token.address]);
 
   const { data: paused } = useReadContract({
     address: coinToss,
@@ -760,7 +660,7 @@ export function useCoinToss() {
     address: coinToss,
     abi: coinTossAbi,
     functionName: "tokens",
-    args: [NATIVE_TOKEN],
+    args: [token.address],
     query: { enabled: queryEnabled },
   });
 
@@ -890,28 +790,56 @@ export function useCoinToss() {
     return vrfCost + BigInt(1);
   }, [vrfCost]);
 
+  /**
+   * Place a coin toss wager.
+   * @param betHeads - true for heads, false for tails
+   * @param betAmount - the amount to bet in the token's smallest unit
+   */
   const placeWager = useCallback(
-    async (betHeads: boolean, valueWei: bigint): Promise<CasinoTxHash> => {
+    async (betHeads: boolean, betAmount: bigint): Promise<CasinoTxHash> => {
       if (!publicClient || !connected) {
         throw new Error("Wallet not connected");
       }
+      if (betAmount === BigInt(0)) {
+        throw new Error("Bet amount must be greater than 0");
+      }
 
-      // Fetch fresh VRF cost with gas price context right before submitting
-      const vrf = await fetchVrfCostWithGasPrice(
+      const vrf = await fetchVrfCost(
         publicClient as PublicClient,
         coinToss,
         connected,
+        coinTossAbi,
+        token.address,
       );
-      const betAmount = valueWei > vrf ? valueWei - vrf : BigInt(0);
-      if (betAmount === BigInt(0)) {
-        throw new Error(
-          "Stake too low to cover VRF fee. Increase your stake amount.",
-        );
-      }
 
       const envAffiliate = process.env.NEXT_PUBLIC_CASINO_AFFILIATE;
       const affiliate: `0x${string}` =
         envAffiliate && isAddress(envAffiliate) ? envAffiliate : connected;
+
+      if (!token.isNative) {
+        // ERC20: approve the CoinToss contract, then wager with msg.value = VRF cost only
+        const erc20Abi = [
+          {
+            inputs: [
+              { name: "spender", type: "address" },
+              { name: "amount", type: "uint256" },
+            ],
+            name: "approve",
+            outputs: [{ name: "", type: "bool" }],
+            stateMutability: "nonpayable",
+            type: "function",
+          },
+        ] as const;
+        await writeContractAsync({
+          address: token.address,
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [coinToss, betAmount],
+        });
+      }
+
+      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(150)) / BigInt(100) : vrf;
+      const msgValue = token.isNative ? betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
         address: coinToss,
@@ -922,7 +850,7 @@ export function useCoinToss() {
           connected,
           affiliate,
           {
-            token: NATIVE_TOKEN,
+            token: token.address,
             betAmount,
             betCount: defaultCasinoGameParams.betCount,
             stopGain: defaultCasinoGameParams.stopGain,
@@ -930,10 +858,10 @@ export function useCoinToss() {
             maxHouseEdge: MAX_HOUSE_EGDE,
           },
         ],
-        value: valueWei,
+        value: msgValue,
       });
     },
-    [coinToss, connected, publicClient, writeContractAsync],
+    [coinToss, connected, publicClient, writeContractAsync, token],
   );
 
   const canWager = coinTossConfigured && paused === false;
@@ -941,6 +869,7 @@ export function useCoinToss() {
   return {
     coinTossAddress: coinToss,
     coinTossConfigured,
+    betToken: token,
     vrfCost,
     chainTokenConfig,
     paused,
@@ -960,8 +889,9 @@ export function useCoinToss() {
 /**
  * Dice game: reads and writes use the on-chain ABI in `@/lib/casino/abis/Dice`.
  */
-export function useDice() {
+export function useDice(betToken?: BetToken) {
   const chainId = useChainId();
+  const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const dice = useMemo(() => getCasinoDiceAddress(chainId), [chainId]);
   const diceConfigured = isCasinoAddressConfigured(dice);
   const { address: connected } = useAccount();
@@ -988,10 +918,12 @@ export function useDice() {
     async function poll() {
       try {
         setVrfPending(true);
-        const cost = await fetchDiceVrfCostWithGasPrice(
+        const cost = await fetchVrfCost(
           publicClient as PublicClient,
           dice,
           connected!,
+          diceAbi,
+          token.address,
         );
         if (!cancelled) {
           setVrfCost(cost);
@@ -1007,7 +939,7 @@ export function useDice() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [queryEnabled, publicClient, dice, connected]);
+  }, [queryEnabled, publicClient, dice, connected, token.address]);
 
   const { data: paused } = useReadContract({
     address: dice,
@@ -1020,7 +952,7 @@ export function useDice() {
     address: dice,
     abi: diceAbi,
     functionName: "tokens",
-    args: [NATIVE_TOKEN],
+    args: [token.address],
     query: { enabled: queryEnabled },
   });
 
@@ -1151,26 +1083,28 @@ export function useDice() {
   }, [vrfCost]);
 
   const placeWager = useCallback(
-    async (cap: number, valueWei: bigint): Promise<CasinoTxHash> => {
+    async (cap: number, betAmount: bigint): Promise<CasinoTxHash> => {
       if (!publicClient || !connected) {
         throw new Error("Wallet not connected");
       }
+      if (betAmount === BigInt(0)) {
+        throw new Error("Bet amount must be greater than 0");
+      }
 
-      const vrf = await fetchDiceVrfCostWithGasPrice(
+      const vrf = await fetchVrfCost(
         publicClient as PublicClient,
         dice,
         connected,
+        diceAbi,
+        token.address,
       );
-      const betAmount = valueWei > vrf ? valueWei - vrf : BigInt(0);
-      if (betAmount === BigInt(0)) {
-        throw new Error(
-          "Stake too low to cover VRF fee. Increase your stake amount.",
-        );
-      }
 
       const envAffiliate = process.env.NEXT_PUBLIC_CASINO_AFFILIATE;
       const affiliate: `0x${string}` =
         envAffiliate && isAddress(envAffiliate) ? envAffiliate : connected;
+
+      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(150)) / BigInt(100) : vrf;
+      const msgValue = token.isNative ? betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
         address: dice,
@@ -1181,7 +1115,7 @@ export function useDice() {
           connected,
           affiliate,
           {
-            token: NATIVE_TOKEN,
+            token: token.address,
             betAmount,
             betCount: defaultCasinoGameParams.betCount,
             stopGain: defaultCasinoGameParams.stopGain,
@@ -1189,10 +1123,10 @@ export function useDice() {
             maxHouseEdge: MAX_HOUSE_EGDE,
           },
         ],
-        value: valueWei,
+        value: msgValue,
       });
     },
-    [dice, connected, publicClient, writeContractAsync],
+    [dice, connected, publicClient, writeContractAsync, token],
   );
 
   const canWager = diceConfigured && paused === false;
@@ -1200,6 +1134,7 @@ export function useDice() {
   return {
     diceAddress: dice,
     diceConfigured,
+    betToken: token,
     vrfCost,
     chainTokenConfig,
     paused,
@@ -1229,8 +1164,9 @@ export type RouletteBetData = {
 /**
  * Roulette game: reads and writes use the on-chain ABI in `@/lib/casino/abis/Roulette`.
  */
-export function useRoulette() {
+export function useRoulette(betToken?: BetToken) {
   const chainId = useChainId();
+  const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const roulette = useMemo(() => getCasinoRouletteAddress(chainId), [chainId]);
   const rouletteConfigured = isCasinoAddressConfigured(roulette);
   const { address: connected } = useAccount();
@@ -1257,10 +1193,12 @@ export function useRoulette() {
     async function poll() {
       try {
         setVrfPending(true);
-        const cost = await fetchRouletteVrfCostWithGasPrice(
+        const cost = await fetchVrfCost(
           publicClient as PublicClient,
           roulette,
           connected!,
+          rouletteAbi,
+          token.address,
         );
         if (!cancelled) {
           setVrfCost(cost);
@@ -1276,7 +1214,7 @@ export function useRoulette() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [queryEnabled, publicClient, roulette, connected]);
+  }, [queryEnabled, publicClient, roulette, connected, token.address]);
 
   const { data: paused } = useReadContract({
     address: roulette,
@@ -1289,7 +1227,7 @@ export function useRoulette() {
     address: roulette,
     abi: rouletteAbi,
     functionName: "tokens",
-    args: [NATIVE_TOKEN],
+    args: [token.address],
     query: { enabled: queryEnabled },
   });
 
@@ -1430,22 +1368,25 @@ export function useRoulette() {
         throw new Error("Wallet not connected");
       }
 
-      const vrf = await fetchRouletteVrfCostWithGasPrice(
+      const vrf = await fetchVrfCost(
         publicClient as PublicClient,
         roulette,
         connected,
+        rouletteAbi,
+        token.address,
       );
-      const valueWei = betData.betAmount + vrf;
+      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(150)) / BigInt(100) : vrf;
+      const msgValue = token.isNative ? betData.betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
         address: roulette,
         abi: rouletteAbi,
         functionName: "wager",
         args: [encodedNumbers, receiver, affiliate, betData],
-        value: valueWei,
+        value: msgValue,
       });
     },
-    [roulette, connected, publicClient, writeContractAsync],
+    [roulette, connected, publicClient, writeContractAsync, token],
   );
 
   const canWager = rouletteConfigured && paused === false;
@@ -1453,6 +1394,7 @@ export function useRoulette() {
   return {
     rouletteAddress: roulette,
     rouletteConfigured,
+    betToken: token,
     vrfCost,
     chainTokenConfig,
     paused,
@@ -1482,8 +1424,9 @@ export type KenoBetData = {
 /**
  * Keno game: reads payout table via `gains`, writes via `wager` on `@/lib/casino/abis/Keno`.
  */
-export function useKeno() {
+export function useKeno(betToken?: BetToken) {
   const chainId = useChainId();
+  const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const keno = useMemo(() => getCasinoKenoAddress(chainId), [chainId]);
   const kenoConfigured = isCasinoAddressConfigured(keno);
   const { address: connected } = useAccount();
@@ -1510,10 +1453,12 @@ export function useKeno() {
     async function poll() {
       try {
         setVrfPending(true);
-        const cost = await fetchKenoVrfCostWithGasPrice(
+        const cost = await fetchVrfCost(
           publicClient as PublicClient,
           keno,
           connected!,
+          kenoAbi,
+          token.address,
           defaultCasinoGameParams.betCount,
         );
         if (!cancelled) {
@@ -1530,7 +1475,7 @@ export function useKeno() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [queryEnabled, publicClient, keno, connected]);
+  }, [queryEnabled, publicClient, keno, connected, token.address]);
 
   const { data: paused } = useReadContract({
     address: keno,
@@ -1543,7 +1488,7 @@ export function useKeno() {
     address: keno,
     abi: kenoAbi,
     functionName: "tokens",
-    args: [NATIVE_TOKEN],
+    args: [token.address],
     query: { enabled: queryEnabled },
   });
 
@@ -1551,7 +1496,7 @@ export function useKeno() {
     address: keno,
     abi: kenoAbi,
     functionName: "gains",
-    args: [NATIVE_TOKEN],
+    args: [token.address],
     query: { enabled: queryEnabled },
   });
 
@@ -1692,23 +1637,26 @@ export function useKeno() {
         throw new Error("Wallet not connected");
       }
 
-      const vrf = await fetchKenoVrfCostWithGasPrice(
+      const vrf = await fetchVrfCost(
         publicClient as PublicClient,
         keno,
         connected,
+        kenoAbi,
+        token.address,
         betData.betCount,
       );
-      const valueWei = betData.betAmount + vrf;
+      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(150)) / BigInt(100) : vrf;
+      const msgValue = token.isNative ? betData.betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
         address: keno,
         abi: kenoAbi,
         functionName: "wager",
         args: [encodedNumbers, receiver, affiliate, betData],
-        value: valueWei,
+        value: msgValue,
       });
     },
-    [keno, connected, publicClient, writeContractAsync],
+    [keno, connected, publicClient, writeContractAsync, token],
   );
 
   const canWager = kenoConfigured && paused === false;
@@ -1716,6 +1664,7 @@ export function useKeno() {
   return {
     kenoAddress: keno,
     kenoConfigured,
+    betToken: token,
     vrfCost,
     chainTokenConfig,
     kenoConfig,
@@ -1752,8 +1701,10 @@ function useWeightedWheelLikeGame(
   game: `0x${string}`,
   gameConfigured: boolean,
   historyStorageKey: WeightedWheelLikeHistoryKey,
+  betTokenOverride?: BetToken,
 ) {
   const chainId = useChainId();
+  const token = useMemo(() => betTokenOverride ?? getDefaultBetToken(chainId), [betTokenOverride, chainId]);
   const { address: connected } = useAccount();
   const publicClient = usePublicClient();
   const {
@@ -1778,10 +1729,12 @@ function useWeightedWheelLikeGame(
     async function poll() {
       try {
         setVrfPending(true);
-        const cost = await fetchWheelVrfCostWithGasPrice(
+        const cost = await fetchVrfCost(
           publicClient as PublicClient,
           game,
           connected!,
+          wheelAbi,
+          token.address,
           defaultCasinoGameParams.betCount,
         );
         if (!cancelled) {
@@ -1798,7 +1751,7 @@ function useWeightedWheelLikeGame(
       cancelled = true;
       clearInterval(id);
     };
-  }, [queryEnabled, publicClient, game, connected]);
+  }, [queryEnabled, publicClient, game, connected, token.address]);
 
   const { data: paused } = useReadContract({
     address: game,
@@ -1811,7 +1764,7 @@ function useWeightedWheelLikeGame(
     address: game,
     abi: wheelAbi,
     functionName: "tokens",
-    args: [NATIVE_TOKEN],
+    args: [token.address],
     query: { enabled: queryEnabled },
   });
 
@@ -2011,23 +1964,26 @@ function useWeightedWheelLikeGame(
         throw new Error("Wallet not connected");
       }
 
-      const vrf = await fetchWheelVrfCostWithGasPrice(
+      const vrf = await fetchVrfCost(
         publicClient as PublicClient,
         game,
         connected,
+        wheelAbi,
+        token.address,
         betData.betCount,
       );
-      const valueWei = betData.betAmount + vrf;
+      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(150)) / BigInt(100) : vrf;
+      const msgValue = token.isNative ? betData.betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
         address: game,
         abi: wheelAbi,
         functionName: "wager",
         args: [configId, receiver, affiliate, betData],
-        value: valueWei,
+        value: msgValue,
       });
     },
-    [game, connected, publicClient, writeContractAsync],
+    [game, connected, publicClient, writeContractAsync, token],
   );
 
   const canWager = gameConfigured && paused === false;
@@ -2035,6 +1991,7 @@ function useWeightedWheelLikeGame(
   return {
     gameAddress: game,
     gameConfigured,
+    betToken: token,
     vrfCost,
     chainTokenConfig,
     gameConfigs,
@@ -2056,7 +2013,7 @@ function useWeightedWheelLikeGame(
 /**
  * Wheel game: loads segment configs via `configsCount` / `gameConfigs`, writes via `wager` on `@/lib/casino/abis/Wheel`.
  */
-export function useWheel() {
+export function useWheel(betToken?: BetToken) {
   const chainId = useChainId();
   const wheel = useMemo(() => getCasinoWheelAddress(chainId), [chainId]);
   const wheelConfigured = isCasinoAddressConfigured(wheel);
@@ -2066,7 +2023,7 @@ export function useWheel() {
     gameConfigs: wheelConfigs,
     gameConfigsLoading: wheelConfigsLoading,
     ...rest
-  } = useWeightedWheelLikeGame(wheel, wheelConfigured, wheelBetHistoryStorageKey);
+  } = useWeightedWheelLikeGame(wheel, wheelConfigured, wheelBetHistoryStorageKey, betToken);
   return {
     wheelAddress,
     wheelConfigured: wheelConfiguredOut,
@@ -2076,10 +2033,7 @@ export function useWheel() {
   };
 }
 
-/**
- * Plinko uses the same weighted-game contract ABI as Wheel; address comes from `getCasinoPlinkoAddress`.
- */
-export function usePlinko() {
+export function usePlinko(betToken?: BetToken) {
   const chainId = useChainId();
   const plinko = useMemo(() => getCasinoPlinkoAddress(chainId), [chainId]);
   const plinkoConfigured = isCasinoAddressConfigured(plinko);
@@ -2089,7 +2043,7 @@ export function usePlinko() {
     gameConfigs: plinkoConfigs,
     gameConfigsLoading: plinkoConfigsLoading,
     ...rest
-  } = useWeightedWheelLikeGame(plinko, plinkoConfigured, plinkoBetHistoryStorageKey);
+  } = useWeightedWheelLikeGame(plinko, plinkoConfigured, plinkoBetHistoryStorageKey, betToken);
   return {
     plinkoAddress,
     plinkoConfigured: plinkoConfiguredOut,
