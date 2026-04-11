@@ -570,9 +570,9 @@ async function fetchVrfCost(
   betCount: number = 1,
 ): Promise<bigint> {
   const gasPrice = await getGasPrice(client);
-  const minGasPrice = BigInt(25_000_000_000);
-  const effective = gasPrice > minGasPrice ? gasPrice : minGasPrice;
-  const buffered = (effective * BigInt(120)) / BigInt(100);
+  const buffered = gasPrice > BigInt(0)
+    ? (gasPrice * BigInt(150)) / BigInt(100)
+    : BigInt(100_000_000);
   const data = encodeFunctionData({
     abi,
     functionName: "getChainlinkVRFCost",
@@ -785,9 +785,10 @@ export function useCoinToss(betToken?: BetToken) {
     },
   });
 
-  const minTotal = useMemo(() => {
+  const minBetAmount = useMemo(() => {
     if (typeof vrfCost !== "bigint") return undefined;
-    return vrfCost + BigInt(1);
+    const oneCent = BigInt(1);
+    return oneCent;
   }, [vrfCost]);
 
   /**
@@ -877,7 +878,7 @@ export function useCoinToss(betToken?: BetToken) {
     betHistory,
     betHistoryLoading,
     betHistoryError,
-    data: minTotal,
+    data: minBetAmount,
     isMinBetPending: vrfPending,
     isPending: writePending,
     placeWager,
