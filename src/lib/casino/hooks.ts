@@ -569,10 +569,7 @@ async function fetchVrfCost(
   tokenAddress: Address,
   betCount: number = 1,
 ): Promise<bigint> {
-  const gasPrice = await getGasPrice(client);
-  const buffered = gasPrice > BigInt(0)
-    ? (gasPrice * BigInt(150)) / BigInt(100)
-    : BigInt(100_000_000);
+  const safeGasPrice = BigInt(1_000_000_000);
   const data = encodeFunctionData({
     abi,
     functionName: "getChainlinkVRFCost",
@@ -581,7 +578,7 @@ async function fetchVrfCost(
   const result = await client.call({
     to: contractAddress,
     data,
-    gasPrice: buffered,
+    gasPrice: safeGasPrice,
     account: callerAddress,
     gas: BigInt(500_000),
   });
