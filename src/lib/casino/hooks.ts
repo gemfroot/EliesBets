@@ -836,7 +836,8 @@ export function useCoinToss(betToken?: BetToken) {
         });
       }
 
-      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(150)) / BigInt(100) : vrf;
+      const MIN_VRF_BUDGET = BigInt(10_000_000_000_000_000);
+      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : MIN_VRF_BUDGET;
       const msgValue = token.isNative ? betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
