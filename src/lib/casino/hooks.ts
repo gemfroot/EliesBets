@@ -1078,7 +1078,7 @@ export function useDice(betToken?: BetToken) {
 
   const minTotal = useMemo(() => {
     if (typeof vrfCost !== "bigint") return undefined;
-    return vrfCost + BigInt(1);
+    return BigInt(1);
   }, [vrfCost]);
 
   const placeWager = useCallback(
@@ -1102,7 +1102,8 @@ export function useDice(betToken?: BetToken) {
       const affiliate: `0x${string}` =
         envAffiliate && isAddress(envAffiliate) ? envAffiliate : connected;
 
-      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(150)) / BigInt(100) : vrf;
+      const MIN_VRF_BUDGET = BigInt(10_000_000_000_000_000);
+      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : MIN_VRF_BUDGET;
       const msgValue = token.isNative ? betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
@@ -1353,7 +1354,7 @@ export function useRoulette(betToken?: BetToken) {
 
   const minTotal = useMemo(() => {
     if (typeof vrfCost !== "bigint") return undefined;
-    return vrfCost + BigInt(1);
+    return BigInt(1);
   }, [vrfCost]);
 
   const placeWager = useCallback(
@@ -1374,7 +1375,8 @@ export function useRoulette(betToken?: BetToken) {
         rouletteAbi,
         token.address,
       );
-      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(150)) / BigInt(100) : vrf;
+      const MIN_VRF_BUDGET = BigInt(10_000_000_000_000_000);
+      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : MIN_VRF_BUDGET;
       const msgValue = token.isNative ? betData.betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
@@ -1622,7 +1624,7 @@ export function useKeno(betToken?: BetToken) {
 
   const minTotal = useMemo(() => {
     if (typeof vrfCost !== "bigint") return undefined;
-    return vrfCost + BigInt(1);
+    return BigInt(1);
   }, [vrfCost]);
 
   const placeWager = useCallback(
@@ -1644,7 +1646,8 @@ export function useKeno(betToken?: BetToken) {
         token.address,
         betData.betCount,
       );
-      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(150)) / BigInt(100) : vrf;
+      const MIN_VRF_BUDGET = BigInt(10_000_000_000_000_000);
+      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : MIN_VRF_BUDGET;
       const msgValue = token.isNative ? betData.betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
@@ -1949,7 +1952,7 @@ function useWeightedWheelLikeGame(
 
   const minTotal = useMemo(() => {
     if (typeof vrfCost !== "bigint") return undefined;
-    return vrfCost + BigInt(1);
+    return BigInt(1);
   }, [vrfCost]);
 
   const placeWager = useCallback(
@@ -1971,7 +1974,8 @@ function useWeightedWheelLikeGame(
         token.address,
         betData.betCount,
       );
-      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(150)) / BigInt(100) : vrf;
+      const MIN_VRF_BUDGET = BigInt(10_000_000_000_000_000);
+      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : MIN_VRF_BUDGET;
       const msgValue = token.isNative ? betData.betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({

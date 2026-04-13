@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BP_VALUE, Dice } from "@betswirl/sdk-core";
-import { formatEther, parseEther } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
-import { polygonAmoy } from "viem/chains";
+import { avalanche } from "viem/chains";
 import { DiceAnimation, type DicePhase } from "@/components/DiceAnimation";
 import { useDice } from "@/lib/casino/hooks";
-import { CASINO_CHAIN_IDS } from "@/lib/casino/addresses";
+import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
 
-const STAKE_PRESET_ETH = ["0.01", "0.05", "0.1", "0.5", "1"] as const;
 const BET_HISTORY_DISPLAY_CAP = 12;
 const CAP_MIN = 2;
 const CAP_MAX = 99;
@@ -26,7 +25,19 @@ const CHAIN_NAMES: Record<number, string> = {
   137: "Polygon",
   80002: "Polygon Amoy",
   100: "Gnosis",
+  43114: "Avalanche",
+  43113: "Avalanche Fuji",
 };
+
+const STAKE_PRESETS_BY_SYMBOL: Record<string, string[]> = {
+  AVAX: ["0.1", "0.5", "1", "5"],
+  USDC: ["1", "5", "10", "25"],
+  USDt: ["1", "5", "10", "25"],
+  LINK: ["0.01", "0.05", "0.1", "0.5"],
+  POL: ["1", "5", "10", "50"],
+  xDAI: ["1", "5", "10", "50"],
+};
+const DEFAULT_PRESETS = ["0.01", "0.05", "0.1", "0.5", "1"];
 
 function formatCasinoTxError(error: Error): string {
   const e = error as Error & { shortMessage?: string };
@@ -50,11 +61,21 @@ export function DiceGame() {
   const { isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+
+  const availableTokens = useMemo(() => getBetTokens(chainId), [chainId]);
+  const [selectedTokenIdx, setSelectedTokenIdx] = useState(0);
+  const selectedToken: BetToken = availableTokens[selectedTokenIdx] ?? availableTokens[0];
+
+  useEffect(() => {
+    setSelectedTokenIdx(0);
+  }, [chainId]);
+
   const {
     data: minBet,
     isMinBetPending: minBetLoading,
     vrfCost,
     chainTokenConfig,
+    betToken,
     placeWager,
     canWager,
     isPending,
@@ -64,7 +85,9 @@ export function DiceGame() {
     betHistory,
     betHistoryLoading,
     betHistoryError,
-  } = useDice();
+  } = useDice(selectedToken);
+
+  const stakePresets = STAKE_PRESETS_BY_SYMBOL[betToken.symbol] ?? DEFAULT_PRESETS;
 
   const [cap, setCap] = useState(50);
   const [amount, setAmount] = useState("");
@@ -107,11 +130,11 @@ export function DiceGame() {
     const zero = BigInt(0);
     if (!t) return { ok: false as const, wei: zero };
     try {
-      return { ok: true as const, wei: parseEther(t) };
+      return { ok: true as const, wei: parseUnits(t, betToken.decimals) };
     } catch {
       return { ok: false as const, wei: zero };
     }
-  }, [amount]);
+  }, [amount, betToken.decimals]);
 
   const amountError =
     amount.trim() !== "" && !parsedAmount.ok
@@ -242,10 +265,10 @@ export function DiceGame() {
             </span>
             <button
               type="button"
-              onClick={() => switchChain?.({ chainId: polygonAmoy.id })}
+              onClick={() => switchChain?.({ chainId: avalanche.id })}
               className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-500"
             >
-              Switch to Polygon Amoy
+              Switch to Avalanche
             </button>
           </div>
         ) : isConnected && isSupportedChain ? (
@@ -350,12 +373,38 @@ export function DiceGame() {
                   </div>
                 </div>
 
+                {availableTokens.length > 1 && (
+                  <div>
+                    <p className="type-overline mb-2">Token</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availableTokens.map((t, idx) => (
+                        <button
+                          key={t.address}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTokenIdx(idx);
+                            setAmount("");
+                            if (phase !== "idle") setPhase("idle");
+                          }}
+                          className={`min-h-[40px] rounded-lg border px-4 py-1.5 text-sm font-medium transition ${
+                            idx === selectedTokenIdx
+                              ? "border-emerald-600 bg-emerald-950/50 text-emerald-100"
+                              : "border-zinc-700 bg-zinc-950 text-zinc-400 hover:border-zinc-600"
+                          }`}
+                        >
+                          {t.symbol}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label htmlFor="dice-amount" className="type-overline mb-2 block">
-                    Stake
+                    Stake ({betToken.symbol})
                   </label>
                   <div className="mb-2 flex flex-wrap gap-2">
-                    {STAKE_PRESET_ETH.map((preset) => (
+                    {stakePresets.map((preset) => (
                       <button
                         key={preset}
                         type="button"
@@ -388,7 +437,7 @@ export function DiceGame() {
                   ) : null}
                   {belowMin ? (
                     <p className="type-caption mt-1.5 text-amber-300">
-                      Minimum stake is {formatEther(minBetWei)} (covers required fees and minimum
+                      Minimum stake is {formatUnits(minBetWei, betToken.decimals)} {betToken.symbol} (covers required fees and minimum
                       bet).
                     </p>
                   ) : null}
@@ -396,7 +445,7 @@ export function DiceGame() {
                     <p className="type-caption mt-1.5 text-zinc-600">Loading minimum…</p>
                   ) : canWager && minBet !== undefined ? (
                     <p className="type-caption mt-1.5 text-zinc-500">
-                      Minimum stake {formatEther(minBetWei)} · Enter an amount to continue.
+                      Minimum stake {formatUnits(minBetWei, betToken.decimals)} {betToken.symbol} · Enter an amount to continue.
                     </p>
                   ) : null}
                 </div>
@@ -447,8 +496,8 @@ export function DiceGame() {
                                 )}
                               </span>
                               <span className="font-mono text-xs text-zinc-400">
-                                Bet {formatEther(row.totalBetAmount)} · Payout{" "}
-                                {formatEther(row.payout)}
+                                Bet {formatUnits(row.totalBetAmount, betToken.decimals)} · Payout{" "}
+                                {formatUnits(row.payout, betToken.decimals)} {betToken.symbol}
                               </span>
                             </li>
                           );
@@ -492,19 +541,20 @@ export function DiceGame() {
                         <p>
                           Payment total:{" "}
                           <span className="font-mono text-zinc-300">
-                            {formatEther(parsedAmount.wei)}
+                            {formatUnits(parsedAmount.wei, betToken.decimals)} {betToken.symbol}
                           </span>
                         </p>
                         <p>
                           VRF fee:{" "}
-                          <span className="font-mono text-zinc-300">{formatEther(vrfWei)}</span>
+                          <span className="font-mono text-zinc-300">{formatUnits(vrfWei, 18)}</span>
                         </p>
                         <p>
                           Bet amount:{" "}
                           <span className="font-mono text-zinc-300">
-                            {formatEther(
+                            {formatUnits(
                               parsedAmount.wei > vrfWei ? parsedAmount.wei - vrfWei : BigInt(0),
-                            )}
+                              betToken.decimals,
+                            )} {betToken.symbol}
                           </span>
                         </p>
                       </div>
