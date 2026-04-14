@@ -1,6 +1,6 @@
 import { createConfig, http } from "wagmi";
 import { injected, metaMask, walletConnect } from "wagmi/connectors";
-import { polygon, polygonAmoy, gnosis, avalanche, avalancheFuji } from "viem/chains";
+import { polygon, polygonAmoy, gnosis, avalanche, avalancheFuji, base } from "viem/chains";
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
@@ -18,7 +18,7 @@ const connectors = [
 ];
 
 export const wagmiConfig = createConfig({
-  chains: [polygon, polygonAmoy, gnosis, avalanche, avalancheFuji],
+  chains: [polygon, polygonAmoy, gnosis, avalanche, avalancheFuji, base],
   connectors,
   transports: {
     [polygon.id]: http(),
@@ -26,6 +26,7 @@ export const wagmiConfig = createConfig({
     [gnosis.id]: http(),
     [avalanche.id]: http("https://api.avax.network/ext/bc/C/rpc"),
     [avalancheFuji.id]: http("https://api.avax-test.network/ext/bc/C/rpc"),
+    [base.id]: http("https://mainnet.base.org"),
   },
   ssr: true,
 });

@@ -48,6 +48,29 @@ import { getDefaultBetToken } from "@/lib/casino/addresses";
 const ROLL_EVENT_LOOKBACK_BLOCKS = BigInt(2_000_000);
 const MAX_BET_HISTORY = 100;
 
+const MIN_VRF_BUDGET_BY_CHAIN: Record<number, bigint> = {
+  43114: BigInt(10_000_000_000_000_000),   // 0.01 AVAX
+  8453:  BigInt(500_000_000_000_000),       // 0.0005 ETH
+  137:   BigInt(100_000_000_000_000_000),   // 0.1 POL
+};
+const DEFAULT_MIN_VRF_BUDGET = BigInt(10_000_000_000_000_000);
+function getMinVrfBudget(chainId: number): bigint {
+  return MIN_VRF_BUDGET_BY_CHAIN[chainId] ?? DEFAULT_MIN_VRF_BUDGET;
+}
+
+const ERC20_APPROVE_ABI = [
+  {
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    name: "approve",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
 const betHistoryStorageKey = (chainId: number, wallet: `0x${string}`) =>
   `coinToss.betHistory.v1:${chainId}:${wallet.toLowerCase()}`;
 
@@ -815,29 +838,16 @@ export function useCoinToss(betToken?: BetToken) {
         envAffiliate && isAddress(envAffiliate) ? envAffiliate : connected;
 
       if (!token.isNative) {
-        // ERC20: approve the CoinToss contract, then wager with msg.value = VRF cost only
-        const erc20Abi = [
-          {
-            inputs: [
-              { name: "spender", type: "address" },
-              { name: "amount", type: "uint256" },
-            ],
-            name: "approve",
-            outputs: [{ name: "", type: "bool" }],
-            stateMutability: "nonpayable",
-            type: "function",
-          },
-        ] as const;
         await writeContractAsync({
           address: token.address,
-          abi: erc20Abi,
+          abi: ERC20_APPROVE_ABI,
           functionName: "approve",
           args: [coinToss, betAmount],
         });
       }
 
-      const MIN_VRF_BUDGET = BigInt(10_000_000_000_000_000);
-      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : MIN_VRF_BUDGET;
+      const vrfWithBuffer =
+        vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : getMinVrfBudget(chainId);
       const msgValue = token.isNative ? betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
@@ -860,7 +870,7 @@ export function useCoinToss(betToken?: BetToken) {
         value: msgValue,
       });
     },
-    [coinToss, connected, publicClient, writeContractAsync, token],
+    [coinToss, connected, publicClient, writeContractAsync, token, chainId],
   );
 
   const canWager = coinTossConfigured && paused === false;
@@ -1102,8 +1112,17 @@ export function useDice(betToken?: BetToken) {
       const affiliate: `0x${string}` =
         envAffiliate && isAddress(envAffiliate) ? envAffiliate : connected;
 
-      const MIN_VRF_BUDGET = BigInt(10_000_000_000_000_000);
-      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : MIN_VRF_BUDGET;
+      if (!token.isNative) {
+        await writeContractAsync({
+          address: token.address,
+          abi: ERC20_APPROVE_ABI,
+          functionName: "approve",
+          args: [dice, betAmount],
+        });
+      }
+
+      const vrfWithBuffer =
+        vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : getMinVrfBudget(chainId);
       const msgValue = token.isNative ? betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
@@ -1126,7 +1145,7 @@ export function useDice(betToken?: BetToken) {
         value: msgValue,
       });
     },
-    [dice, connected, publicClient, writeContractAsync, token],
+    [dice, connected, publicClient, writeContractAsync, token, chainId],
   );
 
   const canWager = diceConfigured && paused === false;
@@ -1375,8 +1394,18 @@ export function useRoulette(betToken?: BetToken) {
         rouletteAbi,
         token.address,
       );
-      const MIN_VRF_BUDGET = BigInt(10_000_000_000_000_000);
-      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : MIN_VRF_BUDGET;
+
+      if (!token.isNative) {
+        await writeContractAsync({
+          address: token.address,
+          abi: ERC20_APPROVE_ABI,
+          functionName: "approve",
+          args: [roulette, betData.betAmount],
+        });
+      }
+
+      const vrfWithBuffer =
+        vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : getMinVrfBudget(chainId);
       const msgValue = token.isNative ? betData.betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
@@ -1387,7 +1416,7 @@ export function useRoulette(betToken?: BetToken) {
         value: msgValue,
       });
     },
-    [roulette, connected, publicClient, writeContractAsync, token],
+    [roulette, connected, publicClient, writeContractAsync, token, chainId],
   );
 
   const canWager = rouletteConfigured && paused === false;
@@ -1646,8 +1675,18 @@ export function useKeno(betToken?: BetToken) {
         token.address,
         betData.betCount,
       );
-      const MIN_VRF_BUDGET = BigInt(10_000_000_000_000_000);
-      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : MIN_VRF_BUDGET;
+
+      if (!token.isNative) {
+        await writeContractAsync({
+          address: token.address,
+          abi: ERC20_APPROVE_ABI,
+          functionName: "approve",
+          args: [keno, betData.betAmount],
+        });
+      }
+
+      const vrfWithBuffer =
+        vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : getMinVrfBudget(chainId);
       const msgValue = token.isNative ? betData.betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
@@ -1658,7 +1697,7 @@ export function useKeno(betToken?: BetToken) {
         value: msgValue,
       });
     },
-    [keno, connected, publicClient, writeContractAsync, token],
+    [keno, connected, publicClient, writeContractAsync, token, chainId],
   );
 
   const canWager = kenoConfigured && paused === false;
@@ -1974,8 +2013,18 @@ function useWeightedWheelLikeGame(
         token.address,
         betData.betCount,
       );
-      const MIN_VRF_BUDGET = BigInt(10_000_000_000_000_000);
-      const vrfWithBuffer = vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : MIN_VRF_BUDGET;
+
+      if (!token.isNative) {
+        await writeContractAsync({
+          address: token.address,
+          abi: ERC20_APPROVE_ABI,
+          functionName: "approve",
+          args: [game, betData.betAmount],
+        });
+      }
+
+      const vrfWithBuffer =
+        vrf > BigInt(0) ? (vrf * BigInt(200)) / BigInt(100) : getMinVrfBudget(chainId);
       const msgValue = token.isNative ? betData.betAmount + vrfWithBuffer : vrfWithBuffer;
 
       return writeContractAsync({
@@ -1986,7 +2035,7 @@ function useWeightedWheelLikeGame(
         value: msgValue,
       });
     },
-    [game, connected, publicClient, writeContractAsync, token],
+    [game, connected, publicClient, writeContractAsync, token, chainId],
   );
 
   const canWager = gameConfigured && paused === false;
