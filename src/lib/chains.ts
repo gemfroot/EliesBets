@@ -9,15 +9,15 @@ export const CHAIN_NAMES: Record<number, string> = {
   [base.id]: "Base",
 };
 
-/** Mainnet chains shown in the header switcher. */
-export const HEADER_SWITCHER_CHAIN_IDS: readonly number[] = [
+/** Mainnet chains shown in the header switcher (literal tuple for wagmi `switchChain`). */
+export const HEADER_SWITCHER_CHAIN_IDS = [
   polygon.id,
   base.id,
   avalanche.id,
 ] as const;
 
 /** All wagmi-supported chain IDs (used by WrongNetworkBanner). */
-export const SUPPORTED_CHAIN_IDS: readonly number[] = [
+export const SUPPORTED_CHAIN_IDS = [
   polygon.id,
   polygonAmoy.id,
   gnosis.id,

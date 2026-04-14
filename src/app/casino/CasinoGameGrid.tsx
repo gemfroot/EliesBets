@@ -63,7 +63,7 @@ const GAMES: readonly GameDef[] = [
     title: "Plinko",
     description: "Drop the ball through pegs for on-chain random payouts.",
     href: "/casino/plinko",
-  getAddress: getCasinoPlinkoAddress,
+    getAddress: getCasinoPlinkoAddress,
   },
 ];
 
