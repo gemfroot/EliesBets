@@ -123,6 +123,18 @@ export const OUR_BANK_FUJI =
 export const OUR_COIN_TOSS_FUJI =
   "0x06458ff96e9d9ba5a4c9848ff97681f5c8af7382" as const satisfies Address;
 
+/** Our Bank — Base mainnet. */
+export const OUR_BANK_BASE =
+  "0x076bcb7fbea47e4f4ea0bcd98b2f83317142ef96" as const satisfies Address;
+
+/** Our CoinToss — Base mainnet. */
+export const OUR_COIN_TOSS_BASE =
+  "0x508d1fCaA41e65E65a2a3978599B48Dfa79cbB41" as const satisfies Address;
+
+/** Our WeightedGame (Wheel + Plinko) — Base mainnet. */
+export const OUR_WEIGHTED_GAME_BASE =
+  "0xD84179B7C51bDF6e3fF8A2bE21De6B1514334b23" as const satisfies Address;
+
 function addressFromEnv(value: string | undefined): Address | undefined {
   if (!value || !isAddress(value)) {
     return undefined;
@@ -142,7 +154,7 @@ const BANK_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_BANK_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_BANK_AVALANCHE) ?? OUR_BANK_AVALANCHE,
   [avalancheFuji.id]: OUR_BANK_FUJI,
-  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_BANK_BASE),
+  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_BANK_BASE) ?? OUR_BANK_BASE,
 };
 
 const COIN_TOSS_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
@@ -152,7 +164,7 @@ const COIN_TOSS_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_AVALANCHE) ?? OUR_COIN_TOSS_AVALANCHE,
   [avalancheFuji.id]: OUR_COIN_TOSS_FUJI,
-  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_BASE),
+  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_BASE) ?? OUR_COIN_TOSS_BASE,
 };
 
 const DICE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
@@ -189,7 +201,7 @@ const WHEEL_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_AVALANCHE),
   [avalancheFuji.id]: undefined,
-  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_BASE),
+  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_BASE) ?? OUR_WEIGHTED_GAME_BASE,
 };
 
 const PLINKO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
@@ -198,7 +210,7 @@ const PLINKO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_AVALANCHE),
   [avalancheFuji.id]: undefined,
-  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_BASE),
+  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_BASE) ?? OUR_WEIGHTED_GAME_BASE,
 };
 
 export function getCasinoBankAddress(chainId: number): Address {

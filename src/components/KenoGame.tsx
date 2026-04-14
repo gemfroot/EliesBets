@@ -29,10 +29,12 @@ const CHAIN_NAMES: Record<number, string> = {
   100: "Gnosis",
   43114: "Avalanche",
   43113: "Avalanche Fuji",
+  8453: "Base",
 };
 
 const STAKE_PRESETS_BY_SYMBOL: Record<string, string[]> = {
   AVAX: ["0.1", "0.5", "1", "5"],
+  ETH: ["0.001", "0.005", "0.01", "0.05"],
   USDC: ["1", "5", "10", "25"],
   USDt: ["1", "5", "10", "25"],
   LINK: ["0.01", "0.05", "0.1", "0.5"],
