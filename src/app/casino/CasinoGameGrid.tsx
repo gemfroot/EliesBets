@@ -13,9 +13,13 @@ import {
   getCasinoWheelAddress,
   isCasinoAddressConfigured,
 } from "@/lib/casino/addresses";
-import { GAME_PREFERRED_CHAINS, chainName } from "@/lib/chains";
+import {
+  GAME_PREFERRED_CHAINS,
+  type GamePreferredChainKey,
+  chainName,
+} from "@/lib/chains";
 
-type GameKey = keyof typeof GAME_PREFERRED_CHAINS;
+type GameKey = GamePreferredChainKey;
 
 type GameDef = {
   key: GameKey;

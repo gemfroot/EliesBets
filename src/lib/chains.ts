@@ -29,15 +29,18 @@ export const SUPPORTED_CHAIN_IDS = [
 /**
  * Preferred chain to suggest for each game when the user is on an unsupported
  * network. First entry is the default; additional entries are alternatives.
+ * `as const` keeps literal chain IDs so wagmi `switchChain({ chainId })` type-checks.
  */
-export const GAME_PREFERRED_CHAINS: Record<string, readonly number[]> = {
+export const GAME_PREFERRED_CHAINS = {
   coinToss: [base.id, avalanche.id, polygon.id],
   dice: [polygon.id],
   roulette: [polygon.id],
   keno: [polygon.id],
   wheel: [base.id, polygon.id],
   plinko: [base.id, polygon.id],
-};
+} as const;
+
+export type GamePreferredChainKey = keyof typeof GAME_PREFERRED_CHAINS;
 
 export function chainName(chainId: number): string {
   return CHAIN_NAMES[chainId] ?? `Chain ${chainId}`;
