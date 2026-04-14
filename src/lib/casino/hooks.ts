@@ -44,9 +44,57 @@ import type { Address } from "viem";
 import type { BetToken } from "@/lib/casino/addresses";
 import { getDefaultBetToken } from "@/lib/casino/addresses";
 
-/** ~46 days at ~2s block time; caps RPC log query range. */
-const ROLL_EVENT_LOOKBACK_BLOCKS = BigInt(2_000_000);
+/** Total lookback depth for initial bet-history load (per chain). */
+const ROLL_EVENT_LOOKBACK_BLOCKS_BY_CHAIN: Record<number, bigint> = {
+  137: BigInt(200_000),      // Polygon — ~4.5 days @ 2s
+  80002: BigInt(100_000),    // Amoy
+  100: BigInt(100_000),      // Gnosis
+  43114: BigInt(100_000),    // Avalanche — ~2.3 days @ 2s
+  43113: BigInt(100_000),    // Fuji
+  8453: BigInt(40_000),      // Base public RPC is restrictive; keep it short
+};
+const ROLL_EVENT_LOOKBACK_DEFAULT = BigInt(40_000);
+/** Max block span per eth_getLogs call. Base public RPC caps ~2k. */
+const ROLL_EVENT_CHUNK_BLOCKS = BigInt(2_000);
 const MAX_BET_HISTORY = 100;
+
+function lookbackFor(chainId: number): bigint {
+  return ROLL_EVENT_LOOKBACK_BLOCKS_BY_CHAIN[chainId] ?? ROLL_EVENT_LOOKBACK_DEFAULT;
+}
+
+/**
+ * Chunked wrapper around viem's getContractEvents. Splits the block range into
+ * spans of ROLL_EVENT_CHUNK_BLOCKS to stay under restrictive public-RPC limits
+ * (Base's mainnet.base.org caps eth_getLogs ranges around 2k blocks).
+ */
+async function getContractEventsChunked(
+  client: PublicClient,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  args: any & { fromBlock: bigint; toBlock: bigint },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any[]> {
+  const { fromBlock, toBlock, ...rest } = args as {
+    fromBlock: bigint;
+    toBlock: bigint;
+    [k: string]: unknown;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const all: any[] = [];
+  let cursor = fromBlock;
+  while (cursor <= toBlock) {
+    const end = cursor + ROLL_EVENT_CHUNK_BLOCKS - BigInt(1);
+    const chunkEnd = end > toBlock ? toBlock : end;
+    const logs = await getContractEvents(client, {
+      ...rest,
+      fromBlock: cursor,
+      toBlock: chunkEnd,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    for (const l of logs) all.push(l);
+    cursor = chunkEnd + BigInt(1);
+  }
+  return all;
+}
 
 const MIN_VRF_BUDGET_BY_CHAIN: Record<number, bigint> = {
   43114: BigInt(10_000_000_000_000_000),   // 0.01 AVAX
@@ -715,10 +763,10 @@ export function useCoinToss(betToken?: BetToken) {
       try {
         const head = await getBlockNumber(publicClient as PublicClient);
         const from =
-          head > ROLL_EVENT_LOOKBACK_BLOCKS
-            ? head - ROLL_EVENT_LOOKBACK_BLOCKS
+          head > lookbackFor(chainId)
+            ? head - lookbackFor(chainId)
             : BigInt(0);
-        const logs = await getContractEvents(publicClient as PublicClient, {
+        const logs = await getContractEventsChunked(publicClient as PublicClient, {
           address: coinToss,
           abi: coinTossAbi,
           eventName: "Roll",
@@ -882,8 +930,8 @@ export function useCoinToss(betToken?: BetToken) {
         const head = await getBlockNumber(publicClient as PublicClient);
         const from =
           fromBlock ??
-          (head > ROLL_EVENT_LOOKBACK_BLOCKS ? head - ROLL_EVENT_LOOKBACK_BLOCKS : BigInt(0));
-        const logs = await getContractEvents(publicClient as PublicClient, {
+          (head > lookbackFor(chainId) ? head - lookbackFor(chainId) : BigInt(0));
+        const logs = await getContractEventsChunked(publicClient as PublicClient, {
           address: coinToss,
           abi: coinTossAbi,
           eventName: "Roll",
@@ -916,7 +964,7 @@ export function useCoinToss(betToken?: BetToken) {
         }
       }
     },
-    [publicClient, connected, coinTossConfigured, coinToss],
+    [publicClient, connected, coinTossConfigured, coinToss, chainId],
   );
 
   return {
@@ -1041,10 +1089,10 @@ export function useDice(betToken?: BetToken) {
       try {
         const head = await getBlockNumber(publicClient as PublicClient);
         const from =
-          head > ROLL_EVENT_LOOKBACK_BLOCKS
-            ? head - ROLL_EVENT_LOOKBACK_BLOCKS
+          head > lookbackFor(chainId)
+            ? head - lookbackFor(chainId)
             : BigInt(0);
-        const logs = await getContractEvents(publicClient as PublicClient, {
+        const logs = await getContractEventsChunked(publicClient as PublicClient, {
           address: dice,
           abi: diceAbi,
           eventName: "Roll",
@@ -1202,8 +1250,8 @@ export function useDice(betToken?: BetToken) {
         const head = await getBlockNumber(publicClient as PublicClient);
         const from =
           fromBlock ??
-          (head > ROLL_EVENT_LOOKBACK_BLOCKS ? head - ROLL_EVENT_LOOKBACK_BLOCKS : BigInt(0));
-        const logs = await getContractEvents(publicClient as PublicClient, {
+          (head > lookbackFor(chainId) ? head - lookbackFor(chainId) : BigInt(0));
+        const logs = await getContractEventsChunked(publicClient as PublicClient, {
           address: dice,
           abi: diceAbi,
           eventName: "Roll",
@@ -1236,7 +1284,7 @@ export function useDice(betToken?: BetToken) {
         }
       }
     },
-    [publicClient, connected, diceConfigured, dice],
+    [publicClient, connected, diceConfigured, dice, chainId],
   );
 
   return {
@@ -1371,10 +1419,10 @@ export function useRoulette(betToken?: BetToken) {
       try {
         const head = await getBlockNumber(publicClient as PublicClient);
         const from =
-          head > ROLL_EVENT_LOOKBACK_BLOCKS
-            ? head - ROLL_EVENT_LOOKBACK_BLOCKS
+          head > lookbackFor(chainId)
+            ? head - lookbackFor(chainId)
             : BigInt(0);
-        const logs = await getContractEvents(publicClient as PublicClient, {
+        const logs = await getContractEventsChunked(publicClient as PublicClient, {
           address: roulette,
           abi: rouletteAbi,
           eventName: "Roll",
@@ -1518,8 +1566,8 @@ export function useRoulette(betToken?: BetToken) {
         const head = await getBlockNumber(publicClient as PublicClient);
         const from =
           fromBlock ??
-          (head > ROLL_EVENT_LOOKBACK_BLOCKS ? head - ROLL_EVENT_LOOKBACK_BLOCKS : BigInt(0));
-        const logs = await getContractEvents(publicClient as PublicClient, {
+          (head > lookbackFor(chainId) ? head - lookbackFor(chainId) : BigInt(0));
+        const logs = await getContractEventsChunked(publicClient as PublicClient, {
           address: roulette,
           abi: rouletteAbi,
           eventName: "Roll",
@@ -1552,7 +1600,7 @@ export function useRoulette(betToken?: BetToken) {
         }
       }
     },
-    [publicClient, connected, rouletteConfigured, roulette],
+    [publicClient, connected, rouletteConfigured, roulette, chainId],
   );
 
   return {
@@ -1696,10 +1744,10 @@ export function useKeno(betToken?: BetToken) {
       try {
         const head = await getBlockNumber(publicClient as PublicClient);
         const from =
-          head > ROLL_EVENT_LOOKBACK_BLOCKS
-            ? head - ROLL_EVENT_LOOKBACK_BLOCKS
+          head > lookbackFor(chainId)
+            ? head - lookbackFor(chainId)
             : BigInt(0);
-        const logs = await getContractEvents(publicClient as PublicClient, {
+        const logs = await getContractEventsChunked(publicClient as PublicClient, {
           address: keno,
           abi: kenoAbi,
           eventName: "Roll",
@@ -1844,8 +1892,8 @@ export function useKeno(betToken?: BetToken) {
         const head = await getBlockNumber(publicClient as PublicClient);
         const from =
           fromBlock ??
-          (head > ROLL_EVENT_LOOKBACK_BLOCKS ? head - ROLL_EVENT_LOOKBACK_BLOCKS : BigInt(0));
-        const logs = await getContractEvents(publicClient as PublicClient, {
+          (head > lookbackFor(chainId) ? head - lookbackFor(chainId) : BigInt(0));
+        const logs = await getContractEventsChunked(publicClient as PublicClient, {
           address: keno,
           abi: kenoAbi,
           eventName: "Roll",
@@ -1878,7 +1926,7 @@ export function useKeno(betToken?: BetToken) {
         }
       }
     },
-    [publicClient, connected, kenoConfigured, keno],
+    [publicClient, connected, kenoConfigured, keno, chainId],
   );
 
   return {
@@ -2079,10 +2127,10 @@ function useWeightedWheelLikeGame(
       try {
         const head = await getBlockNumber(publicClient as PublicClient);
         const from =
-          head > ROLL_EVENT_LOOKBACK_BLOCKS
-            ? head - ROLL_EVENT_LOOKBACK_BLOCKS
+          head > lookbackFor(chainId)
+            ? head - lookbackFor(chainId)
             : BigInt(0);
-        const logs = await getContractEvents(publicClient as PublicClient, {
+        const logs = await getContractEventsChunked(publicClient as PublicClient, {
           address: game,
           abi: wheelAbi,
           eventName: "Roll",
@@ -2227,8 +2275,8 @@ function useWeightedWheelLikeGame(
         const head = await getBlockNumber(publicClient as PublicClient);
         const from =
           fromBlock ??
-          (head > ROLL_EVENT_LOOKBACK_BLOCKS ? head - ROLL_EVENT_LOOKBACK_BLOCKS : BigInt(0));
-        const logs = await getContractEvents(publicClient as PublicClient, {
+          (head > lookbackFor(chainId) ? head - lookbackFor(chainId) : BigInt(0));
+        const logs = await getContractEventsChunked(publicClient as PublicClient, {
           address: game,
           abi: wheelAbi,
           eventName: "Roll",
@@ -2261,7 +2309,7 @@ function useWeightedWheelLikeGame(
         }
       }
     },
-    [publicClient, connected, gameConfigured, game],
+    [publicClient, connected, gameConfigured, game, chainId],
   );
 
   return {
