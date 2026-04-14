@@ -42,3 +42,17 @@ export const GAME_PREFERRED_CHAINS: Record<string, readonly number[]> = {
 export function chainName(chainId: number): string {
   return CHAIN_NAMES[chainId] ?? `Chain ${chainId}`;
 }
+
+const EXPLORER_BY_CHAIN: Record<number, string> = {
+  [polygon.id]: "https://polygonscan.com",
+  [polygonAmoy.id]: "https://amoy.polygonscan.com",
+  [gnosis.id]: "https://gnosisscan.io",
+  [avalanche.id]: "https://snowtrace.io",
+  [avalancheFuji.id]: "https://testnet.snowtrace.io",
+  [base.id]: "https://basescan.org",
+};
+
+export function explorerTxUrl(chainId: number, hash: string): string | undefined {
+  const baseUrl = EXPLORER_BY_CHAIN[chainId];
+  return baseUrl ? `${baseUrl}/tx/${hash}` : undefined;
+}

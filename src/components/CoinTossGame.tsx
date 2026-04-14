@@ -9,7 +9,7 @@ import { base } from "viem/chains";
 import { CoinFlipAnimation, type CoinFlipPhase } from "@/components/CoinFlipAnimation";
 import { useCoinToss } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
-import { chainName } from "@/lib/chains";
+import { chainName, explorerTxUrl } from "@/lib/chains";
 
 type GamePhase = CoinFlipPhase;
 
@@ -73,6 +73,7 @@ export function CoinTossGame() {
     betHistory,
     betHistoryLoading,
     betHistoryError,
+    refreshRolls,
   } = useCoinToss(selectedToken);
 
   const stakePresets = STAKE_PRESETS_BY_SYMBOL[betToken.symbol] ?? DEFAULT_PRESETS;
@@ -85,7 +86,7 @@ export function CoinTossGame() {
   const [outcome, setOutcome] = useState<"heads" | "tails" | null>(null);
   const [payoutWei, setPayoutWei] = useState<bigint | null>(null);
   const [waitingVrf, setWaitingVrf] = useState(false);
-  const rollSnapshotRef = useRef<number>(0);
+  const rollSnapshotRef = useRef<bigint | null>(null);
 
   const isSupportedChain = (CASINO_CHAIN_IDS as readonly number[]).includes(chainId);
 
@@ -160,14 +161,16 @@ export function CoinTossGame() {
       setTxHash(undefined);
       return;
     }
+    rollSnapshotRef.current = lastRoll?.id ?? null;
     setWaitingVrf(true);
-    rollSnapshotRef.current = lastRoll?.timestamp ?? 0;
-  }, [phase, receipt, receiptLoading, txHash, lastRoll?.timestamp]);
+  }, [phase, receipt, receiptLoading, txHash, lastRoll?.id]);
 
   // Roll event arrives from VRF callback → show result
   useEffect(() => {
     if (!waitingVrf || !lastRoll) return;
-    if (lastRoll.timestamp <= rollSnapshotRef.current) return;
+    if (rollSnapshotRef.current !== null && lastRoll.id === rollSnapshotRef.current) {
+      return;
+    }
 
     const landedHeads = lastRoll.rolled[0] === true;
     setOutcome(landedHeads ? "heads" : "tails");
@@ -175,6 +178,25 @@ export function CoinTossGame() {
     setWaitingVrf(false);
     setPhase("result");
   }, [waitingVrf, lastRoll]);
+
+  // Fallback polling: if useWatchContractEvent misses the Roll event (flaky
+  // RPC websockets on Base/public endpoints), poll getContractEvents since the
+  // wager block so the UI always resolves once the Roll log exists on-chain.
+  useEffect(() => {
+    if (!waitingVrf || !receipt?.blockNumber || !refreshRolls) return;
+    const fromBlock = receipt.blockNumber;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      void refreshRolls(fromBlock);
+    };
+    tick();
+    const id = setInterval(tick, 5_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [waitingVrf, receipt?.blockNumber, refreshRolls]);
 
   const canSubmit =
     isConnected &&
@@ -308,8 +330,26 @@ export function CoinTossGame() {
                     : receiptLoading
                       ? "Waiting for on-chain confirmation…"
                       : waitingVrf
-                        ? "Bet placed! Waiting for Chainlink VRF result…"
+                        ? "Waiting for Chainlink VRF (separate callback tx)…"
                         : null}
+                  {waitingVrf && txHash ? (
+                    <>
+                      {" "}
+                      {(() => {
+                        const url = explorerTxUrl(chainId, txHash);
+                        return url ? (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-emerald-400 hover:text-emerald-300 underline"
+                          >
+                            View wager tx
+                          </a>
+                        ) : null;
+                      })()}
+                    </>
+                  ) : null}
                 </span>
               ) : null}
             </div>

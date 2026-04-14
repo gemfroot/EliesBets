@@ -875,6 +875,48 @@ export function useCoinToss(betToken?: BetToken) {
 
   const canWager = coinTossConfigured && paused === false;
 
+  const refreshRolls = useCallback(
+    async (fromBlock?: bigint) => {
+      if (!publicClient || !connected || !coinTossConfigured) return;
+      try {
+        const head = await getBlockNumber(publicClient as PublicClient);
+        const from =
+          fromBlock ??
+          (head > ROLL_EVENT_LOOKBACK_BLOCKS ? head - ROLL_EVENT_LOOKBACK_BLOCKS : BigInt(0));
+        const logs = await getContractEvents(publicClient as PublicClient, {
+          address: coinToss,
+          abi: coinTossAbi,
+          eventName: "Roll",
+          args: { receiver: connected },
+          fromBlock: from,
+          toBlock: head,
+        });
+        const rolls: RollResult[] = [];
+        for (const log of logs) {
+          if (!("args" in log) || !log.args || typeof log.args !== "object") continue;
+          const r = rollFromDecodedLog(
+            log.args as {
+              id?: bigint;
+              rolled?: readonly boolean[];
+              payout?: bigint;
+              totalBetAmount?: bigint;
+              face?: boolean;
+            },
+            log,
+          );
+          if (r) rolls.push(r);
+        }
+        if (rolls.length === 0) return;
+        setBetHistory((prev) => mergeBetHistoryById(prev, rolls));
+        const latest = rolls.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+        setLastRoll((prev) => (prev && prev.id === latest.id ? prev : latest));
+      } catch {
+        // ignore transient RPC errors; caller retries on a timer
+      }
+    },
+    [publicClient, connected, coinTossConfigured, coinToss],
+  );
+
   return {
     coinTossAddress: coinToss,
     coinTossConfigured,
@@ -886,6 +928,7 @@ export function useCoinToss(betToken?: BetToken) {
     betHistory,
     betHistoryLoading,
     betHistoryError,
+    refreshRolls,
     data: minBetAmount,
     isMinBetPending: vrfPending,
     isPending: writePending,
