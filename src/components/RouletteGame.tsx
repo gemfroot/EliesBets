@@ -16,7 +16,7 @@ import { polygon } from "viem/chains";
 import { RouletteAnimation, type RoulettePhase } from "@/components/RouletteAnimation";
 import { useRoulette, type RouletteBetData } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
-import { chainName } from "@/lib/chains";
+import { chainName, explorerTxUrl } from "@/lib/chains";
 
 const BET_HISTORY_DISPLAY_CAP = 12;
 
@@ -107,6 +107,7 @@ export function RouletteGame() {
     betHistory,
     betHistoryLoading,
     betHistoryError,
+    refreshRolls,
   } = useRoulette(selectedToken);
 
   const stakePresets = STAKE_PRESETS_BY_SYMBOL[betToken.symbol] ?? DEFAULT_PRESETS;
@@ -120,7 +121,8 @@ export function RouletteGame() {
   const [won, setWon] = useState<boolean | null>(null);
   const [payoutWei, setPayoutWei] = useState<bigint | null>(null);
   const [waitingVrf, setWaitingVrf] = useState(false);
-  const rollSnapshotRef = useRef<number>(0);
+  const [vrfSoftTimeout, setVrfSoftTimeout] = useState(false);
+  const rollSnapshotRef = useRef<bigint | null>(null);
 
   const isSupportedChain = (CASINO_CHAIN_IDS as readonly number[]).includes(chainId);
 
@@ -228,13 +230,14 @@ export function RouletteGame() {
       setTxHash(undefined);
       return;
     }
+    rollSnapshotRef.current = lastRoll?.id ?? null;
     setWaitingVrf(true);
-    rollSnapshotRef.current = lastRoll?.timestamp ?? 0;
-  }, [phase, receipt, receiptLoading, txHash, lastRoll?.timestamp]);
+    setVrfSoftTimeout(false);
+  }, [phase, receipt, receiptLoading, txHash, lastRoll?.id]);
 
   useEffect(() => {
     if (!waitingVrf || !lastRoll) return;
-    if (lastRoll.timestamp <= rollSnapshotRef.current) return;
+    if (rollSnapshotRef.current !== null && lastRoll.id === rollSnapshotRef.current) return;
 
     const raw = lastRoll.rolled[0];
     const decoded =
@@ -247,8 +250,29 @@ export function RouletteGame() {
     }
     setPayoutWei(lastRoll.payout);
     setWaitingVrf(false);
+    setVrfSoftTimeout(false);
     setPhase("result");
   }, [waitingVrf, lastRoll, frozenEncoded]);
+
+  useEffect(() => {
+    if (!waitingVrf || !receipt?.blockNumber || !refreshRolls) return;
+    const fromBlock = receipt.blockNumber;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      void refreshRolls(fromBlock);
+    };
+    tick();
+    const id = setInterval(tick, 5_000);
+    const softId = setTimeout(() => {
+      if (!cancelled) setVrfSoftTimeout(true);
+    }, 90_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      clearTimeout(softId);
+    };
+  }, [waitingVrf, receipt?.blockNumber, refreshRolls]);
 
   const canSubmit =
     isConnected &&
@@ -270,6 +294,7 @@ export function RouletteGame() {
       setWon(null);
       setPayoutWei(null);
       setWaitingVrf(false);
+      setVrfSoftTimeout(false);
       const encoded = Roulette.encodeInput(selected);
       setFrozenEncoded(encoded);
       setPhase("spinning");
@@ -323,6 +348,7 @@ export function RouletteGame() {
     setWon(null);
     setPayoutWei(null);
     setWaitingVrf(false);
+    setVrfSoftTimeout(false);
     if (parsedAmount.ok && parsedAmount.wei > BigInt(0)) {
       setPhase("picking");
     } else {
@@ -438,8 +464,21 @@ export function RouletteGame() {
                     : receiptLoading
                       ? "Waiting for on-chain confirmation…"
                       : waitingVrf
-                        ? "Bet placed! Waiting for Chainlink VRF result…"
+                        ? vrfSoftTimeout
+                          ? "VRF is taking longer than usual — still waiting for the callback tx…"
+                          : "Waiting for Chainlink VRF (separate callback tx)…"
                         : null}
+                  {waitingVrf && txHash ? (() => {
+                    const url = explorerTxUrl(chainId, txHash);
+                    return url ? (
+                      <>
+                        {" "}
+                        <a href={url} target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300 underline">
+                          View wager tx
+                        </a>
+                      </>
+                    ) : null;
+                  })() : null}
                 </span>
               ) : null}
             </div>

@@ -1193,6 +1193,48 @@ export function useDice(betToken?: BetToken) {
 
   const canWager = diceConfigured && paused === false;
 
+  const refreshRolls = useCallback(
+    async (fromBlock?: bigint) => {
+      if (!publicClient || !connected || !diceConfigured) return;
+      try {
+        const head = await getBlockNumber(publicClient as PublicClient);
+        const from =
+          fromBlock ??
+          (head > ROLL_EVENT_LOOKBACK_BLOCKS ? head - ROLL_EVENT_LOOKBACK_BLOCKS : BigInt(0));
+        const logs = await getContractEvents(publicClient as PublicClient, {
+          address: dice,
+          abi: diceAbi,
+          eventName: "Roll",
+          args: { receiver: connected },
+          fromBlock: from,
+          toBlock: head,
+        });
+        const rolls: DiceRollResult[] = [];
+        for (const log of logs) {
+          if (!("args" in log) || !log.args || typeof log.args !== "object") continue;
+          const r = diceRollFromDecodedLog(
+            log.args as {
+              id?: bigint;
+              rolled?: readonly number[];
+              payout?: bigint;
+              totalBetAmount?: bigint;
+              cap?: number;
+            },
+            log,
+          );
+          if (r) rolls.push(r);
+        }
+        if (rolls.length === 0) return;
+        setBetHistory((prev) => mergeDiceBetHistoryById(prev, rolls));
+        const latest = rolls.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+        setLastRoll((prev) => (prev && prev.id === latest.id ? prev : latest));
+      } catch {
+        // transient RPC errors — caller retries on a timer
+      }
+    },
+    [publicClient, connected, diceConfigured, dice],
+  );
+
   return {
     diceAddress: dice,
     diceConfigured,
@@ -1204,6 +1246,7 @@ export function useDice(betToken?: BetToken) {
     betHistory,
     betHistoryLoading,
     betHistoryError,
+    refreshRolls,
     data: minTotal,
     isMinBetPending: vrfPending,
     isPending: writePending,
@@ -1464,6 +1507,48 @@ export function useRoulette(betToken?: BetToken) {
 
   const canWager = rouletteConfigured && paused === false;
 
+  const refreshRolls = useCallback(
+    async (fromBlock?: bigint) => {
+      if (!publicClient || !connected || !rouletteConfigured) return;
+      try {
+        const head = await getBlockNumber(publicClient as PublicClient);
+        const from =
+          fromBlock ??
+          (head > ROLL_EVENT_LOOKBACK_BLOCKS ? head - ROLL_EVENT_LOOKBACK_BLOCKS : BigInt(0));
+        const logs = await getContractEvents(publicClient as PublicClient, {
+          address: roulette,
+          abi: rouletteAbi,
+          eventName: "Roll",
+          args: { receiver: connected },
+          fromBlock: from,
+          toBlock: head,
+        });
+        const rolls: RouletteRollResult[] = [];
+        for (const log of logs) {
+          if (!("args" in log) || !log.args || typeof log.args !== "object") continue;
+          const r = rouletteRollFromDecodedLog(
+            log.args as {
+              id?: bigint;
+              rolled?: readonly number[];
+              payout?: bigint;
+              totalBetAmount?: bigint;
+              numbers?: bigint;
+            },
+            log,
+          );
+          if (r) rolls.push(r);
+        }
+        if (rolls.length === 0) return;
+        setBetHistory((prev) => mergeRouletteBetHistoryById(prev, rolls));
+        const latest = rolls.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+        setLastRoll((prev) => (prev && prev.id === latest.id ? prev : latest));
+      } catch {
+        // transient RPC errors — caller retries on a timer
+      }
+    },
+    [publicClient, connected, rouletteConfigured, roulette],
+  );
+
   return {
     rouletteAddress: roulette,
     rouletteConfigured,
@@ -1475,6 +1560,7 @@ export function useRoulette(betToken?: BetToken) {
     betHistory,
     betHistoryLoading,
     betHistoryError,
+    refreshRolls,
     data: minTotal,
     isMinBetPending: vrfPending,
     isPending: writePending,
@@ -1745,6 +1831,48 @@ export function useKeno(betToken?: BetToken) {
 
   const canWager = kenoConfigured && paused === false;
 
+  const refreshRolls = useCallback(
+    async (fromBlock?: bigint) => {
+      if (!publicClient || !connected || !kenoConfigured) return;
+      try {
+        const head = await getBlockNumber(publicClient as PublicClient);
+        const from =
+          fromBlock ??
+          (head > ROLL_EVENT_LOOKBACK_BLOCKS ? head - ROLL_EVENT_LOOKBACK_BLOCKS : BigInt(0));
+        const logs = await getContractEvents(publicClient as PublicClient, {
+          address: keno,
+          abi: kenoAbi,
+          eventName: "Roll",
+          args: { receiver: connected },
+          fromBlock: from,
+          toBlock: head,
+        });
+        const rolls: KenoRollResult[] = [];
+        for (const log of logs) {
+          if (!("args" in log) || !log.args || typeof log.args !== "object") continue;
+          const r = kenoRollFromDecodedLog(
+            log.args as {
+              id?: bigint;
+              rolled?: readonly number[];
+              payout?: bigint;
+              totalBetAmount?: bigint;
+              numbers?: bigint;
+            },
+            log,
+          );
+          if (r) rolls.push(r);
+        }
+        if (rolls.length === 0) return;
+        setBetHistory((prev) => mergeKenoBetHistoryById(prev, rolls));
+        const latest = rolls.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+        setLastRoll((prev) => (prev && prev.id === latest.id ? prev : latest));
+      } catch {
+        // transient RPC errors — caller retries on a timer
+      }
+    },
+    [publicClient, connected, kenoConfigured, keno],
+  );
+
   return {
     kenoAddress: keno,
     kenoConfigured,
@@ -1757,6 +1885,7 @@ export function useKeno(betToken?: BetToken) {
     betHistory,
     betHistoryLoading,
     betHistoryError,
+    refreshRolls,
     data: minTotal,
     isMinBetPending: vrfPending,
     isPending: writePending,
@@ -2083,6 +2212,48 @@ function useWeightedWheelLikeGame(
 
   const canWager = gameConfigured && paused === false;
 
+  const refreshRolls = useCallback(
+    async (fromBlock?: bigint) => {
+      if (!publicClient || !connected || !gameConfigured) return;
+      try {
+        const head = await getBlockNumber(publicClient as PublicClient);
+        const from =
+          fromBlock ??
+          (head > ROLL_EVENT_LOOKBACK_BLOCKS ? head - ROLL_EVENT_LOOKBACK_BLOCKS : BigInt(0));
+        const logs = await getContractEvents(publicClient as PublicClient, {
+          address: game,
+          abi: wheelAbi,
+          eventName: "Roll",
+          args: { receiver: connected },
+          fromBlock: from,
+          toBlock: head,
+        });
+        const rolls: WheelRollResult[] = [];
+        for (const log of logs) {
+          if (!("args" in log) || !log.args || typeof log.args !== "object") continue;
+          const r = wheelRollFromDecodedLog(
+            log.args as {
+              id?: bigint;
+              rolled?: readonly number[];
+              payout?: bigint;
+              totalBetAmount?: bigint;
+              configId?: number;
+            },
+            log,
+          );
+          if (r) rolls.push(r);
+        }
+        if (rolls.length === 0) return;
+        setBetHistory((prev) => mergeWheelBetHistoryById(prev, rolls));
+        const latest = rolls.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+        setLastRoll((prev) => (prev && prev.id === latest.id ? prev : latest));
+      } catch {
+        // transient RPC errors — caller retries on a timer
+      }
+    },
+    [publicClient, connected, gameConfigured, game],
+  );
+
   return {
     gameAddress: game,
     gameConfigured,
@@ -2096,6 +2267,7 @@ function useWeightedWheelLikeGame(
     betHistory,
     betHistoryLoading,
     betHistoryError,
+    refreshRolls,
     data: minTotal,
     isMinBetPending: vrfPending,
     isPending: writePending,

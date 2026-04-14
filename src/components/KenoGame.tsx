@@ -20,7 +20,7 @@ import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } 
 import { KenoAnimation, type KenoPhase } from "@/components/KenoAnimation";
 import { useKeno, type KenoBetData } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
-import { chainName } from "@/lib/chains";
+import { chainName, explorerTxUrl } from "@/lib/chains";
 
 const BET_HISTORY_DISPLAY_CAP = 12;
 
@@ -100,6 +100,7 @@ export function KenoGame() {
     betHistory,
     betHistoryLoading,
     betHistoryError,
+    refreshRolls,
   } = useKeno(selectedToken);
 
   const stakePresets = STAKE_PRESETS_BY_SYMBOL[betToken.symbol] ?? DEFAULT_PRESETS;
@@ -114,6 +115,7 @@ export function KenoGame() {
   const [won, setWon] = useState<boolean | null>(null);
   const [payoutWei, setPayoutWei] = useState<bigint | null>(null);
   const [waitingVrf, setWaitingVrf] = useState(false);
+  const [vrfSoftTimeout, setVrfSoftTimeout] = useState(false);
   const rollIdSnapshotRef = useRef<bigint>(BigInt(0));
 
   const isSupportedChain = (CASINO_CHAIN_IDS as readonly number[]).includes(chainId);
@@ -234,9 +236,30 @@ export function KenoGame() {
       setTxHash(undefined);
       return;
     }
-    setWaitingVrf(true);
     rollIdSnapshotRef.current = lastRoll?.id ?? BigInt(0);
+    setWaitingVrf(true);
+    setVrfSoftTimeout(false);
   }, [phase, receipt, receiptLoading, txHash, lastRoll?.id]);
+
+  useEffect(() => {
+    if (!waitingVrf || !receipt?.blockNumber || !refreshRolls) return;
+    const fromBlock = receipt.blockNumber;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      void refreshRolls(fromBlock);
+    };
+    tick();
+    const id = setInterval(tick, 5_000);
+    const softId = setTimeout(() => {
+      if (!cancelled) setVrfSoftTimeout(true);
+    }, 90_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      clearTimeout(softId);
+    };
+  }, [waitingVrf, receipt?.blockNumber, refreshRolls]);
 
   useEffect(() => {
     if (!waitingVrf || !lastRoll || !kenoConfiguration) return;
@@ -248,6 +271,7 @@ export function KenoGame() {
     setPayoutWei(lastRoll.payout);
     setWon(lastRoll.payout > BigInt(0));
     setWaitingVrf(false);
+    setVrfSoftTimeout(false);
     setRevealCount(0);
     setPhase("drawing");
   }, [waitingVrf, lastRoll, kenoConfiguration, frozenEncoded]);
@@ -290,6 +314,7 @@ export function KenoGame() {
       setPayoutWei(null);
       setRevealCount(0);
       setWaitingVrf(false);
+      setVrfSoftTimeout(false);
 
       const encoded = Keno.encodeInput(selected as KenoBall[], kenoConfiguration);
       setFrozenEncoded(encoded);
@@ -346,6 +371,7 @@ export function KenoGame() {
     setPayoutWei(null);
     setRevealCount(0);
     setWaitingVrf(false);
+    setVrfSoftTimeout(false);
     if (parsedAmount.ok && parsedAmount.wei > BigInt(0)) {
       setPhase("picking");
     } else {
@@ -476,8 +502,21 @@ export function KenoGame() {
                     : receiptLoading
                       ? "Waiting for on-chain confirmation…"
                       : waitingVrf
-                        ? "Bet placed! Waiting for Chainlink VRF result…"
+                        ? vrfSoftTimeout
+                          ? "VRF is taking longer than usual — still waiting for the callback tx…"
+                          : "Waiting for Chainlink VRF (separate callback tx)…"
                         : null}
+                  {waitingVrf && txHash ? (() => {
+                    const url = explorerTxUrl(chainId, txHash);
+                    return url ? (
+                      <>
+                        {" "}
+                        <a href={url} target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300 underline">
+                          View wager tx
+                        </a>
+                      </>
+                    ) : null;
+                  })() : null}
                 </span>
               ) : null}
             </div>

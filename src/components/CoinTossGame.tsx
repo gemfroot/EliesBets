@@ -86,6 +86,7 @@ export function CoinTossGame() {
   const [outcome, setOutcome] = useState<"heads" | "tails" | null>(null);
   const [payoutWei, setPayoutWei] = useState<bigint | null>(null);
   const [waitingVrf, setWaitingVrf] = useState(false);
+  const [vrfSoftTimeout, setVrfSoftTimeout] = useState(false);
   const rollSnapshotRef = useRef<bigint | null>(null);
 
   const isSupportedChain = (CASINO_CHAIN_IDS as readonly number[]).includes(chainId);
@@ -163,6 +164,7 @@ export function CoinTossGame() {
     }
     rollSnapshotRef.current = lastRoll?.id ?? null;
     setWaitingVrf(true);
+    setVrfSoftTimeout(false);
   }, [phase, receipt, receiptLoading, txHash, lastRoll?.id]);
 
   // Roll event arrives from VRF callback → show result
@@ -176,6 +178,7 @@ export function CoinTossGame() {
     setOutcome(landedHeads ? "heads" : "tails");
     setPayoutWei(lastRoll.payout);
     setWaitingVrf(false);
+    setVrfSoftTimeout(false);
     setPhase("result");
   }, [waitingVrf, lastRoll]);
 
@@ -192,9 +195,13 @@ export function CoinTossGame() {
     };
     tick();
     const id = setInterval(tick, 5_000);
+    const softId = setTimeout(() => {
+      if (!cancelled) setVrfSoftTimeout(true);
+    }, 90_000);
     return () => {
       cancelled = true;
       clearInterval(id);
+      clearTimeout(softId);
     };
   }, [waitingVrf, receipt?.blockNumber, refreshRolls]);
 
@@ -216,6 +223,7 @@ export function CoinTossGame() {
       setOutcome(null);
       setPayoutWei(null);
       setWaitingVrf(false);
+      setVrfSoftTimeout(false);
       setFrozenBetHeads(betHeads);
       setPhase("flipping");
       setTxHash(undefined);
@@ -236,6 +244,7 @@ export function CoinTossGame() {
     setOutcome(null);
     setPayoutWei(null);
     setWaitingVrf(false);
+    setVrfSoftTimeout(false);
     if (parsedAmount.ok && parsedAmount.wei > BigInt(0)) {
       setPhase("picking");
     } else {
@@ -330,7 +339,9 @@ export function CoinTossGame() {
                     : receiptLoading
                       ? "Waiting for on-chain confirmation…"
                       : waitingVrf
-                        ? "Waiting for Chainlink VRF (separate callback tx)…"
+                        ? vrfSoftTimeout
+                          ? "VRF is taking longer than usual — still waiting for the callback tx…"
+                          : "Waiting for Chainlink VRF (separate callback tx)…"
                         : null}
                   {waitingVrf && txHash ? (
                     <>

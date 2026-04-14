@@ -8,7 +8,6 @@ import { wagmiConfig } from "@/wagmi";
 import { BetslipPanel } from "@/components/Betslip";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { WrongNetworkBanner } from "@/components/WrongNetworkBanner";
 import { MobileLayoutChrome } from "@/components/MobileLayoutChrome";
 import { Sidebar } from "@/components/Sidebar";
 import "./globals.css";
@@ -86,7 +85,6 @@ export default async function RootLayout({
       <body className="min-h-full overflow-x-hidden bg-zinc-950 text-zinc-50">
         <Providers initialState={initialState}>
           <div className="flex min-h-screen flex-col pb-14 md:pb-0">
-            <WrongNetworkBanner />
             <Header />
             <div className="flex min-h-0 min-w-0 flex-1">
               <Sidebar />
