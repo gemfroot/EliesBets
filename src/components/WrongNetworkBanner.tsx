@@ -1,6 +1,7 @@
 "use client";
 
 import { useChainId, useConnection, useSwitchChain } from "wagmi";
+import { SUPPORTED_CHAIN_IDS } from "@/lib/chains";
 import { CHAIN_ID } from "@/lib/constants";
 
 export function WrongNetworkBanner() {
@@ -8,7 +9,7 @@ export function WrongNetworkBanner() {
   const chainId = useChainId();
   const { mutate: switchChain, isPending } = useSwitchChain();
 
-  if (!isConnected || chainId === CHAIN_ID) {
+  if (!isConnected || SUPPORTED_CHAIN_IDS.includes(chainId)) {
     return null;
   }
 
@@ -17,9 +18,7 @@ export function WrongNetworkBanner() {
       role="alert"
       className="flex flex-wrap items-center justify-center gap-3 border-b border-amber-700/50 bg-amber-950/90 px-4 py-2 text-center text-sm text-amber-100"
     >
-      <span>
-        Your wallet is on the wrong network. Switch to Polygon to use EliesBets.
-      </span>
+      <span>Your wallet is on an unsupported network.</span>
       <button
         type="button"
         disabled={isPending}

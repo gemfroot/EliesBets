@@ -115,6 +115,18 @@ export const OUR_BANK_AVALANCHE =
 export const OUR_COIN_TOSS_AVALANCHE =
   "0x423D077cA13b463eb890B7f278F5A20f258B2b50" as const satisfies Address;
 
+/** Our Bank — Base mainnet. */
+export const OUR_BANK_BASE =
+  "0x076bcb7fbea47e4f4ea0bcd98b2f83317142ef96" as const satisfies Address;
+
+/** Our CoinToss — Base mainnet. */
+export const OUR_COIN_TOSS_BASE =
+  "0x508d1fCaA41e65E65a2a3978599B48Dfa79cbB41" as const satisfies Address;
+
+/** Our WeightedGame (Wheel + Plinko) — Base mainnet. */
+export const OUR_WEIGHTED_GAME_BASE =
+  "0xD84179B7C51bDF6e3fF8A2bE21De6B1514334b23" as const satisfies Address;
+
 /** Our forked Bank — Avalanche Fuji testnet. */
 export const OUR_BANK_FUJI =
   "0xa630496e3d1ff7353768cc7f94b2881500dd8010" as const satisfies Address;

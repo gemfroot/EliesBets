@@ -5,10 +5,11 @@ import Link from "next/link";
 import { BP_VALUE, Dice } from "@betswirl/sdk-core";
 import { formatUnits, parseUnits } from "viem";
 import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
-import { avalanche } from "viem/chains";
+import { polygon } from "viem/chains";
 import { DiceAnimation, type DicePhase } from "@/components/DiceAnimation";
 import { useDice } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
+import { chainName } from "@/lib/chains";
 
 const BET_HISTORY_DISPLAY_CAP = 12;
 const CAP_MIN = 2;
@@ -19,15 +20,6 @@ const PHASE_LABEL: Record<DicePhase, string> = {
   picking: "Ready to play",
   rolling: "Rolling",
   result: "Result",
-};
-
-const CHAIN_NAMES: Record<number, string> = {
-  137: "Polygon",
-  80002: "Polygon Amoy",
-  100: "Gnosis",
-  43114: "Avalanche",
-  43113: "Avalanche Fuji",
-  8453: "Base",
 };
 
 const STAKE_PRESETS_BY_SYMBOL: Record<string, string[]> = {
@@ -267,17 +259,17 @@ export function DiceGame() {
             </span>
             <button
               type="button"
-              onClick={() => switchChain?.({ chainId: avalanche.id })}
+              onClick={() => switchChain?.({ chainId: polygon.id })}
               className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-500"
             >
-              Switch to Avalanche
+              Switch to Polygon
             </button>
           </div>
         ) : isConnected && isSupportedChain ? (
           <div className="mb-6 flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-2.5">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
             <span className="text-sm text-zinc-300">
-              {CHAIN_NAMES[chainId] ?? `Chain ${chainId}`}
+              {chainName(chainId)}
             </span>
           </div>
         ) : null}

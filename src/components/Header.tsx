@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useBalance, useConnection, useDisconnect } from "wagmi";
-import { useState } from "react";
+import { useBalance, useChainId, useConnection, useDisconnect, useSwitchChain } from "wagmi";
+import { useEffect, useRef, useState } from "react";
 import { formatUnits } from "viem";
 import { MyBetsLink } from "@/components/MyBetsLink";
+import { CHAIN_NAMES, HEADER_SWITCHER_CHAIN_IDS, chainName } from "@/lib/chains";
 
 const ConnectModal = dynamic(
   () =>
@@ -50,6 +51,21 @@ export function Header() {
   const [modalOpen, setModalOpen] = useState(false);
   const { address, isConnected, status } = useConnection();
   const { disconnect } = useDisconnect();
+  const chainId = useChainId();
+  const { switchChain, isPending: switchPending } = useSwitchChain();
+  const [chainMenuOpen, setChainMenuOpen] = useState(false);
+  const chainMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!chainMenuOpen) return;
+    function onClick(e: MouseEvent) {
+      if (!chainMenuRef.current?.contains(e.target as Node)) {
+        setChainMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [chainMenuOpen]);
 
   const { data: balance, isLoading: balanceLoading } = useBalance({
     address,
@@ -91,6 +107,47 @@ export function Header() {
         <MyBetsLink variant="header" />
         {isConnected && address ? (
           <>
+            <div ref={chainMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setChainMenuOpen((o) => !o)}
+                disabled={switchPending}
+                className="flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-800 disabled:opacity-60"
+                aria-haspopup="menu"
+                aria-expanded={chainMenuOpen}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span>{CHAIN_NAMES[chainId] ? chainName(chainId) : "Unknown"}</span>
+                <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" className="text-zinc-400">
+                  <path d="M2 4l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {chainMenuOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 z-30 mt-1 min-w-[9rem] overflow-hidden rounded-md border border-zinc-800 bg-zinc-900 py-1 shadow-lg"
+                >
+                  {HEADER_SWITCHER_CHAIN_IDS.map((id) => {
+                    const active = id === chainId;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setChainMenuOpen(false);
+                          if (!active) switchChain?.({ chainId: id });
+                        }}
+                        className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs transition hover:bg-zinc-800 ${active ? "text-emerald-400" : "text-zinc-300"}`}
+                      >
+                        <span>{chainName(id)}</span>
+                        {active ? <span aria-hidden="true">✓</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
             <span className="font-mono text-sm text-zinc-300">
               {formatAddress(address)}
             </span>
