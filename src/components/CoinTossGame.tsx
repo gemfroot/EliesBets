@@ -359,7 +359,7 @@ export function CoinTossGame() {
                           </a>
                         ) : null;
                       })()}
-                      {refreshRolls && receipt?.blockNumber ? (
+                      {receipt?.blockNumber != null ? (
                         <>
                           {" · "}
                           <button
