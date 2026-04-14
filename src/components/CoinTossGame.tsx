@@ -340,7 +340,7 @@ export function CoinTossGame() {
                       ? "Waiting for on-chain confirmation…"
                       : waitingVrf
                         ? vrfSoftTimeout
-                          ? "VRF is taking longer than usual — still waiting for the callback tx…"
+                          ? "VRF is taking longer than usual. The subscription may be out of LINK, or the callback is still pending."
                           : "Waiting for Chainlink VRF (separate callback tx)…"
                         : null}
                   {waitingVrf && txHash ? (
@@ -359,6 +359,18 @@ export function CoinTossGame() {
                           </a>
                         ) : null;
                       })()}
+                      {refreshRolls && receipt?.blockNumber ? (
+                        <>
+                          {" · "}
+                          <button
+                            type="button"
+                            onClick={() => void refreshRolls(receipt.blockNumber)}
+                            className="text-emerald-400 hover:text-emerald-300 underline"
+                          >
+                            Check now
+                          </button>
+                        </>
+                      ) : null}
                     </>
                   ) : null}
                 </span>

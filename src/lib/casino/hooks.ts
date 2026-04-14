@@ -910,8 +910,10 @@ export function useCoinToss(betToken?: BetToken) {
         setBetHistory((prev) => mergeBetHistoryById(prev, rolls));
         const latest = rolls.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
         setLastRoll((prev) => (prev && prev.id === latest.id ? prev : latest));
-      } catch {
-        // ignore transient RPC errors; caller retries on a timer
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[casino] refreshRolls RPC error:", e);
+        }
       }
     },
     [publicClient, connected, coinTossConfigured, coinToss],
@@ -1228,8 +1230,10 @@ export function useDice(betToken?: BetToken) {
         setBetHistory((prev) => mergeDiceBetHistoryById(prev, rolls));
         const latest = rolls.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
         setLastRoll((prev) => (prev && prev.id === latest.id ? prev : latest));
-      } catch {
-        // transient RPC errors — caller retries on a timer
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[casino] refreshRolls RPC error:", e);
+        }
       }
     },
     [publicClient, connected, diceConfigured, dice],
@@ -1542,8 +1546,10 @@ export function useRoulette(betToken?: BetToken) {
         setBetHistory((prev) => mergeRouletteBetHistoryById(prev, rolls));
         const latest = rolls.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
         setLastRoll((prev) => (prev && prev.id === latest.id ? prev : latest));
-      } catch {
-        // transient RPC errors — caller retries on a timer
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[casino] refreshRolls RPC error:", e);
+        }
       }
     },
     [publicClient, connected, rouletteConfigured, roulette],
@@ -1866,8 +1872,10 @@ export function useKeno(betToken?: BetToken) {
         setBetHistory((prev) => mergeKenoBetHistoryById(prev, rolls));
         const latest = rolls.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
         setLastRoll((prev) => (prev && prev.id === latest.id ? prev : latest));
-      } catch {
-        // transient RPC errors — caller retries on a timer
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[casino] refreshRolls RPC error:", e);
+        }
       }
     },
     [publicClient, connected, kenoConfigured, keno],
@@ -2247,8 +2255,10 @@ function useWeightedWheelLikeGame(
         setBetHistory((prev) => mergeWheelBetHistoryById(prev, rolls));
         const latest = rolls.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
         setLastRoll((prev) => (prev && prev.id === latest.id ? prev : latest));
-      } catch {
-        // transient RPC errors — caller retries on a timer
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[casino] refreshRolls RPC error:", e);
+        }
       }
     },
     [publicClient, connected, gameConfigured, game],
