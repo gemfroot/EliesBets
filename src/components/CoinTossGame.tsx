@@ -162,10 +162,9 @@ export function CoinTossGame() {
       setTxHash(undefined);
       return;
     }
-    rollSnapshotRef.current = lastRoll?.id ?? null;
     setWaitingVrf(true);
     setVrfSoftTimeout(false);
-  }, [phase, receipt, receiptLoading, txHash, lastRoll?.id]);
+  }, [phase, receipt, receiptLoading, txHash]);
 
   // Roll event arrives from VRF callback → show result
   useEffect(() => {
@@ -225,6 +224,9 @@ export function CoinTossGame() {
       setWaitingVrf(false);
       setVrfSoftTimeout(false);
       setFrozenBetHeads(betHeads);
+      // Snapshot BEFORE sending the tx so useWatchContractEvent can't race
+      // ahead and capture the new Roll's id as the "baseline".
+      rollSnapshotRef.current = lastRoll?.id ?? null;
       setPhase("flipping");
       setTxHash(undefined);
       try {
@@ -235,7 +237,7 @@ export function CoinTossGame() {
         setTxHash(undefined);
       }
     },
-    [canSubmit, reset, placeWager, betHeads, parsedAmount.wei],
+    [canSubmit, reset, placeWager, betHeads, parsedAmount.wei, lastRoll?.id],
   );
 
   function onPlayAgain() {

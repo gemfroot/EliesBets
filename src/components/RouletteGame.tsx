@@ -230,10 +230,9 @@ export function RouletteGame() {
       setTxHash(undefined);
       return;
     }
-    rollSnapshotRef.current = lastRoll?.id ?? null;
     setWaitingVrf(true);
     setVrfSoftTimeout(false);
-  }, [phase, receipt, receiptLoading, txHash, lastRoll?.id]);
+  }, [phase, receipt, receiptLoading, txHash]);
 
   useEffect(() => {
     if (!waitingVrf || !lastRoll) return;
@@ -297,6 +296,7 @@ export function RouletteGame() {
       setVrfSoftTimeout(false);
       const encoded = Roulette.encodeInput(selected);
       setFrozenEncoded(encoded);
+      rollSnapshotRef.current = lastRoll?.id ?? null;
       setPhase("spinning");
       setTxHash(undefined);
 
@@ -338,6 +338,7 @@ export function RouletteGame() {
       parsedAmount.wei,
       vrfWei,
       betToken.address,
+      lastRoll?.id,
     ],
   );
 

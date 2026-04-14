@@ -209,10 +209,9 @@ export function PlinkoGame() {
       setTxHash(undefined);
       return;
     }
-    rollSnapshotRef.current = lastRoll?.id ?? null;
     setWaitingVrf(true);
     setVrfSoftTimeout(false);
-  }, [phase, receipt, receiptLoading, txHash, lastRoll?.id]);
+  }, [phase, receipt, receiptLoading, txHash]);
 
   useEffect(() => {
     if (!waitingVrf || !receipt?.blockNumber || !refreshRolls) return;
@@ -290,6 +289,7 @@ export function PlinkoGame() {
           ? Plinko.getSortedPlinkoOutputs(cfgForPreview, he).length
           : 0;
       setDropPreviewIndex(previewN > 0 ? Math.floor(Math.random() * previewN) : 0);
+      rollSnapshotRef.current = lastRoll?.id ?? null;
       setPhase("dropping");
       setTxHash(undefined);
 
@@ -333,6 +333,7 @@ export function PlinkoGame() {
       plinkoConfigs,
       houseEdgeBp,
       betToken.address,
+      lastRoll?.id,
     ],
   );
 

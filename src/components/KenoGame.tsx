@@ -236,10 +236,9 @@ export function KenoGame() {
       setTxHash(undefined);
       return;
     }
-    rollIdSnapshotRef.current = lastRoll?.id ?? BigInt(0);
     setWaitingVrf(true);
     setVrfSoftTimeout(false);
-  }, [phase, receipt, receiptLoading, txHash, lastRoll?.id]);
+  }, [phase, receipt, receiptLoading, txHash]);
 
   useEffect(() => {
     if (!waitingVrf || !receipt?.blockNumber || !refreshRolls) return;
@@ -318,6 +317,7 @@ export function KenoGame() {
 
       const encoded = Keno.encodeInput(selected as KenoBall[], kenoConfiguration);
       setFrozenEncoded(encoded);
+      rollIdSnapshotRef.current = lastRoll?.id ?? BigInt(0);
       setPhase("drawing");
       setTxHash(undefined);
 
@@ -360,6 +360,7 @@ export function KenoGame() {
       vrfWei,
       kenoConfiguration,
       betToken.address,
+      lastRoll?.id,
     ],
   );
 

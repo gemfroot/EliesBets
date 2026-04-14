@@ -167,10 +167,9 @@ export function DiceGame() {
       setTxHash(undefined);
       return;
     }
-    rollSnapshotRef.current = lastRoll?.id ?? null;
     setWaitingVrf(true);
     setVrfSoftTimeout(false);
-  }, [phase, receipt, receiptLoading, txHash, lastRoll?.id]);
+  }, [phase, receipt, receiptLoading, txHash]);
 
   useEffect(() => {
     if (!waitingVrf || !lastRoll) return;
@@ -233,6 +232,7 @@ export function DiceGame() {
       setWaitingVrf(false);
       setVrfSoftTimeout(false);
       setFrozenCap(cap);
+      rollSnapshotRef.current = lastRoll?.id ?? null;
       setPhase("rolling");
       setTxHash(undefined);
       try {
@@ -243,7 +243,7 @@ export function DiceGame() {
         setTxHash(undefined);
       }
     },
-    [canSubmit, reset, placeWager, cap, parsedAmount.wei],
+    [canSubmit, reset, placeWager, cap, parsedAmount.wei, lastRoll?.id],
   );
 
   function onPlayAgain() {

@@ -207,10 +207,9 @@ export function WheelGame() {
       setTxHash(undefined);
       return;
     }
-    rollSnapshotRef.current = lastRoll?.id ?? null;
     setWaitingVrf(true);
     setVrfSoftTimeout(false);
-  }, [phase, receipt, receiptLoading, txHash, lastRoll?.id]);
+  }, [phase, receipt, receiptLoading, txHash]);
 
   useEffect(() => {
     if (!waitingVrf || !lastRoll) return;
@@ -280,6 +279,7 @@ export function WheelGame() {
       setWaitingVrf(false);
       setVrfSoftTimeout(false);
       setFrozenConfigId(selectedConfigId);
+      rollSnapshotRef.current = lastRoll?.id ?? null;
       setPhase("spinning");
       setTxHash(undefined);
 
@@ -321,6 +321,7 @@ export function WheelGame() {
       parsedAmount.wei,
       vrfWei,
       betToken.address,
+      lastRoll?.id,
     ],
   );
 
