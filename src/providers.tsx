@@ -10,6 +10,7 @@ import { FavoritesProvider } from "@/components/FavoritesProvider";
 import { BetSettlementToasts } from "@/components/BetSettlementToasts";
 import { ToastProvider } from "@/components/Toast";
 import { PendingBetsProvider } from "@/components/PendingBetsProvider";
+import type { SportsChainId } from "@/lib/sportsChainConstants";
 import { DEFAULT_SPORTS_CHAIN_ID } from "@/lib/sportsChainConstants";
 import { SportsChainSync } from "@/components/SportsChainSync";
 import { wagmiConfig } from "./wagmi";
@@ -22,9 +23,9 @@ export function Providers({
   children: ReactNode;
   initialState?: State;
   /** Must match `appChainId` cookie / `getSportsChainId()` for SSR. */
-  initialAzuroChainId?: number;
+  initialAzuroChainId?: SportsChainId;
 }) {
-  const azuroChainId = initialAzuroChainId ?? DEFAULT_SPORTS_CHAIN_ID;
+  const azuroChainId: SportsChainId = initialAzuroChainId ?? DEFAULT_SPORTS_CHAIN_ID;
   const [queryClient] = useState(
     () =>
       new QueryClient({
