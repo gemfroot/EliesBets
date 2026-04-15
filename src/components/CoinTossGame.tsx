@@ -10,6 +10,8 @@ import { CoinFlipAnimation, type CoinFlipPhase } from "@/components/CoinFlipAnim
 import { useCoinToss } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
 import { chainName, explorerTxUrl } from "@/lib/chains";
+import { usePendingBets } from "@/lib/casino/pendingBets";
+import { getCasinoCoinTossAddress } from "@/lib/casino/addresses";
 import {
   useTokenUsdPrice,
   formatUsdFromWei,
@@ -83,6 +85,8 @@ export function CoinTossGame() {
 
   const stakePresets = STAKE_PRESETS_BY_SYMBOL[betToken.symbol] ?? DEFAULT_PRESETS;
   const usdPerUnit = useTokenUsdPrice(chainId, betToken);
+  const { addPending, markBlock, resolve: resolvePending } = usePendingBets();
+  const pendingIdRef = useRef<string | null>(null);
 
   const [betHeads, setBetHeads] = useState(true);
   const [amount, setAmount] = useState("");
@@ -166,11 +170,18 @@ export function CoinTossGame() {
     if (receipt.status === "reverted") {
       setPhase("picking");
       setTxHash(undefined);
+      if (pendingIdRef.current) {
+        resolvePending(pendingIdRef.current, "Reverted", BigInt(0));
+        pendingIdRef.current = null;
+      }
       return;
     }
     setWaitingVrf(true);
     setVrfSoftTimeout(false);
-  }, [phase, receipt, receiptLoading, txHash]);
+    if (pendingIdRef.current && receipt.blockNumber) {
+      markBlock(pendingIdRef.current, receipt.blockNumber);
+    }
+  }, [phase, receipt, receiptLoading, txHash, markBlock, resolvePending]);
 
   // Roll event arrives from VRF callback → show result
   useEffect(() => {
@@ -185,7 +196,12 @@ export function CoinTossGame() {
     setWaitingVrf(false);
     setVrfSoftTimeout(false);
     setPhase("result");
-  }, [waitingVrf, lastRoll]);
+    if (pendingIdRef.current) {
+      const net = lastRoll.payout > BigInt(0) ? lastRoll.payout - lastRoll.totalBetAmount : -lastRoll.totalBetAmount;
+      resolvePending(pendingIdRef.current, lastRoll.payout > BigInt(0) ? "Won" : "Lost", net);
+      pendingIdRef.current = null;
+    }
+  }, [waitingVrf, lastRoll, resolvePending]);
 
   // Fallback polling: if useWatchContractEvent misses the Roll event (flaky
   // RPC websockets on Base/public endpoints), poll getContractEvents since the
@@ -238,12 +254,33 @@ export function CoinTossGame() {
       try {
         const hash = await placeWager(betHeads, parsedAmount.wei);
         setTxHash(hash);
+        pendingIdRef.current = addPending({
+          game: "coinToss",
+          chainId,
+          contract: getCasinoCoinTossAddress(chainId),
+          txHash: hash,
+          stakeWei: parsedAmount.wei.toString(),
+          tokenSymbol: betToken.symbol,
+          tokenDecimals: betToken.decimals,
+          baselineRollId: lastRoll?.id?.toString(),
+        });
       } catch {
         setPhase("picking");
         setTxHash(undefined);
       }
     },
-    [canSubmit, reset, placeWager, betHeads, parsedAmount.wei, lastRoll?.id],
+    [
+      canSubmit,
+      reset,
+      placeWager,
+      betHeads,
+      parsedAmount.wei,
+      lastRoll?.id,
+      addPending,
+      chainId,
+      betToken.symbol,
+      betToken.decimals,
+    ],
   );
 
   function onPlayAgain() {

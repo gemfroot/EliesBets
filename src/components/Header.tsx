@@ -6,6 +6,7 @@ import { useBalance, useChainId, useConnection, useDisconnect, useSwitchChain } 
 import { useEffect, useRef, useState } from "react";
 import { formatUnits } from "viem";
 import { MyBetsLink } from "@/components/MyBetsLink";
+import { PendingBetsIndicator } from "@/components/PendingBetsIndicator";
 import { HEADER_SWITCHER_CHAIN_IDS, SUPPORTED_CHAIN_IDS, chainName } from "@/lib/chains";
 
 const ConnectModal = dynamic(
@@ -175,6 +176,7 @@ export function Header() {
             </select>
           </label>
           <MyBetsLink variant="header" />
+          <PendingBetsIndicator />
           {chainPill}
           {isConnected && address ? (
             <>

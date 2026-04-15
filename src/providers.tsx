@@ -9,6 +9,7 @@ import { OddsFormatProvider } from "@/components/OddsFormatProvider";
 import { FavoritesProvider } from "@/components/FavoritesProvider";
 import { BetSettlementToasts } from "@/components/BetSettlementToasts";
 import { ToastProvider } from "@/components/Toast";
+import { PendingBetsProvider } from "@/components/PendingBetsProvider";
 import { CHAIN_ID } from "@/lib/constants";
 import { wagmiConfig } from "./wagmi";
 
@@ -38,10 +39,12 @@ export function Providers({
           <AzuroBetslipProvider>
             <FavoritesProvider>
               <ToastProvider>
-                <BetslipProvider>
-                  <BetSettlementToasts />
-                  {children}
-                </BetslipProvider>
+                <PendingBetsProvider>
+                  <BetslipProvider>
+                    <BetSettlementToasts />
+                    {children}
+                  </BetslipProvider>
+                </PendingBetsProvider>
               </ToastProvider>
             </FavoritesProvider>
           </AzuroBetslipProvider>
