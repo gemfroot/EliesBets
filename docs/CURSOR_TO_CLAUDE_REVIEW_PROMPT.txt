@@ -1,0 +1,29 @@
+You are reviewing the EliesBets Next.js app in this repo (Azuro sports betting).
+
+CONTEXT — changes made by Cursor agent to fix Polygon vs Gnosis / Azuro app chain mismatch:
+
+1. src/lib/sportsChain.ts — getSportsChainId() reads the same appChainId cookie as @azuro-org/sdk (cookieKeys.appChainId), validates against HEADER_SWITCHER_CHAIN_IDS (Polygon + Gnosis).
+
+2. Root layout + providers — Pass initialAzuroChainId from getSportsChainId() into AzuroSDKProvider so SSR matches cookie on hydrate.
+
+3. SportsChainSync.tsx (client) — When wallet connected on Polygon/Gnosis and wagmi chainId !== Azuro appChain.id, calls setAppChainId(chainId) + router.refresh().
+
+4. Header.tsx — After switchChainAsync, calls setAppChainId(id) + router.refresh().
+
+5. Server data — Replaced fixed CHAIN_ID (137) with await getSportsChainId() in HomePageSections, live page, games/[id], sports pages, sportGames.ts (chainId param), oddsUtils fetchTopOddsByGameId(..., chainId), /api/search.
+
+6. sitemap.ts — Uses DEFAULT_SPORTS_CHAIN_ID only (crawlers have no cookie).
+
+7. middleware.ts — Removed setInterval for rate-limit map; prune expired entries per request.
+
+8. betShare.ts — Gnosis + Amoy explorer fallbacks.
+
+9. scripts/verify-linux.sh — verify script for Linux CI.
+
+Please:
+- Summarize risks or bugs (hydration, cookie SSR, double refresh, wallet on unsupported chain while cookie says Polygon/Gnosis, etc.).
+- Say if anything is missing or inconsistent with the Azuro SDK.
+- Rate confidence 1–10 for shipping sports on Polygon+Gnosis after this.
+- Reference specific files/paths if you inspect the tree.
+
+Be concise but technical.

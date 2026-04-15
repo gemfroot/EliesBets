@@ -11,8 +11,8 @@ import {
 import { GameDetailMarkets } from "@/components/GameDetailMarkets";
 import { GameDetailStatus } from "@/components/GameDetailStatus";
 import { RetryCallout } from "@/components/RetryCallout";
-import { CHAIN_ID } from "@/lib/constants";
 import { gameParticipantLine } from "@/lib/gameTitle";
+import { getSportsChainId } from "@/lib/sportsChain";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -23,8 +23,9 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
+  const chainId = await getSportsChainId();
   try {
-    const games = await getGamesByIds({ chainId: CHAIN_ID, gameIds: [id] });
+    const games = await getGamesByIds({ chainId, gameIds: [id] });
     const game = games[0];
     if (!game) {
       return { title: "Game" };
@@ -114,11 +115,12 @@ function groupMarketsForUi(markets: GameMarkets): { title: string; markets: Mark
 
 export default async function GameDetailPage({ params }: Props) {
   const { id } = await params;
+  const chainId = await getSportsChainId();
 
   let game: GameData | undefined;
   let gameFetchError: string | null = null;
   try {
-    const games = await getGamesByIds({ chainId: CHAIN_ID, gameIds: [id] });
+    const games = await getGamesByIds({ chainId, gameIds: [id] });
     game = games[0];
   } catch (e) {
     gameFetchError =
@@ -144,7 +146,7 @@ export default async function GameDetailPage({ params }: Props) {
   let conditions: Awaited<ReturnType<typeof getConditionsByGameIds>> = [];
   let marketsError: string | null = null;
   try {
-    conditions = await getConditionsByGameIds({ chainId: CHAIN_ID, gameIds: id });
+    conditions = await getConditionsByGameIds({ chainId, gameIds: id });
   } catch (e) {
     marketsError =
       e instanceof Error ? e.message : "Failed to load markets for this game.";

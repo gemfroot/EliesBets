@@ -6,7 +6,7 @@ import {
   type GameData,
 } from "@azuro-org/toolkit";
 import { LiveGamesList } from "@/components/LiveGamesList";
-import { CHAIN_ID } from "@/lib/constants";
+import { getSportsChainId } from "@/lib/sportsChain";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -19,13 +19,13 @@ export const metadata: Metadata = {
 
 const GAMES_PER_PAGE = 100;
 
-async function fetchAllLiveGames(): Promise<GameData[]> {
+async function fetchAllLiveGames(chainId: number): Promise<GameData[]> {
   const collected: GameData[] = [];
   let page = 1;
   let totalPages = 1;
   while (page <= totalPages) {
     const res = await getGamesByFilters({
-      chainId: CHAIN_ID,
+      chainId,
       state: GameState.Live,
       orderBy: GameOrderBy.StartsAt,
       orderDir: OrderDirection.Asc,
@@ -40,10 +40,11 @@ async function fetchAllLiveGames(): Promise<GameData[]> {
 }
 
 export default async function LivePage() {
+  const chainId = await getSportsChainId();
   let games: GameData[] = [];
   let loadError: string | null = null;
   try {
-    games = await fetchAllLiveGames();
+    games = await fetchAllLiveGames(chainId);
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Failed to load live games.";
   }

@@ -1,7 +1,7 @@
 import type { Bet } from "@azuro-org/sdk";
 import type { GameData } from "@azuro-org/toolkit";
 import type { Hex } from "viem";
-import { CHAIN_ID } from "@/lib/constants";
+import { gnosis, polygon, polygonAmoy } from "viem/chains";
 import type { OddsFormat } from "@/lib/oddsFormat";
 import { formatOddsValue, formatStoredOddsString } from "@/lib/oddsFormat";
 
@@ -12,11 +12,13 @@ function txExplorerUrlForKnownChain(
   hash: Hex,
 ): string | null {
   const base =
-    chainId === CHAIN_ID
+    chainId === polygon.id
       ? "https://polygonscan.com"
-      : chainId === 80002
-        ? "https://amoy.polygonscan.com"
-        : null;
+      : chainId === gnosis.id
+        ? "https://gnosisscan.io"
+        : chainId === polygonAmoy.id
+          ? "https://amoy.polygonscan.com"
+          : null;
   return base ? `${base}/tx/${hash}` : null;
 }
 

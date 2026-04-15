@@ -4,6 +4,7 @@ import { GameCard } from "@/components/GameCard";
 import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
 import { fetchGamesForSport } from "@/lib/sportGames";
+import { getSportsChainId } from "@/lib/sportsChain";
 import type { Metadata } from "next";
 
 export const revalidate = 45;
@@ -53,18 +54,19 @@ function groupGamesByLeague(games: GameData[]): LeagueGroup[] {
 export default async function SportPage({ params }: Props) {
   const { slug } = await params;
   const title = titleFromSlug(slug);
+  const chainId = await getSportsChainId();
 
   let games: GameData[] = [];
   let loadError: string | null = null;
   try {
-    games = await fetchGamesForSport(slug);
+    games = await fetchGamesForSport(slug, chainId);
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Failed to load games.";
   }
 
   const oddsByGameId = loadError
     ? new Map<string, GameOddsData>()
-    : await fetchTopOddsByGameId(games.map((g) => g.gameId));
+    : await fetchTopOddsByGameId(games.map((g) => g.gameId), chainId);
 
   const byLeague = groupGamesByLeague(games);
 

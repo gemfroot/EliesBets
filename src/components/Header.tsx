@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useChain } from "@azuro-org/sdk";
+import { useRouter } from "next/navigation";
 import { useBalance, useChainId, useConnection, useDisconnect, useSwitchChain } from "wagmi";
 import { useEffect, useRef, useState } from "react";
 import { formatUnits } from "viem";
@@ -48,12 +50,15 @@ const ODDS_FORMAT_OPTIONS: { value: OddsFormat; label: string }[] = [
 ];
 
 export function Header() {
+  const router = useRouter();
+  const { setAppChainId } = useChain();
   const { format: oddsFormat, setFormat: setOddsFormat } = useOddsFormat();
   const [modalOpen, setModalOpen] = useState(false);
   const { address, isConnected, status } = useConnection();
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
-  const { switchChain, isPending: switchPending, error: switchError } = useSwitchChain();
+  const { switchChainAsync, isPending: switchPending, error: switchError } =
+    useSwitchChain();
   const [chainMenuOpen, setChainMenuOpen] = useState(false);
   const chainMenuRef = useRef<HTMLDivElement | null>(null);
   const [switchErrorMsg, setSwitchErrorMsg] = useState<string | null>(null);
@@ -126,9 +131,18 @@ export function Header() {
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                  setChainMenuOpen(false);
-                  setSwitchErrorMsg(null);
-                  if (!active) switchChain?.({ chainId: id });
+                  void (async () => {
+                    setChainMenuOpen(false);
+                    setSwitchErrorMsg(null);
+                    if (active) return;
+                    try {
+                      await switchChainAsync({ chainId: id });
+                      setAppChainId(id);
+                      router.refresh();
+                    } catch {
+                      /* wagmi surfaces switchError */
+                    }
+                  })();
                 }}
                 className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-xs transition hover:bg-zinc-800 ${active ? "text-emerald-400" : "text-zinc-300"}`}
               >

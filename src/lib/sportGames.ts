@@ -7,7 +7,6 @@ import {
   type GameData,
   type SportData,
 } from "@azuro-org/toolkit";
-import { CHAIN_ID } from "@/lib/constants";
 export const GAMES_PER_PAGE = 100;
 
 /** Games per league from the sports tree API; must be high enough for full country listings. */
@@ -24,6 +23,7 @@ export function chunk<T>(items: T[], size: number): T[][] {
 async function fetchGamesForPaginatedState(
   sportSlug: string,
   state: GameState.Prematch | GameState.Live,
+  chainId: number,
   leagueSlug?: string,
 ): Promise<GameData[]> {
   const collected: GameData[] = [];
@@ -31,7 +31,7 @@ async function fetchGamesForPaginatedState(
   let totalPages = 1;
   while (page <= totalPages) {
     const res = await getGamesByFilters({
-      chainId: CHAIN_ID,
+      chainId,
       state,
       sportSlug,
       ...(leagueSlug ? { leagueSlug } : {}),
@@ -58,10 +58,13 @@ function dedupeGames(games: GameData[]): GameData[] {
   });
 }
 
-export async function fetchGamesForSport(sportSlug: string): Promise<GameData[]> {
+export async function fetchGamesForSport(
+  sportSlug: string,
+  chainId: number,
+): Promise<GameData[]> {
   const collected = await Promise.all([
-    fetchGamesForPaginatedState(sportSlug, GameState.Prematch),
-    fetchGamesForPaginatedState(sportSlug, GameState.Live),
+    fetchGamesForPaginatedState(sportSlug, GameState.Prematch, chainId),
+    fetchGamesForPaginatedState(sportSlug, GameState.Live, chainId),
   ]).then((parts) => parts.flat());
   return dedupeGames(collected);
 }
@@ -92,9 +95,10 @@ async function fetchGamesForSportCountryState(
   sportSlug: string,
   countrySlug: string,
   state: GameState.Prematch | GameState.Live,
+  chainId: number,
 ): Promise<GameData[]> {
   const sports = await getSports({
-    chainId: CHAIN_ID,
+    chainId,
     gameState: state,
     sportSlug,
     countrySlug,
@@ -112,10 +116,21 @@ async function fetchGamesForSportCountryState(
 export async function fetchGamesForSportCountry(
   sportSlug: string,
   countrySlug: string,
+  chainId: number,
 ): Promise<GameData[]> {
   const collected = await Promise.all([
-    fetchGamesForSportCountryState(sportSlug, countrySlug, GameState.Prematch),
-    fetchGamesForSportCountryState(sportSlug, countrySlug, GameState.Live),
+    fetchGamesForSportCountryState(
+      sportSlug,
+      countrySlug,
+      GameState.Prematch,
+      chainId,
+    ),
+    fetchGamesForSportCountryState(
+      sportSlug,
+      countrySlug,
+      GameState.Live,
+      chainId,
+    ),
   ]).then((parts) => parts.flat());
   return dedupeGames(collected);
 }
@@ -123,10 +138,11 @@ export async function fetchGamesForSportCountry(
 export async function fetchGamesForLeague(
   sportSlug: string,
   leagueSlug: string,
+  chainId: number,
 ): Promise<GameData[]> {
   const collected = await Promise.all([
-    fetchGamesForPaginatedState(sportSlug, GameState.Prematch, leagueSlug),
-    fetchGamesForPaginatedState(sportSlug, GameState.Live, leagueSlug),
+    fetchGamesForPaginatedState(sportSlug, GameState.Prematch, chainId, leagueSlug),
+    fetchGamesForPaginatedState(sportSlug, GameState.Live, chainId, leagueSlug),
   ]).then((parts) => parts.flat());
   return dedupeGames(collected);
 }

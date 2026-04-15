@@ -11,7 +11,7 @@ import { GameCard } from "@/components/GameCard";
 import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { LiveGameCard } from "@/components/LiveGameCard";
 import { RetryCallout } from "@/components/RetryCallout";
-import { CHAIN_ID } from "@/lib/constants";
+import { getSportsChainId } from "@/lib/sportsChain";
 import { SportNavIcon } from "@/lib/sportNavIcon";
 
 const HERO_LIVE_LIMIT = 6;
@@ -27,9 +27,9 @@ function parseStartMs(startsAt: string): number {
   return n < 32_503_680_000 ? n * 1000 : n;
 }
 
-async function fetchHeroLiveGames(): Promise<GameData[]> {
+async function fetchHeroLiveGames(chainId: number): Promise<GameData[]> {
   const res = await getGamesByFilters({
-    chainId: CHAIN_ID,
+    chainId,
     state: GameState.Live,
     orderBy: GameOrderBy.StartsAt,
     orderDir: OrderDirection.Asc,
@@ -39,9 +39,9 @@ async function fetchHeroLiveGames(): Promise<GameData[]> {
   return res.games.slice(0, HERO_LIVE_LIMIT);
 }
 
-async function fetchPopularGames(): Promise<GameData[]> {
+async function fetchPopularGames(chainId: number): Promise<GameData[]> {
   const res = await getGamesByFilters({
-    chainId: CHAIN_ID,
+    chainId,
     state: GameState.Prematch,
     orderBy: GameOrderBy.Turnover,
     orderDir: OrderDirection.Desc,
@@ -51,9 +51,9 @@ async function fetchPopularGames(): Promise<GameData[]> {
   return res.games.slice(0, POPULAR_LIMIT);
 }
 
-async function fetchUpcomingGames(): Promise<GameData[]> {
+async function fetchUpcomingGames(chainId: number): Promise<GameData[]> {
   const res = await getGamesByFilters({
-    chainId: CHAIN_ID,
+    chainId,
     state: GameState.Prematch,
     orderBy: GameOrderBy.StartsAt,
     orderDir: OrderDirection.Asc,
@@ -67,11 +67,12 @@ async function fetchUpcomingGames(): Promise<GameData[]> {
 
 /** Live hero: streamed behind Suspense so the shell can render immediately. */
 export async function HomeHeroSection() {
+  const chainId = await getSportsChainId();
   let heroGames: GameData[] = [];
   let heroError: string | null = null;
 
   try {
-    heroGames = await fetchHeroLiveGames();
+    heroGames = await fetchHeroLiveGames(chainId);
   } catch (e) {
     heroError = e instanceof Error ? e.message : "Failed to load live games.";
   }
@@ -124,12 +125,13 @@ export async function HomeHeroSection() {
 
 /** Sports quick links: separate Suspense boundary from hero and game lists. */
 export async function HomeSportsNavSection() {
+  const chainId = await getSportsChainId();
   let sportLinks: { slug: string; name: string }[] = [];
   let sportsError: string | null = null;
 
   try {
     const sports = await getSports({
-      chainId: CHAIN_ID,
+      chainId,
       gameState: GameState.Prematch,
       numberOfGames: 10,
       orderBy: GameOrderBy.Turnover,
@@ -181,14 +183,15 @@ export async function HomeSportsNavSection() {
 
 /** Popular + upcoming lists share one conditions fetch for odds. */
 export async function HomePopularUpcomingSections() {
+  const chainId = await getSportsChainId();
   let popularGames: GameData[] = [];
   let upcomingGames: GameData[] = [];
   let popularError: string | null = null;
   let upcomingError: string | null = null;
 
   const [popularOutcome, upcomingOutcome] = await Promise.allSettled([
-    fetchPopularGames(),
-    fetchUpcomingGames(),
+    fetchPopularGames(chainId),
+    fetchUpcomingGames(chainId),
   ]);
 
   if (popularOutcome.status === "fulfilled") {
@@ -216,7 +219,7 @@ export async function HomePopularUpcomingSections() {
   const uniqueStaticIds = [...new Set(staticGameIds)];
   let oddsByGameId = new Map<string, GameOddsData>();
   try {
-    oddsByGameId = await fetchTopOddsByGameId(uniqueStaticIds);
+    oddsByGameId = await fetchTopOddsByGameId(uniqueStaticIds, chainId);
   } catch {
     oddsByGameId = new Map();
   }

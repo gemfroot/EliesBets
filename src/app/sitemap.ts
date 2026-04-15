@@ -1,7 +1,10 @@
 import { GameState, getSports, type SportData } from "@azuro-org/toolkit";
 import type { MetadataRoute } from "next";
-import { CHAIN_ID } from "@/lib/constants";
+import { DEFAULT_SPORTS_CHAIN_ID } from "@/lib/sportsChain";
 import { getSiteOrigin } from "@/lib/siteUrl";
+
+/** Crawlers often have no `appChainId` cookie; keep a single canonical tree (default Polygon). */
+const SITEMAP_CHAIN_ID = DEFAULT_SPORTS_CHAIN_ID;
 
 /** Large enough to list most fixtures per league in the sitemap tree response. */
 const SITEMAP_GAMES_PER_LEAGUE = 500;
@@ -89,12 +92,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const [prematch, live] = await Promise.all([
       getSports({
-        chainId: CHAIN_ID,
+        chainId: SITEMAP_CHAIN_ID,
         gameState: GameState.Prematch,
         numberOfGames: SITEMAP_GAMES_PER_LEAGUE,
       }),
       getSports({
-        chainId: CHAIN_ID,
+        chainId: SITEMAP_CHAIN_ID,
         gameState: GameState.Live,
         numberOfGames: SITEMAP_GAMES_PER_LEAGUE,
       }),

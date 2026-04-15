@@ -5,7 +5,15 @@ const RATE_LIMIT_MAX = 30;
 
 const hitsByIp = new Map<string, { count: number; resetAt: number }>();
 
+function pruneExpiredRateLimitEntries() {
+  const now = Date.now();
+  for (const [ip, entry] of hitsByIp) {
+    if (now >= entry.resetAt) hitsByIp.delete(ip);
+  }
+}
+
 function isRateLimited(ip: string): boolean {
+  pruneExpiredRateLimitEntries();
   const now = Date.now();
   const entry = hitsByIp.get(ip);
   if (!entry || now >= entry.resetAt) {
@@ -15,14 +23,6 @@ function isRateLimited(ip: string): boolean {
   entry.count += 1;
   return entry.count > RATE_LIMIT_MAX;
 }
-
-/** Periodically prune expired entries so the map doesn't grow unbounded. */
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, entry] of hitsByIp) {
-    if (now >= entry.resetAt) hitsByIp.delete(ip);
-  }
-}, RATE_LIMIT_WINDOW_MS * 2);
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

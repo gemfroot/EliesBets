@@ -1,5 +1,5 @@
 import { searchGames } from "@azuro-org/toolkit";
-import { CHAIN_ID } from "@/lib/constants";
+import { getSportsChainId } from "@/lib/sportsChain";
 
 export async function GET(request: Request) {
   const q = new URL(request.url).searchParams.get("q")?.trim() ?? "";
@@ -8,8 +8,9 @@ export async function GET(request: Request) {
   }
 
   try {
+    const chainId = await getSportsChainId();
     const res = await searchGames({
-      chainId: CHAIN_ID,
+      chainId,
       query: q,
       page: 1,
       perPage: 25,

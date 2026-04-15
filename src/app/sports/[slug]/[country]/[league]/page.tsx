@@ -5,6 +5,7 @@ import { GameCard } from "@/components/GameCard";
 import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
 import { fetchGamesForLeague } from "@/lib/sportGames";
+import { getSportsChainId } from "@/lib/sportsChain";
 
 export const revalidate = 45;
 
@@ -22,11 +23,12 @@ function titleFromSlug(slug: string): string {
 export default async function SportCountryLeaguePage({ params }: Props) {
   const { slug, country: countrySlug, league: leagueSlug } = await params;
   const sportTitle = titleFromSlug(slug);
+  const chainId = await getSportsChainId();
 
   let games: GameData[] = [];
   let loadError: string | null = null;
   try {
-    const fetched = await fetchGamesForLeague(slug, leagueSlug);
+    const fetched = await fetchGamesForLeague(slug, leagueSlug, chainId);
     games = fetched.filter((g) => g.country.slug === countrySlug);
   } catch (e) {
     loadError = e instanceof Error ? e.message : "Failed to load games.";
@@ -37,7 +39,7 @@ export default async function SportCountryLeaguePage({ params }: Props) {
 
   const oddsByGameId = loadError
     ? new Map<string, GameOddsData>()
-    : await fetchTopOddsByGameId(games.map((g) => g.gameId));
+    : await fetchTopOddsByGameId(games.map((g) => g.gameId), chainId);
 
   games = [...games].sort((a, b) => +a.startsAt - +b.startsAt);
 
