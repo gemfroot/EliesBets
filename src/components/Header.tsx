@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useChain } from "@azuro-org/sdk";
-import { useRouter } from "next/navigation";
 import { useBalance, useChainId, useConnection, useDisconnect, useSwitchChain } from "wagmi";
 import { useEffect, useRef, useState } from "react";
 import { formatUnits } from "viem";
@@ -50,8 +48,6 @@ const ODDS_FORMAT_OPTIONS: { value: OddsFormat; label: string }[] = [
 ];
 
 export function Header() {
-  const router = useRouter();
-  const { setAppChainId } = useChain();
   const { format: oddsFormat, setFormat: setOddsFormat } = useOddsFormat();
   const [modalOpen, setModalOpen] = useState(false);
   const { address, isConnected, status } = useConnection();
@@ -137,8 +133,7 @@ export function Header() {
                     if (active) return;
                     try {
                       await switchChainAsync({ chainId: id });
-                      setAppChainId(id);
-                      router.refresh();
+                      /* setAppChainId + router.refresh: SportsChainSync (wagmi chainId → Azuro) */
                     } catch {
                       /* wagmi surfaces switchError */
                     }
