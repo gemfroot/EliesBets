@@ -11,7 +11,7 @@
 
 | ID | Item | Status | Notes |
 |----|------|--------|-------|
-| L1 | Production build passes | ✅ (verify on CI/Linux) | Local Windows agent may lack native SWC/lightningcss; **Vercel/Linux `npm run build`** is canonical. |
+| L1 | Production build passes | ✅ | Confirmed `npm run build` on Linux server after `9a4657d` / `8417db7`. |
 | L2 | Env vars documented | ✅ | `.env.example` + comments for `NEXT_PUBLIC_SITE_URL`, WalletConnect, `NEXT_PUBLIC_CASINO_ENABLED`, casino overrides. |
 | L3 | Azuro sports + errors | 🟡 | Unchanged; routes + error boundaries exist; live data depends on Polygon + Azuro. |
 | L4 | Wallet + chain for sports | ✅ | Header switcher **Polygon + Gnosis** only. |
@@ -49,7 +49,13 @@ Initial audit (pre-implementation).
 
 ### Round 2 — 2026-04-15
 
-Post-implementation verification requested after push (see commit `04fbdea`).
+Post-implementation: **Claude Code API** returned intermittent `500` on headless prompts; verification done via **Cursor + Linux server `npm run build` + `npm run lint`** instead.
+
+**Server ops:** removed stray nested `/home/dev/EliesBets/EliesBets` (duplicate tree breaking `WrongNetworkBanner` import path).
+
+**Follow-up commits:** `tsconfig` **target ES2020** for BigInt literals; **eslint** ignores `contracts/**`; **LiveGamesList** `effectiveSport` fix for react-hooks rule; **Sidebar** unused import.
+
+**Linux `npm run build`:** ✅ | **`npm run lint`:** ✅ 0 errors, 6 warnings in `hooks.ts` (unused vars).
 
 ---
 
@@ -57,3 +63,4 @@ Post-implementation verification requested after push (see commit `04fbdea`).
 
 - _2026-04-15 — Tracker created; Round 1 completed._
 - _2026-04-15 — P0/P1 implementation: chain switcher, casino gate, terms/privacy, .env.example, docs, sitemap; committed._
+- _2026-04-15 — Build+lint green on server; nested dir removed; ES2020 eslint contracts ignore; Claude API 500s noted._
