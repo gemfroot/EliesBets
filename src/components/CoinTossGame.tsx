@@ -498,63 +498,6 @@ export function CoinTossGame() {
                   ) : null}
                 </div>
 
-                <div>
-                  <p className="type-overline mb-2">Bet history</p>
-                  {!isConnected ? (
-                    <p className="type-caption text-zinc-500">
-                      Connect your wallet on a supported network to load your bet history from the
-                      chain.
-                    </p>
-                  ) : !isSupportedChain ? (
-                    <p className="type-caption text-zinc-500">
-                      Switch to a supported network to see your bet history.
-                    </p>
-                  ) : (
-                    <>
-                      {betHistoryError ? (
-                        <p className="type-caption text-amber-300" role="alert">
-                          Could not load full history from the network. New bets still appear here
-                          after they settle.
-                        </p>
-                      ) : null}
-                      {betHistoryLoading && betHistory.length === 0 ? (
-                        <p className="type-caption text-zinc-500">Loading history…</p>
-                      ) : betHistory.length === 0 ? (
-                        <p className="type-caption text-zinc-500">
-                          Your settled bets will show here (synced from chain).
-                        </p>
-                      ) : (
-                        <ul
-                          className="space-y-2"
-                          aria-label="Coin toss bet history"
-                        >
-                          {betHistory.slice(0, BET_HISTORY_DISPLAY_CAP).map((row) => {
-                            const landedHeads = row.rolled[0] === true;
-                            return (
-                              <li
-                                key={row.id.toString()}
-                                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm"
-                              >
-                                <span
-                                  className={`font-mono text-xs font-semibold uppercase ${
-                                    landedHeads ? "text-emerald-300" : "text-red-300"
-                                  }`}
-                                >
-                                  {landedHeads ? "Heads" : "Tails"}
-                                </span>
-                                <span className="font-mono text-xs text-zinc-400">
-                                  Bet {fmt(row.totalBetAmount)} · Payout{" "}
-                                  {fmt(row.payout)} {betToken.symbol}
-                                </span>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </>
-                  )}
-                </div>
-
                 <details className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
                   <summary className="cursor-pointer select-none type-caption text-zinc-400">
                     How it works
@@ -651,6 +594,74 @@ export function CoinTossGame() {
                 )}
               </fieldset>
             </form>
+
+            <section className="mt-6" aria-label="Coin toss bet history">
+              <p className="type-overline mb-2">Bet history</p>
+              {!isConnected ? (
+                <p className="type-caption text-zinc-500">
+                  Connect your wallet on a supported network to load your bet history from the chain.
+                </p>
+              ) : !isSupportedChain ? (
+                <p className="type-caption text-zinc-500">
+                  Switch to a supported network to see your bet history.
+                </p>
+              ) : (
+                <>
+                  {betHistoryError ? (
+                    <p className="type-caption mb-2 text-amber-300" role="alert">
+                      Could not load full history from the network. New bets still appear here after they settle.
+                    </p>
+                  ) : null}
+                  {betHistoryLoading && betHistory.length === 0 ? (
+                    <p className="type-caption text-zinc-500">Loading history…</p>
+                  ) : betHistory.length === 0 ? (
+                    <p className="type-caption text-zinc-500">
+                      Your settled bets will show here (synced from chain).
+                    </p>
+                  ) : (
+                    <ul
+                      className="max-h-[16rem] space-y-2 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950/40 p-2 pr-3"
+                    >
+                      {betHistory.slice(0, BET_HISTORY_DISPLAY_CAP).map((row) => {
+                        const landedHeads = row.rolled[0] === true;
+                        const won = row.payout > BigInt(0);
+                        const netWei = won ? row.payout - row.totalBetAmount : -row.totalBetAmount;
+                        const netPrefix = netWei >= BigInt(0) ? "+" : "−";
+                        const netAbs = netWei < BigInt(0) ? -netWei : netWei;
+                        return (
+                          <li
+                            key={row.id.toString()}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span
+                                className={`rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide ${
+                                  won
+                                    ? "bg-emerald-950/80 text-emerald-200 ring-1 ring-emerald-700/50"
+                                    : "bg-red-950/60 text-red-200 ring-1 ring-red-800/50"
+                                }`}
+                              >
+                                {won ? "Won" : "Lost"}
+                              </span>
+                              <span className="font-mono text-xs text-zinc-400">
+                                {landedHeads ? "Heads" : "Tails"}
+                              </span>
+                            </span>
+                            <span className="font-mono text-xs text-zinc-400">
+                              Bet {fmt(row.totalBetAmount)} ·{" "}
+                              <span className={won ? "text-emerald-300" : "text-red-300"}>
+                                {netPrefix}
+                                {fmt(netAbs)} {betToken.symbol}
+                              </span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </>
+              )}
+            </section>
           </div>
         </div>
       </div>
