@@ -861,8 +861,11 @@ export function useCoinToss(betToken?: BetToken) {
 
   /**
    * Place a coin toss wager.
-   * @param betHeads - true for heads, false for tails
+   * @param betHeads - true when the player chose heads in the UI, false for tails
    * @param betAmount - the amount to bet in the token's smallest unit
+   *
+   * On-chain `wager(bool face, ...)` uses BetSwirl semantics: `true` = Tails, `false` = Heads
+   * (see `contracts/cointoss/contracts/pvh/CoinToss.sol`). The UI bool is inverted when calling.
    */
   const placeWager = useCallback(
     async (betHeads: boolean, betAmount: bigint): Promise<CasinoTxHash> => {
@@ -903,7 +906,7 @@ export function useCoinToss(betToken?: BetToken) {
         abi: coinTossAbi,
         functionName: "wager",
         args: [
-          betHeads,
+          !betHeads,
           connected,
           affiliate,
           {

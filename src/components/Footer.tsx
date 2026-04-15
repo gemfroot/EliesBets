@@ -18,6 +18,23 @@ export function Footer() {
           </Link>
           .
         </p>
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-zinc-500">
+          <Link
+            href="/terms"
+            className="font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200"
+          >
+            Terms of Service
+          </Link>
+          <span className="text-zinc-700" aria-hidden>
+            ·
+          </span>
+          <Link
+            href="/privacy"
+            className="font-medium text-zinc-400 underline decoration-zinc-700 underline-offset-2 transition hover:text-zinc-200"
+          >
+            Privacy Policy
+          </Link>
+        </div>
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
           <span
             className="inline-flex shrink-0 items-center justify-center rounded border border-zinc-600 px-2 py-0.5 font-semibold tabular-nums text-zinc-400"

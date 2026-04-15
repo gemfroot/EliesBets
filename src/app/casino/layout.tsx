@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { CasinoGate } from "./CasinoGate";
 
 export const metadata: Metadata = {
   title: "Casino",
   description:
-    "On-chain casino games: flip a coin and more. Connect your wallet on Polygon or Gnosis.",
+    "On-chain casino games (coming soon). Sports betting is available across the site.",
 };
 
 export default function CasinoLayout({
@@ -12,5 +13,5 @@ export default function CasinoLayout({
 }: Readonly<{
   children: ReactNode;
 }>) {
-  return children;
+  return <CasinoGate>{children}</CasinoGate>;
 }

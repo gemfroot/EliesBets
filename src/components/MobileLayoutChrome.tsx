@@ -211,13 +211,13 @@ function MobileBottomNav({
           Live
         </Link>
 
-        <Link
-          href="/casino"
-          className="flex min-h-[44px] min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 px-2 text-[10px] font-medium text-zinc-400 transition hover:text-zinc-100"
+        <div
+          className="flex min-h-[44px] min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 px-2 text-[10px] font-medium text-zinc-600"
+          title="Casino is coming soon"
         >
-          <CasinoIcon className="h-[1.125rem] w-[1.125rem] text-emerald-400/90" />
-          Casino
-        </Link>
+          <CasinoIcon className="h-[1.125rem] w-[1.125rem] text-zinc-600" />
+          <span className="leading-tight">Soon</span>
+        </div>
 
         <MyBetsLink variant="mobile" />
 

@@ -81,6 +81,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${origin}/`, changeFrequency: "hourly", priority: 1 },
     { url: `${origin}/live`, changeFrequency: "always", priority: 0.9 },
     { url: `${origin}/bets`, changeFrequency: "weekly", priority: 0.5 },
+    { url: `${origin}/terms`, changeFrequency: "yearly", priority: 0.35 },
+    { url: `${origin}/privacy`, changeFrequency: "yearly", priority: 0.35 },
   ];
 
   let sports: SportData[] = [];
