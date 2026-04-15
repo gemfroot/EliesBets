@@ -36,3 +36,15 @@ List **up to 5 concrete** follow-ups (file-level if possible), prioritized **P0 
 If you would make **exactly 2 small code changes** yourself (each &lt; ~40 lines), what would they be and why?
 
 Reply in **markdown** with clear sections A / B / C.
+
+---
+
+## Cursor follow-up (after Claude’s reply)
+
+**Implemented from Claude’s Part C + aligned P0/P1:**
+
+- **Middleware:** `NEXT_PUBLIC_CASINO_ENABLED !== "true"` → **302 redirect** `/casino` → `/`.
+- **Casino layout metadata:** `robots` **noindex** when casino disabled; description varies by flag.
+- **Terms / Privacy:** Removed “template / not legal advice” footers; kept neutral “may update” copy (Terms §5 consolidated).
+
+Skipped for now: integration tests, coin-toss unit test (P2 — add when test harness exists).

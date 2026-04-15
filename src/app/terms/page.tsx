@@ -52,12 +52,8 @@ export default function TermsPage() {
         </p>
         <h2 className="type-title mt-8 text-lg text-zinc-100">5. Changes</h2>
         <p>
-          We may update these terms. Continued use after changes constitutes acceptance. Review this
-          page periodically.
-        </p>
-        <p className="border-t border-zinc-800 pt-6 text-sm text-zinc-500">
-          This is a general template, not legal advice. Have qualified counsel review before relying
-          on these terms for a regulated or high-stakes launch.
+          We may update these terms from time to time. Continued use after changes constitutes
+          acceptance. Review this page periodically.
         </p>
       </div>
     </div>

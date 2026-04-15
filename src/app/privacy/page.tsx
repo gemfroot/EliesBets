@@ -49,8 +49,8 @@ export default function PrivacyPage() {
           listed on the site (once published).
         </p>
         <p className="border-t border-zinc-800 pt-6 text-sm text-zinc-500">
-          This is a general template, not legal advice. Have qualified counsel review for your
-          jurisdiction (GDPR, CCPA, etc.) before launch.
+          This policy may be updated from time to time. Material changes will be reflected on this
+          page with an updated date.
         </p>
       </div>
     </div>

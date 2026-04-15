@@ -27,6 +27,11 @@ setInterval(() => {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  const casinoEnabled = process.env.NEXT_PUBLIC_CASINO_ENABLED === "true";
+  if (!casinoEnabled && pathname.startsWith("/casino")) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   if (pathname.startsWith("/api/search")) {
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
