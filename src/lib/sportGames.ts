@@ -7,6 +7,8 @@ import {
   type GameData,
   type SportData,
 } from "@azuro-org/toolkit";
+import type { SportsChainId } from "@/lib/sportsChainConstants";
+
 export const GAMES_PER_PAGE = 100;
 
 /** Games per league from the sports tree API; must be high enough for full country listings. */
@@ -23,7 +25,7 @@ export function chunk<T>(items: T[], size: number): T[][] {
 async function fetchGamesForPaginatedState(
   sportSlug: string,
   state: GameState.Prematch | GameState.Live,
-  chainId: number,
+  chainId: SportsChainId,
   leagueSlug?: string,
 ): Promise<GameData[]> {
   const collected: GameData[] = [];
@@ -60,7 +62,7 @@ function dedupeGames(games: GameData[]): GameData[] {
 
 export async function fetchGamesForSport(
   sportSlug: string,
-  chainId: number,
+  chainId: SportsChainId,
 ): Promise<GameData[]> {
   const collected = await Promise.all([
     fetchGamesForPaginatedState(sportSlug, GameState.Prematch, chainId),
@@ -95,7 +97,7 @@ async function fetchGamesForSportCountryState(
   sportSlug: string,
   countrySlug: string,
   state: GameState.Prematch | GameState.Live,
-  chainId: number,
+  chainId: SportsChainId,
 ): Promise<GameData[]> {
   const sports = await getSports({
     chainId,
@@ -116,7 +118,7 @@ async function fetchGamesForSportCountryState(
 export async function fetchGamesForSportCountry(
   sportSlug: string,
   countrySlug: string,
-  chainId: number,
+  chainId: SportsChainId,
 ): Promise<GameData[]> {
   const collected = await Promise.all([
     fetchGamesForSportCountryState(
@@ -138,7 +140,7 @@ export async function fetchGamesForSportCountry(
 export async function fetchGamesForLeague(
   sportSlug: string,
   leagueSlug: string,
-  chainId: number,
+  chainId: SportsChainId,
 ): Promise<GameData[]> {
   const collected = await Promise.all([
     fetchGamesForPaginatedState(sportSlug, GameState.Prematch, chainId, leagueSlug),

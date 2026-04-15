@@ -3,6 +3,7 @@ import {
   groupConditionsByMarket,
   type ConditionDetailedData,
 } from "@azuro-org/toolkit";
+import type { SportsChainId } from "@/lib/sportsChainConstants";
 import { chunk } from "@/lib/sportGames";
 
 /** Matches toolkit batching expectations for `getConditionsByGameIds`. */
@@ -115,7 +116,7 @@ export type GameOddsData = {
 
 export async function fetchTopOddsByGameId(
   gameIds: string[],
-  chainId: number,
+  chainId: SportsChainId,
 ): Promise<Map<string, GameOddsData>> {
   const result = new Map<string, GameOddsData>();
   if (!gameIds.length) {

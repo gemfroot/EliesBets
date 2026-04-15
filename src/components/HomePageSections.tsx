@@ -12,6 +12,7 @@ import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { LiveGameCard } from "@/components/LiveGameCard";
 import { RetryCallout } from "@/components/RetryCallout";
 import { getSportsChainId } from "@/lib/sportsChain";
+import type { SportsChainId } from "@/lib/sportsChainConstants";
 import { SportNavIcon } from "@/lib/sportNavIcon";
 
 const HERO_LIVE_LIMIT = 6;
@@ -27,7 +28,7 @@ function parseStartMs(startsAt: string): number {
   return n < 32_503_680_000 ? n * 1000 : n;
 }
 
-async function fetchHeroLiveGames(chainId: number): Promise<GameData[]> {
+async function fetchHeroLiveGames(chainId: SportsChainId): Promise<GameData[]> {
   const res = await getGamesByFilters({
     chainId,
     state: GameState.Live,
@@ -39,7 +40,7 @@ async function fetchHeroLiveGames(chainId: number): Promise<GameData[]> {
   return res.games.slice(0, HERO_LIVE_LIMIT);
 }
 
-async function fetchPopularGames(chainId: number): Promise<GameData[]> {
+async function fetchPopularGames(chainId: SportsChainId): Promise<GameData[]> {
   const res = await getGamesByFilters({
     chainId,
     state: GameState.Prematch,
@@ -51,7 +52,7 @@ async function fetchPopularGames(chainId: number): Promise<GameData[]> {
   return res.games.slice(0, POPULAR_LIMIT);
 }
 
-async function fetchUpcomingGames(chainId: number): Promise<GameData[]> {
+async function fetchUpcomingGames(chainId: SportsChainId): Promise<GameData[]> {
   const res = await getGamesByFilters({
     chainId,
     state: GameState.Prematch,

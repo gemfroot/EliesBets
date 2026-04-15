@@ -7,6 +7,7 @@ import {
 } from "@azuro-org/toolkit";
 import { LiveGamesList } from "@/components/LiveGamesList";
 import { getSportsChainId } from "@/lib/sportsChain";
+import type { SportsChainId } from "@/lib/sportsChainConstants";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
 
 const GAMES_PER_PAGE = 100;
 
-async function fetchAllLiveGames(chainId: number): Promise<GameData[]> {
+async function fetchAllLiveGames(chainId: SportsChainId): Promise<GameData[]> {
   const collected: GameData[] = [];
   let page = 1;
   let totalPages = 1;
