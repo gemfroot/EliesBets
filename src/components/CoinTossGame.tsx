@@ -199,7 +199,7 @@ export function CoinTossGame() {
       void refreshRolls(fromBlock);
     };
     tick();
-    const id = setInterval(tick, 5_000);
+    const id = setInterval(tick, 2_500);
     const softId = setTimeout(() => {
       if (!cancelled) setVrfSoftTimeout(true);
     }, 90_000);
