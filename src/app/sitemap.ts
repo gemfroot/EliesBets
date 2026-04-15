@@ -1,6 +1,6 @@
 import { GameState, getSports, type SportData } from "@azuro-org/toolkit";
 import type { MetadataRoute } from "next";
-import { DEFAULT_SPORTS_CHAIN_ID } from "@/lib/sportsChain";
+import { DEFAULT_SPORTS_CHAIN_ID } from "@/lib/sportsChainConstants";
 import { getSiteOrigin } from "@/lib/siteUrl";
 
 /** Crawlers often have no `appChainId` cookie; keep a single canonical tree (default Polygon). */

@@ -10,7 +10,7 @@ import { FavoritesProvider } from "@/components/FavoritesProvider";
 import { BetSettlementToasts } from "@/components/BetSettlementToasts";
 import { ToastProvider } from "@/components/Toast";
 import { PendingBetsProvider } from "@/components/PendingBetsProvider";
-import { DEFAULT_SPORTS_CHAIN_ID } from "@/lib/sportsChain";
+import { DEFAULT_SPORTS_CHAIN_ID } from "@/lib/sportsChainConstants";
 import { SportsChainSync } from "@/components/SportsChainSync";
 import { wagmiConfig } from "./wagmi";
 

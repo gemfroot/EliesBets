@@ -1,14 +1,11 @@
 import { cookies } from "next/headers";
 import { cookieKeys } from "@azuro-org/sdk";
-import { polygon } from "viem/chains";
-import { HEADER_SWITCHER_CHAIN_IDS } from "@/lib/chains";
+import {
+  DEFAULT_SPORTS_CHAIN_ID,
+  isValidSportsChainId,
+} from "@/lib/sportsChainConstants";
 
-/** Default when no `appChainId` cookie or invalid value. */
-export const DEFAULT_SPORTS_CHAIN_ID = polygon.id;
-
-export function isValidSportsChainId(id: number): boolean {
-  return (HEADER_SWITCHER_CHAIN_IDS as readonly number[]).includes(id);
-}
+export { DEFAULT_SPORTS_CHAIN_ID, isValidSportsChainId } from "@/lib/sportsChainConstants";
 
 /**
  * Resolves Azuro/toolkit `chainId` for server components and route handlers.
