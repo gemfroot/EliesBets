@@ -4,7 +4,7 @@ import { useChain } from "@azuro-org/sdk";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { useConnection, useChainId } from "wagmi";
-import { HEADER_SWITCHER_CHAIN_IDS } from "@/lib/chains";
+import { isValidSportsChainId } from "@/lib/sportsChainConstants";
 
 const REFRESH_DEBOUNCE_MS = 120;
 
@@ -27,7 +27,7 @@ export function SportsChainSync() {
 
   useEffect(() => {
     if (!isConnected) return;
-    if (!(HEADER_SWITCHER_CHAIN_IDS as readonly number[]).includes(chainId)) return;
+    if (!isValidSportsChainId(chainId)) return;
     if (chainId === appChainIdRef.current) return;
     setAppChainId(chainId);
     if (refreshDebounceRef.current) {
