@@ -1,7 +1,7 @@
 "use client";
 
 import type { GameData } from "@azuro-org/toolkit";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { LiveGameCard } from "@/components/LiveGameCard";
 import { RetryCallout } from "@/components/RetryCallout";
@@ -92,26 +92,22 @@ export function LiveGamesList({
 }) {
   const [selectedSport, setSelectedSport] = useState<string>("all");
   const sportTabs = useMemo(() => buildSportFilterTabs(games), [games]);
+  /** If the selected sport disappears from the feed, treat filter as "all" without setState-in-effect. */
+  const effectiveSport = useMemo(() => {
+    if (selectedSport === "all") return "all";
+    return games.some((g) => g.sport.slug === selectedSport) ? selectedSport : "all";
+  }, [games, selectedSport]);
   const filteredGames = useMemo(
     () =>
-      selectedSport === "all"
+      effectiveSport === "all"
         ? games
-        : games.filter((g) => g.sport.slug === selectedSport),
-    [games, selectedSport],
+        : games.filter((g) => g.sport.slug === effectiveSport),
+    [games, effectiveSport],
   );
   const byLeague = useMemo(
     () => groupGamesByLeague(filteredGames),
     [filteredGames],
   );
-
-  useEffect(() => {
-    if (
-      selectedSport !== "all" &&
-      !games.some((g) => g.sport.slug === selectedSport)
-    ) {
-      setSelectedSport("all");
-    }
-  }, [games, selectedSport]);
 
   if (loadError) {
     return (
@@ -147,23 +143,23 @@ export function LiveGamesList({
               <button
                 type="button"
                 role="tab"
-                aria-selected={selectedSport === "all"}
+                aria-selected={effectiveSport === "all"}
                 onClick={() => setSelectedSport("all")}
                 className={`flex min-h-[44px] shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-medium transition ${
-                  selectedSport === "all"
+                  effectiveSport === "all"
                     ? "border-emerald-500/40 bg-emerald-950/30 text-emerald-200"
                     : "border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:border-zinc-600 hover:bg-zinc-900"
                 }`}
               >
                 <AllSportsIcon
                   className={`h-[1.125rem] w-[1.125rem] shrink-0 ${
-                    selectedSport === "all" ? "text-emerald-300" : "text-zinc-300"
+                    effectiveSport === "all" ? "text-emerald-300" : "text-zinc-300"
                   }`}
                 />
                 <span className="whitespace-nowrap">All</span>
                 <span
                   className={`rounded-full px-1.5 py-0.5 text-xs tabular-nums ${
-                    selectedSport === "all"
+                    effectiveSport === "all"
                       ? "bg-emerald-900/50 text-emerald-200/90"
                       : "bg-zinc-800 text-zinc-400"
                   }`}
@@ -173,7 +169,7 @@ export function LiveGamesList({
               </button>
             </li>
             {sportTabs.map((tab) => {
-              const active = selectedSport === tab.slug;
+              const active = effectiveSport === tab.slug;
               return (
                 <li key={tab.slug} role="none">
                   <button

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { FavoritesNav } from "@/components/FavoritesNav";
 import { LiveCountLink } from "@/components/LiveCountLink";
 import { MyBetsLink } from "@/components/MyBetsLink";
