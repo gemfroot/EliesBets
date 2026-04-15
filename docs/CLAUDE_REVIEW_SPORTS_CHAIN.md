@@ -25,6 +25,11 @@
 - **P2 (partial):** Debounce on refresh in `SportsChainSync`.
 - **wagmi:** `useConnection` is the canonical export in wagmi v3 (`useAccount` is deprecated alias) — no change.
 
----
+## Second pass (Claude Code @ `53f315f`)
 
-_Re-run Claude Code after the follow-up commit for a fresh sign-off if needed._
+After P1 fix (Header → `switchChainAsync` only; `SportsChainSync` + ref guard + 120ms debounce):
+
+- **PASS** — Header has no `setAppChainId` / `router.refresh`.
+- **PASS** — Single ownership in `SportsChainSync`; ref keeps `appChain.id` out of effect deps so cleanup does not cancel refresh after `setAppChainId`.
+- **Minor:** refresh skipped if component unmounts mid-debounce — cookie already updated; low risk.
+- **Confidence:** **9/10** for shipping.
