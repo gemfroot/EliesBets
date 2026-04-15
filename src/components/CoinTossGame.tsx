@@ -10,6 +10,11 @@ import { CoinFlipAnimation, type CoinFlipPhase } from "@/components/CoinFlipAnim
 import { useCoinToss } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
 import { chainName, explorerTxUrl } from "@/lib/chains";
+import {
+  useTokenUsdPrice,
+  formatUsdFromWei,
+  formatUsdFromDecimalString,
+} from "@/lib/price";
 
 type GamePhase = CoinFlipPhase;
 
@@ -77,6 +82,7 @@ export function CoinTossGame() {
   } = useCoinToss(selectedToken);
 
   const stakePresets = STAKE_PRESETS_BY_SYMBOL[betToken.symbol] ?? DEFAULT_PRESETS;
+  const usdPerUnit = useTokenUsdPrice(chainId, betToken);
 
   const [betHeads, setBetHeads] = useState(true);
   const [amount, setAmount] = useState("");
@@ -453,19 +459,23 @@ export function CoinTossGame() {
                     Stake ({betToken.symbol})
                   </label>
                   <div className="mb-2 flex flex-wrap gap-2">
-                    {stakePresets.map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => {
-                          setAmount(preset);
-                          setPhase("picking");
-                        }}
-                        className="min-h-[40px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 font-mono text-xs text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100"
-                      >
-                        {preset}
-                      </button>
-                    ))}
+                    {stakePresets.map((preset) => {
+                      const usd = formatUsdFromDecimalString(preset, usdPerUnit);
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => {
+                            setAmount(preset);
+                            setPhase("picking");
+                          }}
+                          className="flex min-h-[40px] flex-col items-center justify-center rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1 font-mono text-xs leading-tight text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100"
+                        >
+                          <span>{preset}</span>
+                          {usd ? <span className="text-[10px] text-zinc-500">{usd}</span> : null}
+                        </button>
+                      );
+                    })}
                   </div>
                   <input
                     id="coin-toss-amount"
@@ -476,6 +486,14 @@ export function CoinTossGame() {
                     onChange={(e) => setAmount(e.target.value)}
                     className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2.5 font-mono text-sm text-zinc-100 outline-none ring-emerald-600/0 transition focus:border-zinc-600 focus:ring-2 focus:ring-emerald-600/30"
                   />
+                  {parsedAmount.ok && parsedAmount.wei > BigInt(0) ? (() => {
+                    const usd = formatUsdFromWei(parsedAmount.wei, betToken.decimals, usdPerUnit);
+                    return usd ? (
+                      <p className="type-caption mt-1.5 text-zinc-500">
+                        ≈ {usd}
+                      </p>
+                    ) : null;
+                  })() : null}
                   {parsedAmount.ok && parsedAmount.wei > BigInt(0) && vrfWei !== undefined ? (
                     <p className="type-caption mt-1.5 text-zinc-500">
                       VRF fee: ~{formatUnits(vrfWei, 18)} (paid in native gas token).
@@ -647,11 +665,26 @@ export function CoinTossGame() {
                                 {landedHeads ? "Heads" : "Tails"}
                               </span>
                             </span>
-                            <span className="font-mono text-xs text-zinc-400">
-                              Bet {fmt(row.totalBetAmount)} ·{" "}
+                            <span className="flex flex-col items-end font-mono text-xs text-zinc-400 sm:flex-row sm:items-center sm:gap-2">
+                              <span>
+                                Bet {fmt(row.totalBetAmount)}{" "}
+                                {(() => {
+                                  const u = formatUsdFromWei(row.totalBetAmount, betToken.decimals, usdPerUnit);
+                                  return u ? <span className="text-zinc-500">({u})</span> : null;
+                                })()}
+                              </span>
                               <span className={won ? "text-emerald-300" : "text-red-300"}>
                                 {netPrefix}
-                                {fmt(netAbs)} {betToken.symbol}
+                                {fmt(netAbs)} {betToken.symbol}{" "}
+                                {(() => {
+                                  const u = formatUsdFromWei(netAbs, betToken.decimals, usdPerUnit);
+                                  return u ? (
+                                    <span className={won ? "text-emerald-400/70" : "text-red-400/70"}>
+                                      ({netPrefix}
+                                      {u.replace("$", "$")})
+                                    </span>
+                                  ) : null;
+                                })()}
                               </span>
                             </span>
                           </li>
