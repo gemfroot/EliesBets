@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     template: "%s · EliesBets",
   },
   description:
-    "Sports betting on Polygon and Gnosis with live and prematch markets, wallet connect, and an in-app betslip.",
+    "Sports betting on Polygon, Gnosis, and Base with live and prematch markets, wallet connect, and an in-app betslip.",
   applicationName: "EliesBets",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "EliesBets — sports betting on Polygon and Gnosis",
+        alt: "EliesBets — sports betting on Polygon, Gnosis, and Base",
       },
     ],
   },

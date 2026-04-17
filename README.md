@@ -1,6 +1,6 @@
 # EliesBets
 
-Sports betting web app built with [Next.js](https://nextjs.org) (App Router), [Azuro](https://azuro.org/) SDK/toolkit, and [wagmi](https://wagmi.sh/) for wallet connection on Polygon and Gnosis.
+Sports betting web app built with [Next.js](https://nextjs.org) (App Router), [Azuro](https://azuro.org/) SDK/toolkit, and [wagmi](https://wagmi.sh/) for wallet connection on Polygon, Gnosis, and Base.
 
 ## Prerequisites
 

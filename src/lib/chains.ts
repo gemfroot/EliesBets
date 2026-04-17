@@ -11,10 +11,10 @@ export const CHAIN_NAMES: Record<number, string> = {
 
 /**
  * Mainnet chains shown in the header switcher (sports / Azuro).
- * Polygon + Gnosis are where Azuro sports markets run; casino-only chains are omitted here
- * so users aren’t nudged onto Base/Avalanche for sports betting.
+ * Polygon, Gnosis, and Base — Azuro-supported networks for sports. Other wagmi chains
+ * (e.g. Avalanche) stay out of this list so users aren’t nudged there for betting.
  */
-export const HEADER_SWITCHER_CHAIN_IDS = [polygon.id, gnosis.id] as const;
+export const HEADER_SWITCHER_CHAIN_IDS = [polygon.id, gnosis.id, base.id] as const;
 
 /** All wagmi-supported chain IDs (used by WrongNetworkBanner). */
 export const SUPPORTED_CHAIN_IDS = [

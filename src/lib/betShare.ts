@@ -1,28 +1,13 @@
 import type { Bet } from "@azuro-org/sdk";
 import type { GameData } from "@azuro-org/toolkit";
 import type { Hex } from "viem";
-import { gnosis, polygon, polygonAmoy } from "viem/chains";
 import type { OddsFormat } from "@/lib/oddsFormat";
 import { formatOddsValue, formatStoredOddsString } from "@/lib/oddsFormat";
+import { explorerTxUrl } from "@/lib/chains";
 
 const APP_LABEL = "Eliesbets";
 
-function txExplorerUrlForKnownChain(
-  chainId: number,
-  hash: Hex,
-): string | null {
-  const base =
-    chainId === polygon.id
-      ? "https://polygonscan.com"
-      : chainId === gnosis.id
-        ? "https://gnosisscan.io"
-        : chainId === polygonAmoy.id
-          ? "https://amoy.polygonscan.com"
-          : null;
-  return base ? `${base}/tx/${hash}` : null;
-}
-
-/** Block explorer URL for a tx, matching in-app links (Azuro chain + Polygon fallbacks). */
+/** Block explorer URL for a tx (Azuro `appChain` explorer when set; else `chains.explorerTxUrl`). */
 export function txExplorerUrlFromAppChain(
   chainId: number,
   blockExplorerDefaultUrl: string | undefined,
@@ -34,7 +19,7 @@ export function txExplorerUrlFromAppChain(
   if (blockExplorerDefaultUrl) {
     return `${blockExplorerDefaultUrl.replace(/\/$/, "")}/tx/${hash}`;
   }
-  return txExplorerUrlForKnownChain(chainId, hash);
+  return explorerTxUrl(chainId, hash) ?? null;
 }
 
 export function participantLineForShare(game: GameData): string {

@@ -22,8 +22,8 @@ These need a browser, wallet, or real UX judgment.
 
 - [ ] Connect with your primary wallet (e.g. MetaMask); **disconnect and reconnect** once.
 - [ ] If you use **WalletConnect / mobile wallet**, connect and complete one navigation flow.
-- [ ] **Polygon ↔ Gnosis** via header switcher: network label updates, no stuck “wrong network” for sports after sync.
-- [ ] **Unsupported chain** (e.g. Base if still in wagmi): header shows **Unsupported**; switch to Polygon or Gnosis succeeds.
+- [ ] **Polygon ↔ Gnosis ↔ Base** via header switcher: network label updates, no stuck “wrong network” for sports after sync.
+- [ ] **Unsupported chain** (e.g. Avalanche): header shows **Unsupported**; switch to Polygon, Gnosis, or Base succeeds.
 - [ ] Optional: switch chain **only in the wallet** (not header) — listings should follow after **SportsChainSync** + refresh (may take a moment).
 
 ### Core sports flows
@@ -32,7 +32,7 @@ These need a browser, wallet, or real UX judgment.
 - [ ] **Live** (`/live`): loads; error state is the app error UI, not a blank page.
 - [ ] **Drill-down:** sport → country → league → **game** (`/games/[id]`): markets load; add/remove selections.
 - [ ] **Betslip:** stake input, approve if needed, **place a small bet** on **Polygon**; tx confirms or reverts with a **clear** message.
-- [ ] Repeat a **small bet on Gnosis** if you market Gnosis (same checks).
+- [ ] Repeat a **small bet on Gnosis** and/or **Base** if you market those chains (same checks).
 - [ ] **My bets** (`/bets`): list loads; tabs/filters if you use them.
 - [ ] **Search** (header): 3+ chars, results or empty; no endless spinners.
 - [ ] **Odds format** (header): decimal / fractional / american toggles and display updates.
