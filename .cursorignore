@@ -1,0 +1,8 @@
+﻿# Keep Cursor index / @-mentions focused on source
+node_modules/
+.next/
+out/
+build/
+coverage/
+.vercel/
+*.tsbuildinfo
