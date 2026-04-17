@@ -61,20 +61,22 @@ These can be done by a **Cursor agent**, **CI**, or **shell** (no wallet).
 ### Build & repo
 
 - [ ] **`npm run build`** passes (Linux or Vercel — source of truth for native/tooling issues).
-- [ ] **`./scripts/verify-linux.sh`** (or `SKIP_CI=1` when `node_modules` exists) on a Linux clone.
+- [ ] **`./scripts/verify-linux.sh`** (or `SKIP_CI=1` when `node_modules` exists) on a Linux clone. After lint + static checks it runs **`npm run check:static`**. Optional: **`SMOKE_PROD=1 ./scripts/verify-linux.sh`** to also hit production HTTP smoke (needs outbound network).
 - [ ] **`npm run lint`** — know current status (`contracts/` may fail unless ignored; align `eslint` with policy).
+- [ ] **`npm run check:static`** — scans `src/` for stray localhost (allowlisted in `lib/siteUrl.ts`) and obvious secret-like strings.
 
 ### HTTP / production smoke (curl or browserless)
 
-- [ ] **`curl -sI https://eliesbets.vercel.app/`** — `200`, reasonable `cache-control`, security headers (CSP, etc.) from middleware.
-- [ ] **`curl -sI`** on `/live`, `/bets`, one `/games/<id>` — not `5xx`.
+- [ ] **`npm run smoke:prod`** (or `SMOKE_BASE_URL=https://your.domain node scripts/smoke-production.mjs`) — `GET` `/`, `/live`, `/bets`, `/terms`, `/privacy`, `/casino`, `/robots.txt`, `/sitemap.xml` (HTTPS locs), `/api/search?q=test`, and one **`/games/<id>`** from the sitemap. Expect `200` and JSON from search.
+- [ ] **`curl -sI https://eliesbets.vercel.app/`** — `200`, reasonable `cache-control`, security headers (CSP, etc.) from middleware (optional if you ran `smoke:prod`).
+- [ ] **`curl -sI`** on `/live`, `/bets`, one `/games/<id>` — not `5xx` (optional if you ran `smoke:prod`).
 - [ ] **`/robots.txt`** — `200`, expected rules.
 - [ ] **`/sitemap.xml`** — `200`, URLs use **HTTPS** production host.
 - [ ] **`/api/search?q=test`** — `200` JSON (empty `games` ok); intentional `429` only under abuse (rate limit).
 
 ### Static / safety checks (grep, review)
 
-- [ ] Grep `src/` for **`localhost`**, **`127.0.0.1`**, stray **`console.log`** in hot paths (optional cleanup).
+- [ ] Grep `src/` for **`localhost`**, **`127.0.0.1`**, stray **`console.log`** in hot paths (optional cleanup — **`npm run check:static`** covers localhost/secret patterns in `src/`).
 - [ ] No **private keys** or **API secrets** committed; `NEXT_PUBLIC_*` only for client-safe values.
 - [ ] **Client/server split:** server-only modules (e.g. `next/headers`) not imported from client-only entrypoints (Vercel build catches many cases).
 

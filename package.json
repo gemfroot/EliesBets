@@ -5,8 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:webpack": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "smoke:prod": "node scripts/smoke-production.mjs",
+    "check:static": "node scripts/check-static-sources.mjs"
   },
   "dependencies": {
     "@apollo/client": "^4.1.7",
@@ -18,6 +21,7 @@
     "@vercel/analytics": "^2.0.1",
     "graphql": "^16.13.2",
     "next": "16.2.2",
+    "pngjs": "^7.0.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "viem": "^2.47.10",

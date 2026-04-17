@@ -15,4 +15,10 @@ echo "==> npm run build"
 npm run build
 echo "==> npm run lint"
 npm run lint
+echo "==> npm run check:static"
+npm run check:static
+if [[ "${SMOKE_PROD:-}" == "1" ]]; then
+  echo "==> npm run smoke:prod (SMOKE_PROD=1)"
+  npm run smoke:prod
+fi
 echo "==> OK"
