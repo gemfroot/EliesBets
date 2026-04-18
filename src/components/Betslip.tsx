@@ -4,6 +4,7 @@ import {
   BetslipDisableReason,
   useBaseBetslip,
   useBet,
+  useBetFee,
   useChain,
   useDetailedBetslip,
 } from "@azuro-org/sdk";
@@ -351,7 +352,14 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     isBetAllowed,
     isOddsFetching,
     isBetCalculationFetching,
+    minBet,
+    maxBet,
+    freebets,
+    selectedFreebet,
+    selectFreebet,
+    isFreebetsFetching,
   } = useDetailedBetslip();
+  const { data: betFeeData } = useBetFee();
   const { showToast } = useToast();
   const { clearSelections } = useBetslipActions();
   const { address, isConnected } = useAccount();
@@ -486,6 +494,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       betAmount: stakeValid ? stakeAmount : "0",
       slippage: SLIPPAGE_PERCENT,
       affiliate: zeroAddress,
+      freebet: selectedFreebet,
       selections: sdkSelections,
       odds: oddsRecord ?? {},
       totalOdds: totalOddsForBet,
@@ -585,6 +594,44 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           </div>
         </div>
       ) : null}
+      {freebets && freebets.length > 0 ? (
+        <div className="flex flex-col gap-1.5">
+          <label
+            className="text-xs font-medium text-zinc-400"
+            htmlFor="betslip-freebet"
+          >
+            Bonus
+          </label>
+          <select
+            id="betslip-freebet"
+            value={selectedFreebet ? String(selectedFreebet.id) : ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) {
+                selectFreebet(undefined);
+                return;
+              }
+              const fb = freebets.find((f) => String(f.id) === v);
+              selectFreebet(fb);
+            }}
+            disabled={isFreebetsFetching}
+            className="min-h-11 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:opacity-50 md:min-h-0"
+          >
+            <option value="">Pay with wallet</option>
+            {freebets.map((f) => (
+              <option key={String(f.id)} value={String(f.id)}>
+                Free bet {f.amount} {betToken.symbol}
+              </option>
+            ))}
+          </select>
+          {selectedFreebet ? (
+            <p className="text-xs text-zinc-500">
+              Stake is set by the free bet. Choose “Pay with wallet” to use your
+              balance instead.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <label className="text-xs font-medium text-zinc-400" htmlFor="betslip-stake">
         Stake ({betToken.symbol})
       </label>
@@ -593,8 +640,9 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           <button
             key={preset}
             type="button"
+            disabled={Boolean(selectedFreebet)}
             onClick={() => applyStake(preset)}
-            className="min-h-9 min-w-[2.75rem] touch-manipulation rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-medium tabular-nums text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-800 active:bg-zinc-800/90"
+            className="min-h-9 min-w-[2.75rem] touch-manipulation rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-medium tabular-nums text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-800 active:bg-zinc-800/90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {preset}
           </button>
@@ -603,6 +651,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           type="button"
           onClick={fillMaxStake}
           disabled={
+            Boolean(selectedFreebet) ||
             !isConnected ||
             tokenBalanceRaw == null ||
             tokenBalanceRaw === BigInt(0)
@@ -621,10 +670,38 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           step="any"
           placeholder="0"
           value={betAmount}
+          readOnly={Boolean(selectedFreebet)}
           onChange={(e) => applyStake(e.target.value)}
-          className="min-h-11 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-base tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 md:min-h-0 md:text-sm"
+          className="min-h-11 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-base tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 read-only:cursor-not-allowed read-only:bg-zinc-900/80 read-only:text-zinc-400 md:min-h-0 md:text-sm"
         />
       </div>
+      {isConnected &&
+      activeSelections.length > 0 &&
+      !isBetCalculationFetching &&
+      (minBet > 0 || maxBet > 0) ? (
+        <p className="text-xs text-zinc-500">
+          Allowed stake:{" "}
+          <span className="font-mono tabular-nums text-zinc-400">
+            {[
+              minBet > 0 ? `min ${minBet}` : null,
+              maxBet > 0 ? `max ${maxBet}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>{" "}
+          {betToken.symbol}
+        </p>
+      ) : null}
+      {isConnected &&
+      !selectedFreebet &&
+      betFeeData?.formattedRelayerFeeAmount ? (
+        <p className="text-xs text-zinc-500">
+          Est. relayer fee:{" "}
+          <span className="font-mono tabular-nums text-zinc-400">
+            {betFeeData.formattedRelayerFeeAmount} {betToken.symbol}
+          </span>
+        </p>
+      ) : null}
       {mode === "combo" && multiPick ? (
         <p className="text-xs text-zinc-500">
           Combined odds:{" "}

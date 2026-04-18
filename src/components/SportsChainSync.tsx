@@ -22,8 +22,11 @@ export function SportsChainSync() {
   const chainId = useChainId();
   const { appChain, setAppChainId } = useChain();
   const appChainIdRef = useRef(appChain.id);
-  appChainIdRef.current = appChain.id;
   const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    appChainIdRef.current = appChain.id;
+  }, [appChain.id]);
 
   useEffect(() => {
     if (!isConnected) return;

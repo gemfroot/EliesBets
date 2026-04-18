@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { zeroAddress } from "viem";
 import { BetCard } from "@/components/BetCard";
+import { BetsSummaryStrip } from "@/components/BetsSummaryStrip";
+import { ClaimAllBetsButton } from "@/components/ClaimAllBetsButton";
 import { RetryCallout } from "@/components/RetryCallout";
 import { BetsListSkeleton } from "@/components/Skeleton";
 
@@ -104,10 +106,22 @@ export default function BetsPage() {
 
   return (
     <div className="page-shell">
-      <h1 className="type-display text-xl">My bets</h1>
-      <p className="type-muted mt-1">
-        Bets placed with your connected wallet on the app chain.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="type-display text-xl">My bets</h1>
+          <p className="type-muted mt-1">
+            Bets placed with your connected wallet on the app chain.
+          </p>
+        </div>
+        {queryEnabled && !isError ? (
+          <ClaimAllBetsButton
+            bets={allBets}
+            onDone={() => void refetch()}
+          />
+        ) : null}
+      </div>
+
+      {queryEnabled && !isError ? <BetsSummaryStrip /> : null}
 
       <div
         className="mt-6 flex flex-wrap gap-2 border-b border-zinc-800 pb-3"
