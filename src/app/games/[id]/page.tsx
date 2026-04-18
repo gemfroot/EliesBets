@@ -13,6 +13,7 @@ import { GameDetailStatus } from "@/components/GameDetailStatus";
 import { RetryCallout } from "@/components/RetryCallout";
 import { gameParticipantLine } from "@/lib/gameTitle";
 import { getSportsChainId } from "@/lib/sportsChain";
+import { isSoccerSport } from "@/lib/outcomeLabels";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -47,10 +48,10 @@ function marketFamilyKey(marketKey: string): string {
 }
 
 const FAMILY_LABEL: Record<string, string> = {
-  "1": "1X2",
+  "1": "Match result",
   "2": "Double Chance",
   "3": "Handicap",
-  "4": "Over / Under",
+  "4": "Totals",
   "7": "Team Totals",
   "9": "Both Teams To Score",
   "16": "Team To Score",
@@ -80,11 +81,24 @@ const FAMILY_SORT_ORDER: string[] = [
   "29",
 ];
 
-function sectionTitle(family: string, markets: Market[]): string {
+function sectionTitle(
+  family: string,
+  markets: Market[],
+  sportSlug: string,
+): string {
+  if (family === "1") {
+    return isSoccerSport(sportSlug) ? "Match result (1X2)" : "Moneyline (3-way)";
+  }
+  if (family === "4") {
+    return "Totals (Over / Under)";
+  }
   return FAMILY_LABEL[family] ?? markets[0]?.name ?? "Markets";
 }
 
-function groupMarketsForUi(markets: GameMarkets): { title: string; markets: Market[] }[] {
+function groupMarketsForUi(
+  markets: GameMarkets,
+  sportSlug: string,
+): { title: string; markets: Market[] }[] {
   const byFamily = new Map<string, Market[]>();
   for (const m of markets) {
     const fam = marketFamilyKey(m.marketKey);
@@ -109,7 +123,7 @@ function groupMarketsForUi(markets: GameMarkets): { title: string; markets: Mark
 
   return keys.map((family) => {
     const ms = byFamily.get(family)!;
-    return { title: sectionTitle(family, ms), markets: ms };
+    return { title: sectionTitle(family, ms, sportSlug), markets: ms };
   });
 }
 
@@ -153,7 +167,7 @@ export default async function GameDetailPage({ params }: Props) {
   }
 
   const markets = groupConditionsByMarket(conditions);
-  const sections = groupMarketsForUi(markets);
+  const sections = groupMarketsForUi(markets, game.sport.slug);
 
   const names = gameParticipantLine(game);
 
@@ -191,6 +205,8 @@ export default async function GameDetailPage({ params }: Props) {
         sections={sections}
         gameId={game.gameId}
         gameTitle={names}
+        sportSlug={game.sport.slug}
+        participants={game.participants}
         marketsError={marketsError}
       />
     </div>

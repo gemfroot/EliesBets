@@ -9,11 +9,15 @@ export function GameDetailMarkets({
   sections,
   gameId,
   gameTitle,
+  sportSlug,
+  participants,
   marketsError,
 }: {
   sections: { title: string; markets: Market[] }[];
   gameId: string;
   gameTitle: string;
+  sportSlug: string;
+  participants: readonly { name: string }[];
   marketsError: string | null;
 }) {
   const router = useRouter();
@@ -50,6 +54,8 @@ export function GameDetailMarkets({
           markets={section.markets}
           gameId={gameId}
           gameTitle={gameTitle}
+          sportSlug={sportSlug}
+          participants={participants}
         />
       ))}
     </div>

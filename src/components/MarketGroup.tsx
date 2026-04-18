@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { ConditionState, type Market, type MarketOutcome } from "@azuro-org/toolkit";
 import { OddsButton } from "@/components/OddsButton";
 import { useBetslipActions } from "@/components/Betslip";
+import { getOutcomeDisplayLabel } from "@/lib/outcomeLabels";
 
 export type MarketGroupProps = {
   title: string;
@@ -12,17 +13,23 @@ export type MarketGroupProps = {
   gameId: string;
   /** Match title for receipts (e.g. Team A vs Team B). */
   gameTitle: string;
+  sportSlug: string;
+  participants: readonly { name: string }[];
   defaultOpen?: boolean;
 };
 
 function OutcomeButton({
   gameId,
   gameTitle,
+  sportSlug,
+  participants,
   outcome,
   conditionState,
 }: {
   gameId: string;
   gameTitle: string;
+  sportSlug: string;
+  participants: readonly { name: string }[];
   outcome: MarketOutcome;
   conditionState: ConditionState;
 }) {
@@ -32,20 +39,24 @@ function OutcomeButton({
       ? outcome.odds.toFixed(2)
       : "—";
   const suspended = conditionState !== ConditionState.Active;
+  const displayName = getOutcomeDisplayLabel(outcome.selectionName, {
+    sportSlug,
+    participants,
+  });
 
   return (
     <OddsButton
       gameId={gameId}
-      outcomeName={outcome.selectionName}
+      outcomeName={displayName}
       outcomeId={outcome.outcomeId}
       odds={outcome.odds}
       disabled={suspended}
-      label={outcome.selectionName}
+      label={displayName}
       onClick={() =>
         addSelection({
           gameId,
           gameTitle,
-          outcomeName: outcome.selectionName,
+          outcomeName: displayName,
           odds: oddsStr,
           outcomeId: outcome.outcomeId,
           conditionId: outcome.conditionId,
@@ -59,12 +70,16 @@ function OutcomeButton({
 function ConditionBlock({
   gameId,
   gameTitle,
+  sportSlug,
+  participants,
   label,
   outcomes,
   conditionState,
 }: {
   gameId: string;
   gameTitle: string;
+  sportSlug: string;
+  participants: readonly { name: string }[];
   label: ReactNode;
   outcomes: MarketOutcome[];
   conditionState: ConditionState;
@@ -91,6 +106,8 @@ function ConditionBlock({
             key={o.outcomeId}
             gameId={gameId}
             gameTitle={gameTitle}
+            sportSlug={sportSlug}
+            participants={participants}
             outcome={o}
             conditionState={conditionState}
           />
@@ -109,6 +126,8 @@ export function MarketGroup({
   markets,
   gameId,
   gameTitle,
+  sportSlug,
+  participants,
   defaultOpen = true,
 }: MarketGroupProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -146,6 +165,8 @@ export function MarketGroup({
                     key={cond.conditionId}
                     gameId={gameId}
                     gameTitle={gameTitle}
+                    sportSlug={sportSlug}
+                    participants={participants}
                     conditionState={cond.state}
                     label={
                       market.conditions.length > 1 && cond.margin ? (

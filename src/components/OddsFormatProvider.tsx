@@ -31,7 +31,7 @@ function writeStorage(format: OddsFormat) {
 }
 
 export function OddsFormatProvider({ children }: { children: ReactNode }) {
-  const [format, setFormatState] = useState<OddsFormat>("decimal");
+  const [format, setFormatState] = useState<OddsFormat>("american");
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time read

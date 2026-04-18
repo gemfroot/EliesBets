@@ -47,9 +47,9 @@ function formatNativeBalance(
 }
 
 const ODDS_FORMAT_OPTIONS: { value: OddsFormat; label: string }[] = [
+  { value: "american", label: "American" },
   { value: "decimal", label: "Decimal" },
   { value: "fractional", label: "Fractional" },
-  { value: "american", label: "American" },
 ];
 
 export function Header() {

@@ -9,6 +9,7 @@ import { useBetslipActions } from "@/components/Betslip";
 import type { TopOddsLine } from "@/lib/oddsUtils";
 import { useCountdown, parseStartsAtMs } from "@/lib/useCountdown";
 import { SportNavIcon } from "@/lib/sportNavIcon";
+import { getOutcomeDisplayLabel } from "@/lib/outcomeLabels";
 
 function formatStartTime(startsAt: string): string {
   const ms = +startsAt < 32_503_680_000 ? +startsAt * 1000 : +startsAt;
@@ -78,11 +79,17 @@ export function GameCard({
   const { participants } = game;
   const gameHref = `/games/${game.gameId}`;
 
-  const addLine = (line: TopOddsLine) =>
+  const outcomeCtx = {
+    sportSlug: game.sport.slug,
+    participants: game.participants,
+  };
+
+  const addLine = (line: TopOddsLine) => {
+    const displayLabel = getOutcomeDisplayLabel(line.label, outcomeCtx);
     addSelection({
       gameId: game.gameId,
       gameTitle: names,
-      outcomeName: line.label,
+      outcomeName: displayLabel,
       odds:
         Number.isFinite(line.odds) && line.odds > 0
           ? line.odds.toFixed(2)
@@ -91,6 +98,7 @@ export function GameCard({
       conditionId: line.conditionId,
       isExpressForbidden: line.isExpressForbidden,
     });
+  };
 
   const hasMain = topOdds && topOdds.length > 0;
   const hasOu = overUnderOdds && overUnderOdds.length > 0;
@@ -101,35 +109,41 @@ export function GameCard({
         <div className="flex w-full min-w-0 flex-col gap-1.5">
           <div className="flex w-full min-w-0 flex-row gap-1.5" aria-label="Odds">
             {hasMain
-              ? topOdds.map((line) => (
-                  <OddsButton
-                    key={line.outcomeId}
-                    gameId={game.gameId}
-                    outcomeName={line.label}
-                    outcomeId={line.outcomeId}
-                    odds={line.odds}
-                    label={line.label}
-                    className="min-h-10 min-w-0 flex-1 py-1.5"
-                    onClick={() => addLine(line)}
-                  />
-                ))
+              ? topOdds.map((line) => {
+                  const displayLabel = getOutcomeDisplayLabel(line.label, outcomeCtx);
+                  return (
+                    <OddsButton
+                      key={line.outcomeId}
+                      gameId={game.gameId}
+                      outcomeName={displayLabel}
+                      outcomeId={line.outcomeId}
+                      odds={line.odds}
+                      label={displayLabel}
+                      className="min-h-10 min-w-0 flex-1 py-1.5"
+                      onClick={() => addLine(line)}
+                    />
+                  );
+                })
               : null}
             {hasMain && hasOu ? (
               <div className="w-px shrink-0 self-stretch bg-zinc-700/60" />
             ) : null}
             {hasOu
-              ? overUnderOdds.map((line) => (
-                  <OddsButton
-                    key={line.outcomeId}
-                    gameId={game.gameId}
-                    outcomeName={line.label}
-                    outcomeId={line.outcomeId}
-                    odds={line.odds}
-                    label={line.label}
-                    className="min-h-10 min-w-0 flex-1 py-1.5"
-                    onClick={() => addLine(line)}
-                  />
-                ))
+              ? overUnderOdds.map((line) => {
+                  const displayLabel = getOutcomeDisplayLabel(line.label, outcomeCtx);
+                  return (
+                    <OddsButton
+                      key={line.outcomeId}
+                      gameId={game.gameId}
+                      outcomeName={displayLabel}
+                      outcomeId={line.outcomeId}
+                      odds={line.odds}
+                      label={displayLabel}
+                      className="min-h-10 min-w-0 flex-1 py-1.5"
+                      onClick={() => addLine(line)}
+                    />
+                  );
+                })
               : null}
           </div>
           {extraMarketsCount > 0 ? (
@@ -145,35 +159,41 @@ export function GameCard({
         <div className="flex w-full min-w-0 shrink flex-col gap-1.5 md:w-auto md:max-w-[min(100%,26rem)] md:items-end">
           <div className="flex w-full min-w-0 flex-row items-stretch gap-1.5">
             {hasMain
-              ? topOdds.map((line) => (
-                  <OddsButton
-                    key={line.outcomeId}
-                    gameId={game.gameId}
-                    outcomeName={line.label}
-                    outcomeId={line.outcomeId}
-                    odds={line.odds}
-                    label={line.label}
-                    className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
-                    onClick={() => addLine(line)}
-                  />
-                ))
+              ? topOdds.map((line) => {
+                  const displayLabel = getOutcomeDisplayLabel(line.label, outcomeCtx);
+                  return (
+                    <OddsButton
+                      key={line.outcomeId}
+                      gameId={game.gameId}
+                      outcomeName={displayLabel}
+                      outcomeId={line.outcomeId}
+                      odds={line.odds}
+                      label={displayLabel}
+                      className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
+                      onClick={() => addLine(line)}
+                    />
+                  );
+                })
               : null}
             {hasMain && hasOu ? (
               <div className="hidden w-px shrink-0 self-stretch bg-zinc-700/60 md:block" />
             ) : null}
             {hasOu
-              ? overUnderOdds.map((line) => (
-                  <OddsButton
-                    key={line.outcomeId}
-                    gameId={game.gameId}
-                    outcomeName={line.label}
-                    outcomeId={line.outcomeId}
-                    odds={line.odds}
-                    label={line.label}
-                    className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
-                    onClick={() => addLine(line)}
-                  />
-                ))
+              ? overUnderOdds.map((line) => {
+                  const displayLabel = getOutcomeDisplayLabel(line.label, outcomeCtx);
+                  return (
+                    <OddsButton
+                      key={line.outcomeId}
+                      gameId={game.gameId}
+                      outcomeName={displayLabel}
+                      outcomeId={line.outcomeId}
+                      odds={line.odds}
+                      label={displayLabel}
+                      className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
+                      onClick={() => addLine(line)}
+                    />
+                  );
+                })
               : null}
             {extraMarketsCount > 0 ? (
               <Link

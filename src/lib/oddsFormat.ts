@@ -13,7 +13,7 @@ export function parseOddsFormat(raw: string | null): OddsFormat {
   if (t != null && isOddsFormat(t)) {
     return t;
   }
-  return "decimal";
+  return "american";
 }
 
 function gcd(a: number, b: number): number {
