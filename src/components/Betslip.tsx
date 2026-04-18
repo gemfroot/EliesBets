@@ -678,13 +678,13 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       {isConnected &&
       activeSelections.length > 0 &&
       !isBetCalculationFetching &&
-      (minBet > 0 || maxBet > 0) ? (
+      ((minBet ?? 0) > 0 || (maxBet ?? 0) > 0) ? (
         <p className="text-xs text-zinc-500">
           Allowed stake:{" "}
           <span className="font-mono tabular-nums text-zinc-400">
             {[
-              minBet > 0 ? `min ${minBet}` : null,
-              maxBet > 0 ? `max ${maxBet}` : null,
+              (minBet ?? 0) > 0 ? `min ${minBet}` : null,
+              (maxBet ?? 0) > 0 ? `max ${maxBet}` : null,
             ]
               .filter(Boolean)
               .join(" · ")}
