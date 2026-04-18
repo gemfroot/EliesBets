@@ -5,7 +5,6 @@ import { useChain, useRedeemBet, type Bet } from "@azuro-org/sdk";
 import type { GameData } from "@azuro-org/toolkit";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
-import { formatUnits } from "viem";
 import { getBalanceQueryKey } from "wagmi/query";
 import { useChainId, useConnection } from "wagmi";
 import { CashoutButton } from "@/components/CashoutButton";
@@ -88,11 +87,11 @@ export function BetCard({ bet }: BetCardProps) {
 
   const claimBusy = isPending || isProcessing;
 
-  const stakeStr = formatUnits(BigInt(bet.amount), betToken.decimals);
-  const stakeNum = Number.parseFloat(stakeStr);
+  // `Bet.amount` from Azuro is already a human token amount (see SDK: possibleWin = +amount * totalOdds), not raw wei.
+  const stakeNum = Number.parseFloat(bet.amount);
   const stakeDisplay = Number.isFinite(stakeNum)
     ? stakeNum.toLocaleString(undefined, { maximumFractionDigits: 6 })
-    : stakeStr;
+    : bet.amount;
 
   const payoutDisplay =
     bet.payout != null && Number.isFinite(bet.payout)

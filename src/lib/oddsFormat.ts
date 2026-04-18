@@ -61,27 +61,34 @@ function profitToSimplifiedFraction(
 }
 
 /**
- * Avoid absurd fractions (e.g. 3959/100, 198/5). Allow small numerators with larger d (1/50).
+ * Fractional mode must never fall back to decimal on a per-outcome basis (that mixed
+ * "3/23" with "5.44" in the same row). Use coarser rationals or simple X/1 · 1/X instead.
  */
-function isReadableSportsFraction(n: number, d: number): boolean {
-  if (n <= 0 || d <= 0) return false;
-  if (d === 1) return n <= 500;
-  if (n <= 12) return d <= 100;
-  return n <= 60 && d <= 20;
-}
-
 function formatFractionalFromDecimal(decimal: number): string {
   if (!Number.isFinite(decimal) || decimal <= 1) {
     return "—";
   }
   const profit = decimal - 1;
-  const [n, d] = profitToSimplifiedFraction(profit, 50);
+  if (profit <= 0) {
+    return "—";
+  }
+
+  let [n, d] = profitToSimplifiedFraction(profit, 24);
   if (n <= 0 || d <= 0) {
     return "—";
   }
-  if (!isReadableSportsFraction(n, d)) {
-    return formatDecimalOddsValue(decimal);
+
+  if (n > 100 || d > 50) {
+    [n, d] = profitToSimplifiedFraction(profit, 8);
   }
+  if (n > 100 || d > 50) {
+    if (profit >= 1) {
+      return `${Math.max(1, Math.round(profit))}/1`;
+    }
+    const inv = Math.round(1 / profit);
+    return `1/${Math.max(2, inv)}`;
+  }
+
   return `${n}/${d}`;
 }
 
