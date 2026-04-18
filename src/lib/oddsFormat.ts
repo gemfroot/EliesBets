@@ -27,7 +27,10 @@ function gcd(a: number, b: number): number {
   return x || 1;
 }
 
-/** Profit (decimal − 1) as a simplified fraction, denominator ≤ maxDen. */
+/**
+ * Best rational approximation of `profit` with denominator ≤ maxDen.
+ * Tie-break: lower error first, then smaller denominator (avoids 3959/100 when 40/1 is fine).
+ */
 function profitToSimplifiedFraction(
   profit: number,
   maxDen: number,
@@ -44,7 +47,10 @@ function profitToSimplifiedFraction(
       continue;
     }
     const err = Math.abs(num / den - profit);
-    if (err < bestErr) {
+    if (
+      err < bestErr - 1e-9 ||
+      (Math.abs(err - bestErr) < 1e-9 && den < bestD)
+    ) {
       bestErr = err;
       bestN = num;
       bestD = den;
@@ -54,14 +60,27 @@ function profitToSimplifiedFraction(
   return [bestN / g, bestD / g];
 }
 
+/**
+ * Avoid absurd fractions (e.g. 3959/100, 198/5). Allow small numerators with larger d (1/50).
+ */
+function isReadableSportsFraction(n: number, d: number): boolean {
+  if (n <= 0 || d <= 0) return false;
+  if (d === 1) return n <= 500;
+  if (n <= 12) return d <= 100;
+  return n <= 60 && d <= 20;
+}
+
 function formatFractionalFromDecimal(decimal: number): string {
   if (!Number.isFinite(decimal) || decimal <= 1) {
     return "—";
   }
   const profit = decimal - 1;
-  const [n, d] = profitToSimplifiedFraction(profit, 1000);
+  const [n, d] = profitToSimplifiedFraction(profit, 50);
   if (n <= 0 || d <= 0) {
     return "—";
+  }
+  if (!isReadableSportsFraction(n, d)) {
+    return formatDecimalOddsValue(decimal);
   }
   return `${n}/${d}`;
 }
