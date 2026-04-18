@@ -7,7 +7,12 @@ import { useEffect, useRef, useState } from "react";
 import { formatUnits } from "viem";
 import { MyBetsLink } from "@/components/MyBetsLink";
 import { PendingBetsIndicator } from "@/components/PendingBetsIndicator";
-import { HEADER_SWITCHER_CHAIN_IDS, SUPPORTED_CHAIN_IDS, chainName } from "@/lib/chains";
+import {
+  HEADER_SWITCHER_CHAIN_IDS,
+  SUPPORTED_CHAIN_IDS,
+  chainName,
+  normalizeChainId,
+} from "@/lib/chains";
 
 const ConnectModal = dynamic(
   () =>
@@ -52,7 +57,7 @@ export function Header() {
   const [modalOpen, setModalOpen] = useState(false);
   const { address, isConnected, status } = useConnection();
   const { disconnect } = useDisconnect();
-  const chainId = useChainId();
+  const chainId = normalizeChainId(useChainId());
   const { switchChainAsync, isPending: switchPending, error: switchError } =
     useSwitchChain();
   const [chainMenuOpen, setChainMenuOpen] = useState(false);
@@ -85,7 +90,10 @@ export function Header() {
     query: { enabled: Boolean(address && isConnected) },
   });
 
-  const isUnsupported = isConnected && !SUPPORTED_CHAIN_IDS.includes(chainId);
+  const isUnsupported =
+    isConnected &&
+    chainId !== undefined &&
+    !(SUPPORTED_CHAIN_IDS as readonly number[]).includes(chainId);
 
   const chainPill = (
     <div ref={chainMenuRef} className="relative">
@@ -107,7 +115,9 @@ export function Header() {
             isUnsupported ? "bg-amber-400" : isConnected ? "bg-emerald-500" : "bg-zinc-500"
           }`}
         />
-        <span>{isUnsupported ? "Unsupported" : chainName(chainId)}</span>
+        <span>
+          {isUnsupported ? "Unsupported" : chainId !== undefined ? chainName(chainId) : "—"}
+        </span>
         {isConnected ? (
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" className="text-zinc-400">
             <path d="M2 4l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -117,10 +127,10 @@ export function Header() {
       {chainMenuOpen ? (
         <div
           role="menu"
-          className="absolute right-0 z-30 mt-1 min-w-[9rem] overflow-hidden rounded-md border border-zinc-800 bg-zinc-900 py-1 shadow-lg"
+          className="absolute right-0 z-50 mt-1 max-h-[min(12rem,70vh)] min-w-[9rem] overflow-y-auto rounded-md border border-zinc-800 bg-zinc-900 py-1 shadow-lg"
         >
           {HEADER_SWITCHER_CHAIN_IDS.map((id) => {
-            const active = id === chainId;
+            const active = chainId !== undefined && id === chainId;
             return (
               <button
                 key={id}
@@ -153,7 +163,7 @@ export function Header() {
 
   return (
     <>
-      <header className="flex h-16 shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4">
+      <header className="relative z-50 flex h-16 shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4">
         <Link
           href="/"
           className="shrink-0 text-lg font-semibold tracking-tight text-zinc-50 transition hover:text-zinc-200"

@@ -46,6 +46,19 @@ export function chainName(chainId: number): string {
   return CHAIN_NAMES[chainId] ?? `Chain ${chainId}`;
 }
 
+/** Normalize chain id from wagmi / wallets (number, bigint, or decimal string). */
+export function normalizeChainId(
+  chainId: number | bigint | string | undefined,
+): number | undefined {
+  if (chainId === undefined) return undefined;
+  if (typeof chainId === "bigint") return Number(chainId);
+  if (typeof chainId === "string") {
+    const n = Number.parseInt(chainId, 10);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return chainId;
+}
+
 const EXPLORER_BY_CHAIN: Record<number, string> = {
   [polygon.id]: "https://polygonscan.com",
   [polygonAmoy.id]: "https://amoy.polygonscan.com",
