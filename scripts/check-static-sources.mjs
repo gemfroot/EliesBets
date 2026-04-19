@@ -16,6 +16,9 @@ const ALLOWLIST_FILES = new Set(["lib/siteUrl.ts"]);
 
 const LOCALHOST_RE = /\b(localhost|127\.0\.0\.1)\b/;
 const SECRET_RE = /\b(sk_live_|sk_test_|AIza[0-9A-Za-z_-]{20,}|DEPLOYER_PRIVATE_KEY\s*=\s*0x)/;
+/** PEM / SSH private key material must never live in app source. */
+const PEM_PRIVATE_RE =
+  /-----BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY( BLOCK)?-----/;
 
 let issues = 0;
 
@@ -44,6 +47,10 @@ function scanFile(full, relPath) {
     }
     if (SECRET_RE.test(line)) {
       console.error(`${norm}:${i + 1}: possible secret pattern — redact if real`);
+      issues += 1;
+    }
+    if (PEM_PRIVATE_RE.test(line)) {
+      console.error(`${norm}:${i + 1}: PEM/private key block — never commit keys in source`);
       issues += 1;
     }
   });
