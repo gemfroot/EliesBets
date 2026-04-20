@@ -7,14 +7,19 @@ type ErrLike = {
   reason?: unknown;
   cause?: unknown;
   code?: unknown;
+  metaMessages?: unknown;
+  data?: unknown;
+  docsPath?: unknown;
+  version?: unknown;
 };
 
 function pushStr(parts: string[], v: unknown) {
   if (typeof v === "string" && v.trim()) parts.push(v.trim());
 }
 
+/** viem/wagmi often put the actionable sentence only on `details` or nested `cause`. */
 function collectErrorText(err: unknown, depth = 0): string {
-  if (depth > 6) return "";
+  if (depth > 8) return "";
   if (err == null) return "";
   if (typeof err === "string") return err.trim();
   if (typeof err !== "object") return String(err);
@@ -26,9 +31,50 @@ function collectErrorText(err: unknown, depth = 0): string {
   pushStr(parts, o.details);
   pushStr(parts, o.reason);
   if (o.code !== undefined) parts.push(String(o.code));
+  if (Array.isArray(o.metaMessages)) {
+    for (const m of o.metaMessages) pushStr(parts, m);
+  }
+  pushStr(parts, o.docsPath);
+  pushStr(parts, o.version);
+  if (o.data !== undefined) {
+    if (typeof o.data === "string") pushStr(parts, o.data);
+    else if (typeof o.data === "object" && o.data !== null) {
+      try {
+        pushStr(parts, JSON.stringify(o.data));
+      } catch {
+        /* ignore */
+      }
+    }
+  }
   if (o.cause) parts.push(collectErrorText(o.cause, depth + 1));
 
-  return parts.join(" ").trim();
+  if (typeof AggregateError !== "undefined" && err instanceof AggregateError) {
+    for (const sub of err.errors) {
+      parts.push(collectErrorText(sub, depth + 1));
+    }
+  }
+
+  /* Walk plain objects for any other string fields (viem variants / connector wrappers). */
+  if (depth < 4 && typeof err === "object" && err !== null && !Array.isArray(err)) {
+    const seen = new Set<unknown>();
+    function harvest(x: unknown, d: number) {
+      if (d > 6 || x == null || typeof x !== "object" || seen.has(x)) return;
+      seen.add(x);
+      if (x instanceof Error && d > 0) {
+        pushStr(parts, x.message);
+        if (x.cause) harvest(x.cause, d + 1);
+        return;
+      }
+      for (const v of Object.values(x as Record<string, unknown>)) {
+        if (typeof v === "string") pushStr(parts, v);
+        else if (typeof v === "object" && v !== null) harvest(v, d + 1);
+      }
+    }
+    harvest(err, depth);
+  }
+
+  const joined = parts.join(" ").trim();
+  return joined.length > 12_000 ? joined.slice(0, 12_000) : joined;
 }
 
 /**
@@ -157,6 +203,10 @@ export function formatUserFacingTxError(error: unknown): string {
 
   if (t.includes("contract runner does not support")) {
     return "Your wallet cannot perform this action in the current mode. Try a different browser or wallet.";
+  }
+
+  if (t.includes("unknown rpc error")) {
+    return "Your wallet could not complete this request on the current network. Use the header menu to switch to Polygon, Gnosis, or Base (the same chain as your bet), then claim again.";
   }
 
   if (raw.length > 420) {
