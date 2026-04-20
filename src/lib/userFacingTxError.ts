@@ -209,6 +209,13 @@ export function formatUserFacingTxError(error: unknown): string {
     return "Your wallet could not complete this request on the current network. Use the header menu to switch to Polygon, Gnosis, or Base (the same chain as your bet), then claim again.";
   }
 
+  if (
+    t.includes("exceeds the configured cap") ||
+    (t.includes("tx fee") && t.includes("configured cap"))
+  ) {
+    return "Your wallet blocked this transaction because the estimated network fee hit its safety cap (common in Rabby / MetaMask). Raise the max fee cap in wallet settings, or claim one bet at a time instead of Claim all.";
+  }
+
   if (raw.length > 420) {
     return `${raw.slice(0, 400).trim()}…`;
   }

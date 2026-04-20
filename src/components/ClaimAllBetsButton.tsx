@@ -19,11 +19,6 @@ function isClaimable(bet: Bet): boolean {
   );
 }
 
-/** Same LP + core as required by Azuro batch `withdrawPayouts`. */
-function batchKey(bet: Bet): string {
-  return `${bet.lpAddress.toLowerCase()}\0${bet.coreAddress.toLowerCase()}`;
-}
-
 export type ClaimAllBetsButtonProps = {
   bets: Bet[];
   /** Called after a successful run (refetch bet list, etc.). */
@@ -52,36 +47,12 @@ export function ClaimAllBetsButton({ bets, onDone }: ClaimAllBetsButtonProps) {
     if (claimable.length === 0) return;
     setSequentialBusy(true);
     try {
-      const withFreebet = claimable.filter((b) => b.freebetId != null);
-      const paid = claimable.filter((b) => b.freebetId == null);
-
-      const groups = new Map<string, Bet[]>();
-      for (const b of paid) {
-        const k = batchKey(b);
-        const list = groups.get(k) ?? [];
-        list.push(b);
-        groups.set(k, list);
-      }
-
-      for (const [, group] of groups) {
-        if (group.length === 0) continue;
-        try {
-          await submit({ bets: group });
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          if (
-            msg.includes("v2 redeem can't be executed for multiple bets")
-          ) {
-            for (const bet of group) {
-              await submit({ bets: [bet] });
-            }
-          } else {
-            throw e;
-          }
-        }
-      }
-
-      for (const bet of withFreebet) {
+      /*
+       * One tx per bet. Batching `withdrawPayouts` for many legs can blow gas estimation
+       * or hit wallet “max fee cap” (e.g. Rabby: tx fee exceeds configured cap) even when
+       * the simulation looks fine — sequential claims stay under typical caps.
+       */
+      for (const bet of claimable) {
         await submit({ bets: [bet] });
       }
 
