@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAccount, useChainId, usePublicClient } from "wagmi";
+import { useAccount, usePublicClient } from "wagmi";
+import { useWalletChainId } from "@/lib/useWalletChainId";
 import type { PublicClient } from "viem";
 import { getBlockNumber, getContractEvents } from "viem/actions";
 import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
@@ -68,7 +69,7 @@ function randomId() {
 
 export function PendingBetsProvider({ children }: { children: React.ReactNode }) {
   const { address } = useAccount();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const publicClient = usePublicClient();
   const [pending, setPending] = useState<PendingBet[]>([]);
   const loadedFor = useRef<string | null>(null);

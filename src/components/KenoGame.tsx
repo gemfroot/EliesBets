@@ -16,11 +16,13 @@ import {
 } from "@betswirl/sdk-core";
 import { formatUnits, isAddress, parseUnits } from "viem";
 import { type Chain, avalanche, avalancheFuji, gnosis, polygon, polygonAmoy } from "viem/chains";
-import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
+import { useWalletChainId } from "@/lib/useWalletChainId";
 import { KenoAnimation, type KenoPhase } from "@/components/KenoAnimation";
 import { useKeno, type KenoBetData } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
 import { chainName, explorerTxUrl } from "@/lib/chains";
+import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 
 const BET_HISTORY_DISPLAY_CAP = 12;
 
@@ -43,18 +45,6 @@ const VIEM_CHAIN_BY_ID: Record<number, Chain> = {
   [avalancheFuji.id]: avalancheFuji,
 };
 
-function formatCasinoTxError(error: Error): string {
-  const e = error as Error & { shortMessage?: string };
-  const text =
-    typeof e.shortMessage === "string" && e.shortMessage.trim()
-      ? e.shortMessage.trim()
-      : (e.message ?? "").trim() || "Transaction failed.";
-  if (/msg\.value/i.test(text)) {
-    return "Transaction failed. Check your stake covers the minimum and network fees, then try again.";
-  }
-  return text;
-}
-
 const PHASE_LABEL: Record<KenoPhase, string> = {
   idle: "Ready",
   picking: "Ready to play",
@@ -73,7 +63,7 @@ function countMatches(selected: readonly number[], drawn: readonly number[]): nu
 
 export function KenoGame() {
   const { isConnected, address: connected } = useAccount();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const { switchChain } = useSwitchChain();
 
   const availableTokens = useMemo(() => getBetTokens(chainId), [chainId]);
@@ -812,7 +802,7 @@ export function KenoGame() {
 
                 {error ? (
                   <p className="type-body text-red-400" role="alert">
-                    {formatCasinoTxError(error)}
+                    {formatUserFacingTxError(error)}
                   </p>
                 ) : null}
 

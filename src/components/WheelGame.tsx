@@ -10,12 +10,14 @@ import {
   type WeightedGameConfiguration,
 } from "@betswirl/sdk-core";
 import { formatUnits, isAddress, parseUnits } from "viem";
-import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
+import { useWalletChainId } from "@/lib/useWalletChainId";
 import { base } from "viem/chains";
 import { WheelAnimation, type WheelPhase } from "@/components/WheelAnimation";
 import { useWheel, type WheelBetData } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
 import { chainName, explorerTxUrl } from "@/lib/chains";
+import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 
 const BET_HISTORY_DISPLAY_CAP = 12;
 
@@ -48,18 +50,6 @@ const FALLBACK_SEGMENT_COLORS = [
   "#dc2626",
 ] as const;
 
-function formatCasinoTxError(error: Error): string {
-  const e = error as Error & { shortMessage?: string };
-  const text =
-    typeof e.shortMessage === "string" && e.shortMessage.trim()
-      ? e.shortMessage.trim()
-      : (e.message ?? "").trim() || "Transaction failed.";
-  if (/msg\.value/i.test(text)) {
-    return "Transaction failed. Check your stake covers the minimum and network fees, then try again.";
-  }
-  return text;
-}
-
 function segmentVisualsForConfig(cfg: WeightedGameConfiguration | undefined) {
   if (!cfg) return [];
   const n = cfg.multipliers.length;
@@ -71,7 +61,7 @@ function segmentVisualsForConfig(cfg: WeightedGameConfiguration | undefined) {
 
 export function WheelGame() {
   const { isConnected, address: connected } = useAccount();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const { switchChain } = useSwitchChain();
 
   const availableTokens = useMemo(() => getBetTokens(chainId), [chainId]);
@@ -707,7 +697,7 @@ export function WheelGame() {
 
                 {error ? (
                   <p className="type-body text-red-400" role="alert">
-                    {formatCasinoTxError(error)}
+                    {formatUserFacingTxError(error)}
                   </p>
                 ) : null}
 

@@ -17,13 +17,13 @@ import {
 } from "@betswirl/sdk-core";
 import {
   useAccount,
-  useChainId,
   usePublicClient,
   useReadContract,
   useReadContracts,
   useWatchContractEvent,
   useWriteContract,
 } from "wagmi";
+import { useWalletChainId } from "@/lib/useWalletChainId";
 import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
 import { diceAbi } from "@/lib/casino/abis/Dice";
 import { kenoAbi } from "@/lib/casino/abis/Keno";
@@ -666,7 +666,7 @@ async function fetchVrfCost(
  * Accepts an optional betToken; defaults to the chain's default token.
  */
 export function useCoinToss(betToken?: BetToken) {
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const coinToss = useMemo(() => getCasinoCoinTossAddress(chainId), [chainId]);
   const coinTossConfigured = isCasinoAddressConfigured(coinToss);
@@ -995,7 +995,7 @@ export function useCoinToss(betToken?: BetToken) {
  * Dice game: reads and writes use the on-chain ABI in `@/lib/casino/abis/Dice`.
  */
 export function useDice(betToken?: BetToken) {
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const dice = useMemo(() => getCasinoDiceAddress(chainId), [chainId]);
   const diceConfigured = isCasinoAddressConfigured(dice);
@@ -1325,7 +1325,7 @@ export type RouletteBetData = {
  * Roulette game: reads and writes use the on-chain ABI in `@/lib/casino/abis/Roulette`.
  */
 export function useRoulette(betToken?: BetToken) {
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const roulette = useMemo(() => getCasinoRouletteAddress(chainId), [chainId]);
   const rouletteConfigured = isCasinoAddressConfigured(roulette);
@@ -1641,7 +1641,7 @@ export type KenoBetData = {
  * Keno game: reads payout table via `gains`, writes via `wager` on `@/lib/casino/abis/Keno`.
  */
 export function useKeno(betToken?: BetToken) {
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const keno = useMemo(() => getCasinoKenoAddress(chainId), [chainId]);
   const kenoConfigured = isCasinoAddressConfigured(keno);
@@ -1975,7 +1975,7 @@ function useWeightedWheelLikeGame(
   historyStorageKey: WeightedWheelLikeHistoryKey,
   betTokenOverride?: BetToken,
 ) {
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const token = useMemo(() => betTokenOverride ?? getDefaultBetToken(chainId), [betTokenOverride, chainId]);
   const { address: connected } = useAccount();
   const publicClient = usePublicClient();
@@ -2342,7 +2342,7 @@ function useWeightedWheelLikeGame(
  * Wheel game: loads segment configs via `configsCount` / `gameConfigs`, writes via `wager` on `@/lib/casino/abis/Wheel`.
  */
 export function useWheel(betToken?: BetToken) {
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const wheel = useMemo(() => getCasinoWheelAddress(chainId), [chainId]);
   const wheelConfigured = isCasinoAddressConfigured(wheel);
   const {
@@ -2362,7 +2362,7 @@ export function useWheel(betToken?: BetToken) {
 }
 
 export function usePlinko(betToken?: BetToken) {
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const plinko = useMemo(() => getCasinoPlinkoAddress(chainId), [chainId]);
   const plinkoConfigured = isCasinoAddressConfigured(plinko);
   const {

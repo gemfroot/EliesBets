@@ -14,6 +14,7 @@ import { RetryCallout } from "@/components/RetryCallout";
 import { getSportsChainId } from "@/lib/sportsChain";
 import type { SportsChainId } from "@/lib/sportsChainConstants";
 import { SportNavIcon } from "@/lib/sportNavIcon";
+import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 
 const HERO_LIVE_LIMIT = 6;
 const HERO_FETCH_PER_PAGE = 24;
@@ -75,7 +76,7 @@ export async function HomeHeroSection() {
   try {
     heroGames = await fetchHeroLiveGames(chainId);
   } catch (e) {
-    heroError = e instanceof Error ? e.message : "Failed to load live games.";
+    heroError = formatUserFacingTxError(e);
   }
 
   return (
@@ -143,7 +144,7 @@ export async function HomeSportsNavSection() {
       name: s.name,
     }));
   } catch (e) {
-    sportsError = e instanceof Error ? e.message : "Failed to load sports.";
+    sportsError = formatUserFacingTxError(e);
   }
 
   if (sportsError) {
@@ -198,19 +199,13 @@ export async function HomePopularUpcomingSections() {
   if (popularOutcome.status === "fulfilled") {
     popularGames = popularOutcome.value;
   } else {
-    popularError =
-      popularOutcome.reason instanceof Error
-        ? popularOutcome.reason.message
-        : "Failed to load popular games.";
+    popularError = formatUserFacingTxError(popularOutcome.reason);
   }
 
   if (upcomingOutcome.status === "fulfilled") {
     upcomingGames = upcomingOutcome.value;
   } else {
-    upcomingError =
-      upcomingOutcome.reason instanceof Error
-        ? upcomingOutcome.reason.message
-        : "Failed to load upcoming games.";
+    upcomingError = formatUserFacingTxError(upcomingOutcome.reason);
   }
 
   const staticGameIds = [

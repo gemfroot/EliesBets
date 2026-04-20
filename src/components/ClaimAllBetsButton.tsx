@@ -4,8 +4,11 @@ import { useRedeemBet, type Bet } from "@azuro-org/sdk";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { getBalanceQueryKey } from "wagmi/query";
-import { useChainId, useConnection } from "wagmi";
+import { useConnection } from "wagmi";
+import { useAzuroActionChain } from "@/lib/useAzuroActionChain";
+import { AzuroWrongChainCallout } from "@/components/AzuroWrongChainCallout";
 import { useToast } from "@/components/Toast";
+import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 
 function isClaimable(bet: Bet): boolean {
   return (
@@ -31,7 +34,7 @@ export function ClaimAllBetsButton({ bets, onDone }: ClaimAllBetsButtonProps) {
   const { submit, isPending, isProcessing } = useRedeemBet();
   const { showToast } = useToast();
   const { address } = useConnection();
-  const chainId = useChainId();
+  const azuroChain = useAzuroActionChain();
   const queryClient = useQueryClient();
   const [sequentialBusy, setSequentialBusy] = useState(false);
 
@@ -40,10 +43,10 @@ export function ClaimAllBetsButton({ bets, onDone }: ClaimAllBetsButtonProps) {
   const invalidateBalances = useCallback(() => {
     if (address) {
       void queryClient.invalidateQueries({
-        queryKey: getBalanceQueryKey({ chainId, address }),
+        queryKey: getBalanceQueryKey({ chainId: azuroChain.appChainId, address }),
       });
     }
-  }, [address, chainId, queryClient]);
+  }, [address, azuroChain.appChainId, queryClient]);
 
   const handleClaimAll = useCallback(async () => {
     if (claimable.length === 0) return;
@@ -89,10 +92,7 @@ export function ClaimAllBetsButton({ bets, onDone }: ClaimAllBetsButtonProps) {
       );
       onDone?.();
     } catch (e) {
-      showToast(
-        e instanceof Error ? e.message : "Could not claim all bets.",
-        "error",
-      );
+      showToast(formatUserFacingTxError(e), "error");
     } finally {
       setSequentialBusy(false);
     }
@@ -105,13 +105,23 @@ export function ClaimAllBetsButton({ bets, onDone }: ClaimAllBetsButtonProps) {
   }
 
   return (
-    <button
-      type="button"
-      disabled={loading}
-      onClick={() => void handleClaimAll()}
-      className="min-h-11 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 md:min-h-0"
-    >
-      {loading ? "Claiming…" : `Claim all (${claimable.length})`}
-    </button>
+    <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:items-end">
+      {!azuroChain.onBetChain ? (
+        <AzuroWrongChainCallout
+          appChainName={azuroChain.appChainName}
+          walletChainName={azuroChain.walletChainName}
+          switchPending={azuroChain.switchPending}
+          onSwitch={() => void azuroChain.switchToAppChain().catch(() => {})}
+        />
+      ) : null}
+      <button
+        type="button"
+        disabled={loading || !azuroChain.onBetChain}
+        onClick={() => void handleClaimAll()}
+        className="min-h-11 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 md:min-h-0"
+      >
+        {loading ? "Claiming…" : `Claim all (${claimable.length})`}
+      </button>
+    </div>
   );
 }

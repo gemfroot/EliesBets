@@ -11,6 +11,8 @@ import {
   useState,
 } from "react";
 
+import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+
 const MIN_QUERY = 3;
 
 type GamePayload = {
@@ -190,7 +192,7 @@ export function SearchBar() {
             return;
           }
           setGames([]);
-          setFetchError(e instanceof Error ? e.message : "Search failed");
+          setFetchError(formatUserFacingTxError(e));
         })
         .finally(() => {
           if (searchRequestId.current !== myId) {

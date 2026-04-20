@@ -1,6 +1,9 @@
 import { polygon, polygonAmoy, gnosis, avalanche, avalancheFuji, base } from "viem/chains";
 
 export const CHAIN_NAMES: Record<number, string> = {
+  1: "Ethereum",
+  10: "Optimism",
+  42161: "Arbitrum One",
   [polygon.id]: "Polygon",
   [polygonAmoy.id]: "Polygon Amoy",
   [gnosis.id]: "Gnosis",

@@ -10,8 +10,11 @@ import { GraphBetStatus } from "@azuro-org/toolkit";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBalanceQueryKey } from "wagmi/query";
-import { useChainId, useConnection } from "wagmi";
+import { useConnection } from "wagmi";
+import { useAzuroActionChain } from "@/lib/useAzuroActionChain";
+import { AzuroWrongChainCallout } from "@/components/AzuroWrongChainCallout";
 import { useToast } from "@/components/Toast";
+import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 
 export type CashoutButtonProps = {
   bet: Bet;
@@ -27,10 +30,10 @@ function isPendingBet(bet: Bet): boolean {
 }
 
 export function CashoutButton({ bet }: CashoutButtonProps) {
-  const { betToken } = useChain();
+  const { betToken, appChain } = useChain();
   const { showToast } = useToast();
   const { address } = useConnection();
-  const chainId = useChainId();
+  const azuroChain = useAzuroActionChain();
   const queryClient = useQueryClient();
   const pendingCashoutAfterApprove = useRef(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -56,10 +59,10 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
   const invalidateBalances = useCallback(() => {
     if (address) {
       void queryClient.invalidateQueries({
-        queryKey: getBalanceQueryKey({ chainId, address }),
+        queryKey: getBalanceQueryKey({ chainId: appChain.id, address }),
       });
     }
-  }, [address, chainId, queryClient]);
+  }, [address, appChain.id, queryClient]);
 
   const { submit, isCashoutAvailable, isApproveRequired, calculationQuery, cashoutTx, approveTx } =
     useCashout({
@@ -72,7 +75,7 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
       },
       onError: (err) => {
         pendingCashoutAfterApprove.current = false;
-        setActionError(err?.message ?? "Cashout failed");
+        setActionError(formatUserFacingTxError(err ?? new Error("Cashout failed")));
       },
     });
 
@@ -97,9 +100,9 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
         pendingCashoutAfterApprove.current = true;
       }
       await submit();
-    } catch {
+    } catch (e) {
       pendingCashoutAfterApprove.current = false;
-      setActionError((prev) => prev ?? "Transaction failed");
+      setActionError((prev) => prev ?? formatUserFacingTxError(e));
     }
   };
 
@@ -115,6 +118,7 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
         : "—";
 
   const canTryCashout =
+    azuroChain.onBetChain &&
     Boolean(precalcAvailable) &&
     !precalc.isLoading &&
     isCashoutAvailable &&
@@ -128,6 +132,16 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
   return (
     <>
       <div className="mt-3 flex flex-wrap items-end justify-between gap-2 border-t border-zinc-800/80 pt-3">
+        {!azuroChain.onBetChain ? (
+          <div className="w-full">
+            <AzuroWrongChainCallout
+              appChainName={azuroChain.appChainName}
+              walletChainName={azuroChain.walletChainName}
+              switchPending={azuroChain.switchPending}
+              onSwitch={() => void azuroChain.switchToAppChain().catch(() => {})}
+            />
+          </div>
+        ) : null}
         <div>
           <p className="text-xs text-zinc-500">Cash out value ({betToken.symbol})</p>
           <p className="mt-0.5 font-mono font-semibold tabular-nums text-zinc-100">

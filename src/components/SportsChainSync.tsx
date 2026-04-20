@@ -3,7 +3,8 @@
 import { useChain } from "@azuro-org/sdk";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { useConnection, useChainId } from "wagmi";
+import { useConnection } from "wagmi";
+import { useWalletChainId } from "@/lib/useWalletChainId";
 import { isValidSportsChainId } from "@/lib/sportsChainConstants";
 
 const REFRESH_DEBOUNCE_MS = 120;
@@ -19,7 +20,7 @@ const REFRESH_DEBOUNCE_MS = 120;
 export function SportsChainSync() {
   const router = useRouter();
   const { isConnected } = useConnection();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const { appChain, setAppChainId } = useChain();
   const appChainIdRef = useRef(appChain.id);
   const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);

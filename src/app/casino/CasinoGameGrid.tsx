@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useChainId, useConnection, useSwitchChain } from "wagmi";
+import { useConnection, useSwitchChain } from "wagmi";
+import { useWalletChainId } from "@/lib/useWalletChainId";
 import type { Address } from "viem";
 import {
   getCasinoCoinTossAddress,
@@ -98,7 +99,7 @@ function GameSkeleton() {
 
 export function CasinoGameGrid() {
   const { isConnected } = useConnection();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const { switchChain, isPending: switchPending } = useSwitchChain();
   const [mounted, setMounted] = useState(false);
 

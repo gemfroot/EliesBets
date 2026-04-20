@@ -23,6 +23,7 @@ import dynamic from "next/dynamic";
 import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { useToast } from "@/components/Toast";
 import { formatOddsValue, formatStoredOddsString } from "@/lib/oddsFormat";
+import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 
 const BetReceipt = dynamic(
   () =>
@@ -529,7 +530,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
         }
       },
       onError: (err) => {
-        setErrorMessage(err?.message ?? "Could not place bet.");
+        setErrorMessage(formatUserFacingTxError(err ?? new Error("Could not place bet.")));
       },
     });
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useBalance, useChainId, useConnection, useDisconnect, useSwitchChain } from "wagmi";
+import { useBalance, useConnection, useDisconnect, useSwitchChain } from "wagmi";
 import { useEffect, useRef, useState } from "react";
 import { formatUnits } from "viem";
 import { MyBetsLink } from "@/components/MyBetsLink";
@@ -11,8 +11,8 @@ import {
   HEADER_SWITCHER_CHAIN_IDS,
   SUPPORTED_CHAIN_IDS,
   chainName,
-  normalizeChainId,
 } from "@/lib/chains";
+import { useWalletChainId } from "@/lib/useWalletChainId";
 
 const ConnectModal = dynamic(
   () =>
@@ -22,6 +22,7 @@ const ConnectModal = dynamic(
   { ssr: false },
 );
 import { useOddsFormat } from "@/components/OddsFormatProvider";
+import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 import { SearchBar } from "@/components/SearchBar";
 import type { OddsFormat } from "@/lib/oddsFormat";
 
@@ -57,7 +58,7 @@ export function Header() {
   const [modalOpen, setModalOpen] = useState(false);
   const { address, isConnected, status } = useConnection();
   const { disconnect } = useDisconnect();
-  const chainId = normalizeChainId(useChainId());
+  const chainId = useWalletChainId();
   const { switchChainAsync, isPending: switchPending, error: switchError } =
     useSwitchChain();
   const [chainMenuOpen, setChainMenuOpen] = useState(false);
@@ -77,8 +78,7 @@ export function Header() {
 
   useEffect(() => {
     if (!switchError) return;
-    const e = switchError as Error & { shortMessage?: string };
-    const msg = (e.shortMessage ?? e.message ?? "Failed to switch network").trim();
+    const msg = formatUserFacingTxError(switchError);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sync error toast from async mutation
     setSwitchErrorMsg(msg);
     const id = setTimeout(() => setSwitchErrorMsg(null), 5000);
@@ -108,7 +108,13 @@ export function Header() {
         }`}
         aria-haspopup={isConnected ? "menu" : undefined}
         aria-expanded={isConnected ? chainMenuOpen : undefined}
-        title={isConnected ? "Switch network" : "Connect a wallet to switch network"}
+        title={
+          !isConnected
+            ? "Connect a wallet to switch network"
+            : isUnsupported
+              ? `${chainName(chainId)} isn’t supported — open this menu to switch to Polygon, Gnosis, or Base`
+              : "Switch network"
+        }
       >
         <span
           className={`h-1.5 w-1.5 rounded-full ${
@@ -243,6 +249,17 @@ export function Header() {
           <ConnectModal open onClose={() => setModalOpen(false)} />
         ) : null}
       </header>
+
+      {isUnsupported ? (
+        <div
+          role="status"
+          className="border-b border-amber-800/60 bg-amber-950/90 px-4 py-2 text-center text-xs leading-snug text-amber-50"
+        >
+          You&apos;re on <strong>{chainName(chainId)}</strong>, which isn&apos;t used for sports
+          here. Open the <strong>network</strong> control in the header and switch to{" "}
+          <strong>Polygon</strong>, <strong>Gnosis</strong>, or <strong>Base</strong>.
+        </div>
+      ) : null}
 
       {switchErrorMsg ? (
         <div

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BP_VALUE } from "@betswirl/sdk-core";
 import { formatUnits, parseUnits } from "viem";
-import { useAccount, useChainId, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
+import { useWalletChainId } from "@/lib/useWalletChainId";
 import { base } from "viem/chains";
 import { CoinFlipAnimation, type CoinFlipPhase } from "@/components/CoinFlipAnimation";
 import { useCoinToss } from "@/lib/casino/hooks";
@@ -17,6 +18,7 @@ import {
   formatUsdFromWei,
   formatUsdFromDecimalString,
 } from "@/lib/price";
+import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 
 type GamePhase = CoinFlipPhase;
 
@@ -40,21 +42,9 @@ const STAKE_PRESETS_BY_SYMBOL: Record<string, string[]> = {
 };
 const DEFAULT_PRESETS = ["0.01", "0.05", "0.1", "0.5", "1"];
 
-function formatCasinoTxError(error: Error): string {
-  const e = error as Error & { shortMessage?: string };
-  const text =
-    typeof e.shortMessage === "string" && e.shortMessage.trim()
-      ? e.shortMessage.trim()
-      : (e.message ?? "").trim() || "Transaction failed.";
-  if (/msg\.value/i.test(text)) {
-    return "Transaction failed. Check your stake covers the minimum and network fees, then try again.";
-  }
-  return text;
-}
-
 export function CoinTossGame() {
   const { isConnected } = useAccount();
-  const chainId = useChainId();
+  const chainId = useWalletChainId();
   const { switchChain } = useSwitchChain();
 
   const availableTokens = useMemo(() => getBetTokens(chainId), [chainId]);
@@ -622,7 +612,7 @@ export function CoinTossGame() {
 
                 {error ? (
                   <p className="type-body text-red-400" role="alert">
-                    {formatCasinoTxError(error)}
+                    {formatUserFacingTxError(error)}
                   </p>
                 ) : null}
 

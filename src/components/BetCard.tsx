@@ -6,7 +6,9 @@ import type { GameData } from "@azuro-org/toolkit";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import { getBalanceQueryKey } from "wagmi/query";
-import { useChainId, useConnection } from "wagmi";
+import { useConnection } from "wagmi";
+import { useAzuroActionChain } from "@/lib/useAzuroActionChain";
+import { AzuroWrongChainCallout } from "@/components/AzuroWrongChainCallout";
 import { CashoutButton } from "@/components/CashoutButton";
 import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { useToast } from "@/components/Toast";
@@ -16,6 +18,7 @@ import {
   txExplorerUrlFromAppChain,
 } from "@/lib/betShare";
 import { formatOddsValue } from "@/lib/oddsFormat";
+import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 
 function participantLine(game: GameData): string {
   const { participants, title } = game;
@@ -64,7 +67,7 @@ export function BetCard({ bet }: BetCardProps) {
   const { betToken, appChain } = useChain();
   const { showToast } = useToast();
   const { address } = useConnection();
-  const chainId = useChainId();
+  const azuroChain = useAzuroActionChain();
   const queryClient = useQueryClient();
   const { submit, isPending, isProcessing } = useRedeemBet();
   const [claimError, setClaimError] = useState<string | null>(null);
@@ -80,10 +83,10 @@ export function BetCard({ bet }: BetCardProps) {
   const invalidateBalances = useCallback(() => {
     if (address) {
       void queryClient.invalidateQueries({
-        queryKey: getBalanceQueryKey({ chainId, address }),
+        queryKey: getBalanceQueryKey({ chainId: appChain.id, address }),
       });
     }
-  }, [address, chainId, queryClient]);
+  }, [address, appChain.id, queryClient]);
 
   const claimBusy = isPending || isProcessing;
 
@@ -252,6 +255,14 @@ export function BetCard({ bet }: BetCardProps) {
 
       {showClaim ? (
         <div className="mt-3 border-t border-zinc-800/80 pt-3">
+          {!azuroChain.onBetChain ? (
+            <AzuroWrongChainCallout
+              appChainName={azuroChain.appChainName}
+              walletChainName={azuroChain.walletChainName}
+              switchPending={azuroChain.switchPending}
+              onSwitch={() => void azuroChain.switchToAppChain().catch(() => {})}
+            />
+          ) : null}
           {claimError ? (
             <p className="mb-2 text-sm text-red-400" role="alert">
               {claimError}
@@ -259,7 +270,7 @@ export function BetCard({ bet }: BetCardProps) {
           ) : null}
           <button
             type="button"
-            disabled={claimBusy}
+            disabled={claimBusy || !azuroChain.onBetChain}
             onClick={async () => {
               setClaimError(null);
               try {
@@ -267,9 +278,7 @@ export function BetCard({ bet }: BetCardProps) {
                 invalidateBalances();
                 showToast("Winnings claimed.", "success");
               } catch (e) {
-                setClaimError(
-                  e instanceof Error ? e.message : "Could not claim winnings",
-                );
+                setClaimError(formatUserFacingTxError(e));
               }
             }}
             className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"

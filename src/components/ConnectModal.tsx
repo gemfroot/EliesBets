@@ -1,6 +1,7 @@
 "use client";
 
 import { useConnect, useConnectors } from "wagmi";
+import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 import { useCallback, useEffect, useRef } from "react";
 
 type ConnectModalProps = {
@@ -85,7 +86,7 @@ export function ConnectModal({ open, onClose }: ConnectModalProps) {
         </ul>
         {error && (
           <p className="mt-3 text-sm text-red-400" role="alert">
-            {error.message}
+            {formatUserFacingTxError(error)}
           </p>
         )}
         <button
