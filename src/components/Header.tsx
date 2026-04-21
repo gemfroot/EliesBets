@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useChain as useAzuroChain } from "@azuro-org/sdk";
 import { useBalance, useConnection, useDisconnect, useSwitchChain } from "wagmi";
 import { useEffect, useRef, useState } from "react";
 import { formatUnits } from "viem";
@@ -22,7 +23,7 @@ const ConnectModal = dynamic(
   { ssr: false },
 );
 import { useOddsFormat } from "@/components/OddsFormatProvider";
-import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+import { formatWalletTxError } from "@/lib/userFacingTxError";
 import { SearchBar } from "@/components/SearchBar";
 import type { OddsFormat } from "@/lib/oddsFormat";
 
@@ -57,6 +58,7 @@ export function Header() {
   const { format: oddsFormat, setFormat: setOddsFormat } = useOddsFormat();
   const [modalOpen, setModalOpen] = useState(false);
   const { address, isConnected, status } = useConnection();
+  const { setAppChainId } = useAzuroChain();
   const { disconnect } = useDisconnect();
   const chainId = useWalletChainId();
   const { switchChainAsync, isPending: switchPending, error: switchError } =
@@ -78,7 +80,7 @@ export function Header() {
 
   useEffect(() => {
     if (!switchError) return;
-    const msg = formatUserFacingTxError(switchError);
+    const msg = formatWalletTxError(switchError);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sync error toast from async mutation
     setSwitchErrorMsg(msg);
     const id = setTimeout(() => setSwitchErrorMsg(null), 5000);
@@ -108,6 +110,7 @@ export function Header() {
         }`}
         aria-haspopup={isConnected ? "menu" : undefined}
         aria-expanded={isConnected ? chainMenuOpen : undefined}
+        aria-describedby={!isConnected ? "header-chain-pill-help" : undefined}
         title={
           !isConnected
             ? "Connect a wallet to switch network"
@@ -124,7 +127,28 @@ export function Header() {
         <span>
           {isUnsupported ? "Unsupported" : chainId !== undefined ? chainName(chainId) : "—"}
         </span>
-        {isConnected ? (
+        {switchPending ? (
+          <svg
+            className="h-3.5 w-3.5 shrink-0 animate-spin text-zinc-400"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+              fill="none"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+        ) : isConnected ? (
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" className="text-zinc-400">
             <path d="M2 4l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -149,7 +173,8 @@ export function Header() {
                     if (active) return;
                     try {
                       await switchChainAsync({ chainId: id });
-                      /* setAppChainId + router.refresh: SportsChainSync (wagmi chainId → Azuro) */
+                      setAppChainId(id);
+                      /* router.refresh: SportsChainSync debounces after wagmi chainId updates */
                     } catch {
                       /* wagmi surfaces switchError */
                     }
@@ -169,6 +194,9 @@ export function Header() {
 
   return (
     <>
+      <span id="header-chain-pill-help" className="sr-only">
+        Connect a wallet to switch sports betting network.
+      </span>
       <header className="relative z-50 flex h-16 shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4">
         <Link
           href="/"

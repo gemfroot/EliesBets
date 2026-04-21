@@ -1,32 +1,20 @@
 "use client";
 
-import { BetType, useBets } from "@azuro-org/sdk";
 import { useEffect, useRef } from "react";
 import { useConnection } from "wagmi";
-import { zeroAddress } from "viem";
 import { useToast } from "@/components/Toast";
-
-/** Cap auto-pagination so huge histories do not hammer the subgraph from this effect alone. */
-const MAX_SETTLEMENT_TOAST_PAGES = 30;
+import { useSettledBetsPrefetch } from "@/components/SettledBetsPrefetchProvider";
 
 /**
  * Shows win/loss toasts when a bet settles (from cached graph data).
+ * Settled pages are prefetched by `SettledBetsPrefetchProvider` (single `fetchNextPage` owner).
  */
 export function BetSettlementToasts() {
-  const { address, isConnected } = useConnection();
+  const { address } = useConnection();
   const { showToast } = useToast();
+  const { settledBets } = useSettledBetsPrefetch();
   const seen = useRef<Map<string, { win: boolean; lose: boolean }>>(new Map());
   const hydrated = useRef(false);
-
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useBets({
-    filter: { bettor: address ?? zeroAddress, type: BetType.Settled },
-    query: { enabled: Boolean(isConnected && address) },
-  });
 
   useEffect(() => {
     hydrated.current = false;
@@ -34,28 +22,12 @@ export function BetSettlementToasts() {
   }, [address]);
 
   useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage) {
+    if (!settledBets.length) {
       return;
     }
-    const loadedPages = data?.pages?.length ?? 0;
-    if (loadedPages >= MAX_SETTLEMENT_TOAST_PAGES) {
-      return;
-    }
-    void fetchNextPage();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage, data?.pages?.length]);
-
-  useEffect(() => {
-    if (!data?.pages?.length) {
-      return;
-    }
-    if (hasNextPage || isFetchingNextPage) {
-      return;
-    }
-
-    const bets = data.pages.flatMap((p) => p.bets);
 
     if (!hydrated.current) {
-      for (const bet of bets) {
+      for (const bet of settledBets) {
         const id = bet.orderId;
         seen.current.set(id, {
           win: bet.isWin && !bet.isCanceled,
@@ -66,7 +38,7 @@ export function BetSettlementToasts() {
       return;
     }
 
-    for (const bet of bets) {
+    for (const bet of settledBets) {
       const id = bet.orderId;
       const win = bet.isWin && !bet.isCanceled;
       const lose = bet.isLose && !bet.isCanceled;
@@ -89,7 +61,7 @@ export function BetSettlementToasts() {
       }
       seen.current.set(id, { win, lose });
     }
-  }, [data, hasNextPage, isFetchingNextPage, showToast]);
+  }, [settledBets, showToast]);
 
   return null;
 }

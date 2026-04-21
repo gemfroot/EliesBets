@@ -1,10 +1,7 @@
 import { GameState, getSports, type SportData } from "@azuro-org/toolkit";
 import type { MetadataRoute } from "next";
-import { DEFAULT_SPORTS_CHAIN_ID } from "@/lib/sportsChainConstants";
+import { HEADER_SWITCHER_CHAIN_IDS } from "@/lib/chains";
 import { getSiteOrigin } from "@/lib/siteUrl";
-
-/** Crawlers often have no `appChainId` cookie; keep a single canonical tree (default Polygon). */
-const SITEMAP_CHAIN_ID = DEFAULT_SPORTS_CHAIN_ID;
 
 /** Large enough to list most fixtures per league in the sitemap tree response. */
 const SITEMAP_GAMES_PER_LEAGUE = 500;
@@ -90,19 +87,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let sports: SportData[] = [];
   try {
-    const [prematch, live] = await Promise.all([
-      getSports({
-        chainId: SITEMAP_CHAIN_ID,
-        gameState: GameState.Prematch,
-        numberOfGames: SITEMAP_GAMES_PER_LEAGUE,
+    const perChainTrees = await Promise.all(
+      HEADER_SWITCHER_CHAIN_IDS.map(async (chainId) => {
+        const [prematch, live] = await Promise.all([
+          getSports({
+            chainId,
+            gameState: GameState.Prematch,
+            numberOfGames: SITEMAP_GAMES_PER_LEAGUE,
+          }),
+          getSports({
+            chainId,
+            gameState: GameState.Live,
+            numberOfGames: SITEMAP_GAMES_PER_LEAGUE,
+          }),
+        ]);
+        return mergeSportsTrees([prematch, live]);
       }),
-      getSports({
-        chainId: SITEMAP_CHAIN_ID,
-        gameState: GameState.Live,
-        numberOfGames: SITEMAP_GAMES_PER_LEAGUE,
-      }),
-    ]);
-    sports = mergeSportsTrees([prematch, live]);
+    );
+    sports = mergeSportsTrees(perChainTrees);
   } catch {
     return base;
   }

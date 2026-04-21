@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAccount, usePublicClient } from "wagmi";
+import { useConnection, usePublicClient } from "wagmi";
 import { useWalletChainId } from "@/lib/useWalletChainId";
 import type { PublicClient } from "viem";
 import { getBlockNumber, getContractEvents } from "viem/actions";
@@ -67,8 +67,27 @@ function randomId() {
   return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function rollFromBlock(
+  bet: PendingBet,
+  head: bigint,
+): { fromBlock: bigint; skipRpc: boolean } {
+  const start = bet.blockNumber ? BigInt(bet.blockNumber) : null;
+  const last = bet.lastCheckedBlock ? BigInt(bet.lastCheckedBlock) : null;
+  let fromBlock: bigint;
+  if (last == null) {
+    fromBlock = start ?? (head > 2_000n ? head - 2_000n : 0n);
+  } else {
+    const floor = start ?? 0n;
+    fromBlock = floor > last + 1n ? floor : last + 1n;
+  }
+  if (fromBlock > head) {
+    return { fromBlock: head, skipRpc: true };
+  }
+  return { fromBlock, skipRpc: false };
+}
+
 export function PendingBetsProvider({ children }: { children: React.ReactNode }) {
-  const { address } = useAccount();
+  const { address } = useConnection();
   const chainId = useWalletChainId();
   const publicClient = usePublicClient();
   const [pending, setPending] = useState<PendingBet[]>([]);
@@ -83,7 +102,7 @@ export function PendingBetsProvider({ children }: { children: React.ReactNode })
     }
     if (loadedFor.current === address.toLowerCase()) return;
     loadedFor.current = address.toLowerCase();
-     
+
     setPending(load(address));
   }, [address]);
 
@@ -159,7 +178,9 @@ export function PendingBetsProvider({ children }: { children: React.ReactNode })
   // so the drawer resolves itself even when the user isn't on the game page.
   useEffect(() => {
     if (!publicClient || !address) return;
-    const active = pending.filter((b) => b.status !== "resolved" && b.chainId === chainId);
+    const active = pending.filter(
+      (b) => b.status === "pending" && b.chainId === chainId,
+    );
     if (active.length === 0) return;
 
     let cancelled = false;
@@ -175,7 +196,10 @@ export function PendingBetsProvider({ children }: { children: React.ReactNode })
       for (const bet of active) {
         if (cancelled) return;
         const abi = ABI_BY_GAME[bet.game];
-        const fromBlock = bet.blockNumber ? BigInt(bet.blockNumber) : head > 2_000n ? head - 2_000n : 0n;
+        const { fromBlock, skipRpc } = rollFromBlock(bet, head);
+        if (skipRpc) {
+          continue;
+        }
         try {
           const logs = await getContractEvents(publicClient as PublicClient, {
             address: bet.contract,
@@ -185,15 +209,41 @@ export function PendingBetsProvider({ children }: { children: React.ReactNode })
             fromBlock,
             toBlock: head,
           });
-          if (logs.length === 0) continue;
-          // Find a Roll with id != baseline (most recent one qualifies)
-           
+
+          if (logs.length === 0) {
+            setPending((prev) =>
+              prev.map((b) =>
+                b.id === bet.id && b.status === "pending"
+                  ? { ...b, lastCheckedBlock: head.toString() }
+                  : b,
+              ),
+            );
+            continue;
+          }
           const baseline = bet.baselineRollId ? BigInt(bet.baselineRollId) : null;
           const latest = logs[logs.length - 1];
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const args = (latest as any).args as { id?: bigint; payout?: bigint; totalBetAmount?: bigint };
-          if (args?.id == null) continue;
-          if (baseline != null && args.id === baseline) continue;
+          if (args?.id == null) {
+            setPending((prev) =>
+              prev.map((b) =>
+                b.id === bet.id && b.status === "pending"
+                  ? { ...b, lastCheckedBlock: head.toString() }
+                  : b,
+              ),
+            );
+            continue;
+          }
+          if (baseline != null && args.id === baseline) {
+            setPending((prev) =>
+              prev.map((b) =>
+                b.id === bet.id && b.status === "pending"
+                  ? { ...b, lastCheckedBlock: head.toString() }
+                  : b,
+              ),
+            );
+            continue;
+          }
           const payout = args.payout ?? 0n;
           const stake = args.totalBetAmount ?? 0n;
           const net = payout > 0n ? payout - stake : -stake;
@@ -234,4 +284,3 @@ export function PendingBetsProvider({ children }: { children: React.ReactNode })
 
   return <PendingBetsCtx.Provider value={value}>{children}</PendingBetsCtx.Provider>;
 }
-

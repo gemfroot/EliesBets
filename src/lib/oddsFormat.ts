@@ -126,7 +126,18 @@ export function formatOddsValue(decimal: number, format: OddsFormat): string {
   }
 }
 
-/** Slip odds are stored as a decimal string (e.g. "2.10"); used to detect line moves vs live prices. */
+/**
+ * Encode SDK decimal odds for the betslip string (full precision for drift checks).
+ * Avoid `toFixed(2)` at add-to-slip time — that caused false “Odds updated” on live lines.
+ */
+export function encodeSlipDecimalOdds(odds: number): string {
+  if (!Number.isFinite(odds) || odds <= 0) {
+    return "—";
+  }
+  return odds.toFixed(6);
+}
+
+/** Slip odds are stored as a decimal string; used to detect line moves vs live prices. */
 export function parseStoredDecimalOdds(stored: string): number | null {
   const trimmed = stored.trim();
   if (trimmed === "" || trimmed === "—") {

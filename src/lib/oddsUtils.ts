@@ -42,9 +42,11 @@ export function extractMainLineOdds(
   try {
     const markets = groupConditionsByMarket(conditions);
     const fullTime = markets.find((m) => m.marketKey === "1-1-1");
-    const matchWinner = markets.find((m) =>
-      /match winner/i.test(m.name),
-    );
+    /** Moneyline / two-way winner: family `19` in Azuro keys (e.g. `19-...`), not localized names. */
+    const matchWinnerByKey = markets.find((m) => marketFamilyKey(m.marketKey) === "19");
+    const matchWinner =
+      matchWinnerByKey ??
+      markets.find((m) => /match winner/i.test(m.name));
     const firstNonOu =
       markets.find((m) => marketFamilyKey(m.marketKey) !== "4") ?? null;
     const main =
@@ -116,7 +118,10 @@ export function countGameMarkets(conditions: ConditionDetailedData[]): number {
 
 export type GameOddsData = {
   topOdds: TopOddsLine[] | null;
+  overUnderOdds: TopOddsLine[] | null;
   marketCount: number;
+  /** Unix ms when this row was built (for list card staleness). */
+  fetchedAt: number;
 };
 
 export async function fetchTopOddsByGameId(
@@ -147,11 +152,14 @@ export async function fetchTopOddsByGameId(
           }
         }
         const batchResult = new Map<string, GameOddsData>();
+        const fetchedAt = Date.now();
         for (const gid of batch) {
           const conds = byGameId.get(gid) ?? [];
           batchResult.set(gid, {
             topOdds: extractMainLineOdds(conds),
+            overUnderOdds: extractOverUnderOdds(conds),
             marketCount: countGameMarkets(conds),
+            fetchedAt,
           });
         }
         return batchResult;

@@ -10,14 +10,14 @@ import {
   type WeightedGameConfiguration,
 } from "@betswirl/sdk-core";
 import { formatUnits, isAddress, parseUnits } from "viem";
-import { useAccount, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
+import { useConnection, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
 import { useWalletChainId } from "@/lib/useWalletChainId";
 import { base } from "viem/chains";
 import { WheelAnimation, type WheelPhase } from "@/components/WheelAnimation";
 import { useWheel, type WheelBetData } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
 import { chainName, explorerTxUrl } from "@/lib/chains";
-import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+import { formatWalletTxError } from "@/lib/userFacingTxError";
 
 const BET_HISTORY_DISPLAY_CAP = 12;
 
@@ -60,7 +60,7 @@ function segmentVisualsForConfig(cfg: WeightedGameConfiguration | undefined) {
 }
 
 export function WheelGame() {
-  const { isConnected, address: connected } = useAccount();
+  const { isConnected, address: connected } = useConnection();
   const chainId = useWalletChainId();
   const { switchChain } = useSwitchChain();
 
@@ -697,7 +697,7 @@ export function WheelGame() {
 
                 {error ? (
                   <p className="type-body text-red-400" role="alert">
-                    {formatUserFacingTxError(error)}
+                    {formatWalletTxError(error)}
                   </p>
                 ) : null}
 

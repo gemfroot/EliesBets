@@ -8,6 +8,7 @@ import { BetslipProvider } from "@/components/Betslip";
 import { OddsFormatProvider } from "@/components/OddsFormatProvider";
 import { FavoritesProvider } from "@/components/FavoritesProvider";
 import { BetSettlementToasts } from "@/components/BetSettlementToasts";
+import { SettledBetsPrefetchProvider } from "@/components/SettledBetsPrefetchProvider";
 import { ToastProvider } from "@/components/Toast";
 import { PendingBetsProvider } from "@/components/PendingBetsProvider";
 import type { SportsChainId } from "@/lib/sportsChainConstants";
@@ -48,8 +49,10 @@ export function Providers({
               <ToastProvider>
                 <PendingBetsProvider>
                   <BetslipProvider>
-                    <BetSettlementToasts />
-                    {children}
+                    <SettledBetsPrefetchProvider>
+                      <BetSettlementToasts />
+                      {children}
+                    </SettledBetsPrefetchProvider>
                   </BetslipProvider>
                 </PendingBetsProvider>
               </ToastProvider>

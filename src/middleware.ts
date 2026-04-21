@@ -3,6 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 30;
 
+/**
+ * Best-effort rate limit only: each Edge instance keeps its own map, so the effective
+ * ceiling is roughly per-instance (not global). Stronger protection needs Redis/KV.
+ */
 const hitsByIp = new Map<string, { count: number; resetAt: number }>();
 
 function pruneExpiredRateLimitEntries() {
@@ -51,6 +55,7 @@ export function middleware(request: NextRequest) {
   const csp = [
     `default-src 'self'`,
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    // next/font + Tailwind inject inline <style>; nonces on those tags are not wired here.
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https:`,
     `font-src 'self' https://fonts.gstatic.com`,

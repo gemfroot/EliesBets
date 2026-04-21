@@ -12,8 +12,7 @@ import {
   HomeSportsNavSection,
 } from "@/components/HomePageSections";
 
-/** Prematch/home lists: ISR. Live hero is dynamic via `unstable_noStore` in `LiveHeroSection`. */
-export const revalidate = 45;
+// Home sections call `getSportsChainId()` (cookies) → dynamic; `revalidate` would not apply as ISR.
 
 async function LiveHeroSection() {
   unstable_noStore();

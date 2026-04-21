@@ -5,6 +5,7 @@ import { ConditionState, type Market, type MarketOutcome } from "@azuro-org/tool
 import { OddsButton } from "@/components/OddsButton";
 import { useBetslipActions } from "@/components/Betslip";
 import { getOutcomeDisplayLabel } from "@/lib/outcomeLabels";
+import { encodeSlipDecimalOdds } from "@/lib/oddsFormat";
 
 export type MarketGroupProps = {
   title: string;
@@ -36,7 +37,7 @@ function OutcomeButton({
   const { addSelection } = useBetslipActions();
   const oddsStr =
     Number.isFinite(outcome.odds) && outcome.odds > 0
-      ? outcome.odds.toFixed(2)
+      ? encodeSlipDecimalOdds(outcome.odds)
       : "—";
   const suspended = conditionState !== ConditionState.Active;
   const displayName = getOutcomeDisplayLabel(outcome.selectionName, {
@@ -61,6 +62,7 @@ function OutcomeButton({
           outcomeId: outcome.outcomeId,
           conditionId: outcome.conditionId,
           isExpressForbidden: outcome.isExpressForbidden,
+          listConditionStateAtAdd: conditionState,
         })
       }
     />

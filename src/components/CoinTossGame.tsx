@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BP_VALUE } from "@betswirl/sdk-core";
 import { formatUnits, parseUnits } from "viem";
-import { useAccount, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
+import { useConnection, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
 import { useWalletChainId } from "@/lib/useWalletChainId";
 import { base } from "viem/chains";
 import { CoinFlipAnimation, type CoinFlipPhase } from "@/components/CoinFlipAnimation";
@@ -18,7 +18,7 @@ import {
   formatUsdFromWei,
   formatUsdFromDecimalString,
 } from "@/lib/price";
-import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+import { formatWalletTxError } from "@/lib/userFacingTxError";
 
 type GamePhase = CoinFlipPhase;
 
@@ -43,7 +43,7 @@ const STAKE_PRESETS_BY_SYMBOL: Record<string, string[]> = {
 const DEFAULT_PRESETS = ["0.01", "0.05", "0.1", "0.5", "1"];
 
 export function CoinTossGame() {
-  const { isConnected } = useAccount();
+  const { isConnected } = useConnection();
   const chainId = useWalletChainId();
   const { switchChain } = useSwitchChain();
 
@@ -612,7 +612,7 @@ export function CoinTossGame() {
 
                 {error ? (
                   <p className="type-body text-red-400" role="alert">
-                    {formatUserFacingTxError(error)}
+                    {formatWalletTxError(error)}
                   </p>
                 ) : null}
 

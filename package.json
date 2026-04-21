@@ -8,6 +8,7 @@
     "build:webpack": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "smoke:prod": "node scripts/smoke-production.mjs",
     "check:static": "node scripts/check-static-sources.mjs"
   },
@@ -36,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

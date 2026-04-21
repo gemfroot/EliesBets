@@ -20,7 +20,8 @@ import {
 import { formatOddsValue } from "@/lib/oddsFormat";
 import { betIsClaimable } from "@/lib/azuroClaimEligibility";
 import { logClaimFailure } from "@/lib/claimDebugLog";
-import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+import { formatWalletTxError } from "@/lib/userFacingTxError";
+import { formatStartTime } from "@/lib/useCountdown";
 
 function participantLine(game: GameData): string {
   const { participants, title } = game;
@@ -31,17 +32,6 @@ function participantLine(game: GameData): string {
     return participants[0]!.name;
   }
   return title;
-}
-
-function formatStartTime(startsAt: string): string {
-  const ms = +startsAt < 32_503_680_000 ? +startsAt * 1000 : +startsAt;
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(ms));
 }
 
 function statusLabel(bet: Bet): string {
@@ -284,7 +274,7 @@ export function BetCard({ bet }: BetCardProps) {
                 showToast("Winnings claimed.", "success");
               } catch (e) {
                 logClaimFailure("claim_single", e, [bet]);
-                setClaimError(formatUserFacingTxError(e));
+                setClaimError(formatWalletTxError(e));
               }
             }}
             className="w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"

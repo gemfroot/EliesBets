@@ -8,16 +8,19 @@ import {
   useChain,
   useDetailedBetslip,
 } from "@azuro-org/sdk";
+import { ConditionState } from "@azuro-org/toolkit";
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { useAccount, useReadContract } from "wagmi";
+import { useConnection, useReadContract } from "wagmi";
 import { erc20Abi, formatUnits, zeroAddress } from "viem";
 import dynamic from "next/dynamic";
 import { useOddsFormat } from "@/components/OddsFormatProvider";
@@ -29,7 +32,7 @@ import {
   oddsDriftedFromStored,
   parseStoredDecimalOdds,
 } from "@/lib/oddsFormat";
-import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+import { formatWalletTxError } from "@/lib/userFacingTxError";
 
 const BetReceipt = dynamic(
   () =>
@@ -62,6 +65,8 @@ export type BetslipSelection = {
   odds: string;
   conditionId: string;
   outcomeId: string;
+  /** Condition state when the pick was added from a list card (dev diagnostics). */
+  listConditionStateAtAdd?: ConditionState;
 };
 
 type BetslipActionsValue = {
@@ -73,6 +78,7 @@ type BetslipActionsValue = {
     conditionId: string;
     outcomeId: string;
     isExpressForbidden?: boolean;
+    listConditionStateAtAdd?: ConditionState;
   }) => void;
   clearSelections: () => void;
   removeSelection: (id: string) => void;
@@ -237,6 +243,7 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
       conditionId: string;
       outcomeId: string;
       isExpressForbidden?: boolean;
+      listConditionStateAtAdd?: ConditionState;
     }) => {
       const id = selectionId(item.gameId, item.outcomeName, item.outcomeId);
       const row: BetslipSelection = {
@@ -247,6 +254,7 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
         odds: item.odds,
         conditionId: item.conditionId,
         outcomeId: item.outcomeId,
+        listConditionStateAtAdd: item.listConditionStateAtAdd,
       };
       setMetaById((prev) => ({ ...prev, [id]: row }));
       addItem({
@@ -385,7 +393,7 @@ function messageForBetslipDisableReason(
   }
   switch (reason) {
     case BetslipDisableReason.ConditionState:
-      return "This market is paused or closed for betting. Remove the pick or choose another line. When only the price changes, the slip shows “Odds updated” instead.";
+      return "This market is paused or closed for betting on the contract right now. Remove the pick and add it again from the game page — on live matches the line can flicker while the feed updates. When only the price changes, you will see “Odds updated” instead.";
     case BetslipDisableReason.BetAmountGreaterThanMaxBet:
       return "Stake is above the maximum allowed for this bet.";
     case BetslipDisableReason.BetAmountLowerThanMinBet:
@@ -429,7 +437,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const { data: betFeeData } = useBetFee();
   const { showToast } = useToast();
   const { clearSelections } = useBetslipActions();
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useConnection();
   const { data: tokenBalanceRaw } = useReadContract({
     address: betToken.address,
     abi: erc20Abi,
@@ -456,6 +464,8 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   }, [applyStake, betToken.decimals, tokenBalanceRaw]);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [oddsConfirmOpen, setOddsConfirmOpen] = useState(false);
+  const oddsDialogRef = useRef<HTMLDivElement>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptSnapshot, setReceiptSnapshot] = useState<{
     selections: BetslipSelection[];
@@ -570,15 +580,107 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     [activeSelections, sdkOdds, sdkTotalOdds, mode, multiPick],
   );
 
+  const [pauseGraceElapsed, setPauseGraceElapsed] = useState(false);
+  useEffect(() => {
+    const soft =
+      disableReason === BetslipDisableReason.ConditionState &&
+      (isOddsFetching || isBetCalculationFetching);
+    if (!soft) {
+      setPauseGraceElapsed(false);
+      return;
+    }
+    setPauseGraceElapsed(false);
+    const id = window.setTimeout(() => setPauseGraceElapsed(true), 800);
+    return () => window.clearTimeout(id);
+  }, [disableReason, isOddsFetching, isBetCalculationFetching]);
+
   const sdkDisableMessage = useMemo(() => {
     if (
       disableReason === BetslipDisableReason.ConditionState &&
-      (isOddsFetching || isBetCalculationFetching)
+      (isOddsFetching || isBetCalculationFetching) &&
+      !pauseGraceElapsed
     ) {
       return "Checking market availability…";
     }
     return messageForBetslipDisableReason(disableReason);
-  }, [disableReason, isOddsFetching, isBetCalculationFetching]);
+  }, [disableReason, isOddsFetching, isBetCalculationFetching, pauseGraceElapsed]);
+
+  const betslipDebug = process.env.NEXT_PUBLIC_BETSLIP_DEBUG === "1";
+  const betslipDebugLoggedKey = useRef("");
+  useEffect(() => {
+    if (!betslipDebug) {
+      return;
+    }
+    if (
+      disableReason !== BetslipDisableReason.ConditionState ||
+      !pauseGraceElapsed
+    ) {
+      betslipDebugLoggedKey.current = "";
+      return;
+    }
+    const key = activeSelections
+      .map((s) => `${s.conditionId}:${s.outcomeId}`)
+      .join("|");
+    if (betslipDebugLoggedKey.current === key) {
+      return;
+    }
+    betslipDebugLoggedKey.current = key;
+    console.info("[betslip-debug]", {
+      disableReason,
+      isOddsFetching,
+      isBetCalculationFetching,
+      legs: activeSelections.map((s) => ({
+        gameId: s.gameId,
+        conditionId: s.conditionId,
+        outcomeId: s.outcomeId,
+        listConditionStateAtAdd: s.listConditionStateAtAdd,
+      })),
+    });
+  }, [
+    betslipDebug,
+    disableReason,
+    pauseGraceElapsed,
+    activeSelections,
+    isOddsFetching,
+    isBetCalculationFetching,
+  ]);
+
+  const pausedConditionBlocking =
+    disableReason === BetslipDisableReason.ConditionState &&
+    pauseGraceElapsed &&
+    !isBetAllowed;
+  const [showPauseBannerRemove, setShowPauseBannerRemove] = useState(false);
+  useEffect(() => {
+    if (!pausedConditionBlocking) {
+      setShowPauseBannerRemove(false);
+      return;
+    }
+    setShowPauseBannerRemove(false);
+    const id = window.setTimeout(() => setShowPauseBannerRemove(true), 3_000);
+    return () => window.clearTimeout(id);
+  }, [pausedConditionBlocking]);
+
+  useEffect(() => {
+    if (!oddsConfirmOpen) return;
+    const t = window.setTimeout(() => {
+      oddsDialogRef.current
+        ?.querySelector<HTMLElement>("[data-odds-confirm-primary]")
+        ?.focus();
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [oddsConfirmOpen]);
+
+  useEffect(() => {
+    if (!oddsConfirmOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setOddsConfirmOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [oddsConfirmOpen]);
 
   const { submit, approveTx, betTx, isApproveRequired } =
     useBet({
@@ -620,7 +722,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
         }
       },
       onError: (err) => {
-        setErrorMessage(formatUserFacingTxError(err ?? new Error("Could not place bet.")));
+        setErrorMessage(formatWalletTxError(err ?? new Error("Could not place bet.")));
       },
     });
 
@@ -832,12 +934,22 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
         <p className="text-xs text-zinc-500">Connect a wallet to place a bet.</p>
       ) : null}
       {isConnected && sdkDisableMessage && !isBetAllowed ? (
-        <p
+        <div
           className="rounded-md border border-amber-800/80 bg-amber-950/40 px-3 py-2 text-xs text-amber-200"
           role="status"
+          aria-live="polite"
         >
-          {sdkDisableMessage}
-        </p>
+          <p>{sdkDisableMessage}</p>
+          {showPauseBannerRemove ? (
+            <button
+              type="button"
+              className="mt-2 rounded border border-amber-700/80 px-2 py-1 text-[11px] font-medium text-amber-100 hover:bg-amber-900/50"
+              onClick={() => clearSelections()}
+            >
+              Remove all picks
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {errorMessage ? (
         <p
@@ -855,6 +967,8 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
         <p
           className="rounded-md border border-amber-800/80 bg-amber-950/35 px-3 py-2 text-xs text-amber-100"
           role="status"
+          aria-live="polite"
+          aria-relevant="additions text"
         >
           <span className="font-medium text-amber-50">Odds updated.</span> Prices
           no longer match when you added these picks (including small line moves). Tap
@@ -864,16 +978,64 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           </span>
         </p>
       ) : null}
+      {oddsConfirmOpen ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-4 sm:items-center"
+          role="presentation"
+          onClick={() => setOddsConfirmOpen(false)}
+        >
+          <div
+            ref={oddsDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="odds-confirm-title"
+            className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="odds-confirm-title"
+              className="text-base font-semibold text-zinc-50"
+            >
+              Confirm updated prices
+            </h2>
+            <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+              Prices changed since you added these picks. You can place at the
+              current prices shown in the betslip, or cancel to adjust your stake.
+            </p>
+            <pre className="mt-3 max-h-40 overflow-auto rounded-md border border-zinc-800 bg-zinc-950/80 p-3 font-mono text-[11px] leading-snug text-amber-100/95 whitespace-pre-wrap">
+              {oddsDrift.summary}
+            </pre>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="rounded-lg border border-zinc-600 px-4 py-2.5 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+                onClick={() => setOddsConfirmOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-odds-confirm-primary
+                className="rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-500"
+                onClick={() => {
+                  setOddsConfirmOpen(false);
+                  void submit();
+                }}
+              >
+                Place at new prices
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <button
         type="button"
         disabled={!canSubmit}
         onClick={() => {
           if (!canSubmit) return;
           if (oddsDrift.hasDrift) {
-            const ok = window.confirm(
-              `Prices changed since you added these picks:\n\n${oddsDrift.summary}\n\nPlace the bet at the current prices shown in the betslip?`,
-            );
-            if (!ok) return;
+            setOddsConfirmOpen(true);
+            return;
           }
           void submit();
         }}

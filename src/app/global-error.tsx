@@ -53,7 +53,13 @@ export default function GlobalError({
             ) : null}
             <button
               type="button"
-              onClick={() => unstable_retry()}
+              onClick={() => {
+                try {
+                  unstable_retry();
+                } catch {
+                  window.location.reload();
+                }
+              }}
               className="mt-6 w-full rounded-lg bg-zinc-100 px-4 py-2.5 text-sm font-medium text-zinc-900 transition hover:bg-white sm:w-auto"
             >
               Try again

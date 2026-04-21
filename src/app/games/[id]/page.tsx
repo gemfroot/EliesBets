@@ -12,6 +12,7 @@ import { GameDetailMarkets } from "@/components/GameDetailMarkets";
 import { GameDetailStatus } from "@/components/GameDetailStatus";
 import { RetryCallout } from "@/components/RetryCallout";
 import { gameParticipantLine } from "@/lib/gameTitle";
+import { formatServerFetchError } from "@/lib/serverFetchError";
 import { getSportsChainId } from "@/lib/sportsChain";
 import { isSoccerSport } from "@/lib/outcomeLabels";
 import type { Metadata } from "next";
@@ -137,8 +138,10 @@ export default async function GameDetailPage({ params }: Props) {
     const games = await getGamesByIds({ chainId, gameIds: [id] });
     game = games[0];
   } catch (e) {
-    gameFetchError =
-      e instanceof Error ? e.message : "Failed to load this game. Please try again.";
+    if (process.env.NODE_ENV === "development") {
+      console.error("[GameDetailPage] getGamesByIds", e);
+    }
+    gameFetchError = formatServerFetchError(e);
   }
 
   if (gameFetchError) {
@@ -162,8 +165,10 @@ export default async function GameDetailPage({ params }: Props) {
   try {
     conditions = await getConditionsByGameIds({ chainId, gameIds: id });
   } catch (e) {
-    marketsError =
-      e instanceof Error ? e.message : "Failed to load markets for this game.";
+    if (process.env.NODE_ENV === "development") {
+      console.error("[GameDetailPage] getConditionsByGameIds", e);
+    }
+    marketsError = formatServerFetchError(e);
   }
 
   const markets = groupConditionsByMarket(conditions);

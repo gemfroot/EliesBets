@@ -2,16 +2,17 @@
 
 import { useBetsSummary, useRedeemBet, type Bet } from "@azuro-org/sdk";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getBalanceQueryKey } from "wagmi/query";
 import { useConnection } from "wagmi";
 import { zeroAddress } from "viem";
 import { useAzuroActionChain } from "@/lib/useAzuroActionChain";
 import { AzuroWrongChainCallout } from "@/components/AzuroWrongChainCallout";
+import { useSettledBetsPrefetch } from "@/components/SettledBetsPrefetchProvider";
 import { useToast } from "@/components/Toast";
 import { betIsClaimable } from "@/lib/azuroClaimEligibility";
-import { logClaimFailure } from "@/lib/claimDebugLog";
-import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+import { claimBetDebugSlice, logClaimFailure } from "@/lib/claimDebugLog";
+import { formatWalletTxError } from "@/lib/userFacingTxError";
 
 /** Smaller first batches reduce block-gas / complex-leg blowups; wallet fee-cap bisect still narrows further. */
 const CLAIM_BATCH_SIZE = 6;
@@ -72,10 +73,8 @@ async function redeemSliceWithSplitFallback(
   }
 }
 
-async function redeemAllClaimableBatched(
-  submit: (props: { bets: Bet[] }) => Promise<unknown>,
-  claimable: Bet[],
-): Promise<void> {
+/** Ordered redeem chunks (same batching as the previous nested loops). */
+function buildRedeemChunks(claimable: Bet[]): Bet[][] {
   const byKey = new Map<string, Bet[]>();
   for (const bet of claimable) {
     const k = redeemBatchKey(bet);
@@ -84,13 +83,14 @@ async function redeemAllClaimableBatched(
     else byKey.set(k, [bet]);
   }
   const keys = [...byKey.keys()].sort();
+  const chunks: Bet[][] = [];
   for (const k of keys) {
     const group = byKey.get(k)!;
     for (let i = 0; i < group.length; i += CLAIM_BATCH_SIZE) {
-      const chunk = group.slice(i, i + CLAIM_BATCH_SIZE);
-      await redeemSliceWithSplitFallback(submit, chunk);
+      chunks.push(group.slice(i, i + CLAIM_BATCH_SIZE));
     }
   }
+  return chunks;
 }
 
 type BetsInfinitePage = { bets: Bet[] };
@@ -138,14 +138,23 @@ export function ClaimAllBetsButton({
   const { submit, isPending, isProcessing } = useRedeemBet();
   const { showToast } = useToast();
   const { address } = useConnection();
-  const { data: summary } = useBetsSummary({
+  const { data: summary, refetch: refetchBetsSummary } = useBetsSummary({
     account: address ?? "",
     query: { enabled: Boolean(address) },
   });
+  const { refetch: refetchSettled } = useSettledBetsPrefetch();
   const azuroChain = useAzuroActionChain();
   const queryClient = useQueryClient();
   const [sequentialBusy, setSequentialBusy] = useState(false);
   const [busyPhase, setBusyPhase] = useState<"idle" | "pages" | "claim">("idle");
+  const [claimBatch, setClaimBatch] = useState<{ done: number; total: number } | null>(
+    null,
+  );
+  const [mismatchOpen, setMismatchOpen] = useState(false);
+  const lastMergedBetsRef = useRef<Bet[]>(bets);
+  useEffect(() => {
+    lastMergedBetsRef.current = bets;
+  }, [bets]);
 
   const claimableLoaded = useMemo(() => bets.filter(betIsClaimable), [bets]);
 
@@ -156,6 +165,34 @@ export function ClaimAllBetsButton({
       });
     }
   }, [address, azuroChain.appChainId, queryClient]);
+
+  const handleRetryRefetch = useCallback(() => {
+    setMismatchOpen(false);
+    void refetchSettled();
+    void refetchBetsSummary();
+  }, [refetchSettled, refetchBetsSummary]);
+
+  const handleReportMismatch = useCallback(
+    async (mergedBets: Bet[]) => {
+      const slice = mergedBets.slice(0, 60).map(claimBetDebugSlice);
+      const text = JSON.stringify(
+        {
+          summaryToPayout: summary?.toPayout,
+          betCount: mergedBets.length,
+          slice,
+        },
+        null,
+        2,
+      );
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("Copied debug report to clipboard.", "success");
+      } catch {
+        showToast("Could not copy to clipboard.", "error");
+      }
+    },
+    [showToast, summary?.toPayout],
+  );
 
   const handleClaimAll = useCallback(async () => {
     const summaryPending = Number.parseFloat(summary?.toPayout ?? "0");
@@ -169,18 +206,23 @@ export function ClaimAllBetsButton({
       return;
     }
     setSequentialBusy(true);
+    setMismatchOpen(false);
+    setClaimBatch(null);
     let mergedBets = bets;
+    let succeededBets = 0;
     try {
       if (fetchNextPage) {
         setBusyPhase("pages");
         mergedBets = await loadAllBetsPages(bets, fetchNextPage);
       }
+      lastMergedBetsRef.current = mergedBets;
       const claimable = mergedBets.filter(betIsClaimable);
       if (claimable.length === 0) {
         const pending = Number.parseFloat(summary?.toPayout ?? "0");
         if (Number.isFinite(pending) && pending > 1e-6) {
+          setMismatchOpen(true);
           showToast(
-            "Your summary still shows unclaimed funds, but no redeemable wins were found in settled bets. Refresh the page or wait a minute for data to sync.",
+            "Summary still shows funds to claim, but no redeemable rows were found in loaded slips. Use Retry or copy a report below.",
             "info",
           );
         } else {
@@ -189,7 +231,34 @@ export function ClaimAllBetsButton({
         return;
       }
       setBusyPhase("claim");
-      await redeemAllClaimableBatched(submit, claimable);
+      const chunks = buildRedeemChunks(claimable);
+      const totalBatches = chunks.length;
+      setClaimBatch({ done: 0, total: totalBatches });
+      let claimAborted = false;
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i]!;
+        try {
+          await redeemSliceWithSplitFallback(submit, chunk);
+          succeededBets += chunk.length;
+          setClaimBatch({ done: i + 1, total: totalBatches });
+        } catch (e) {
+          const remaining = claimable.length - succeededBets;
+          logClaimFailure(
+            "claim_all_batch",
+            e,
+            chunk.length > 0 ? chunk : mergedBets,
+          );
+          showToast(
+            `${formatWalletTxError(e)} — succeeded ${succeededBets} bet${succeededBets === 1 ? "" : "s"}; about ${remaining} not submitted yet. Retry or claim smaller sets from My bets.`,
+            "error",
+          );
+          claimAborted = true;
+          break;
+        }
+      }
+      if (claimAborted) {
+        return;
+      }
 
       invalidateBalances();
       showToast(
@@ -204,10 +273,11 @@ export function ClaimAllBetsButton({
         e,
         pendingClaim.length > 0 ? pendingClaim : mergedBets,
       );
-      showToast(formatUserFacingTxError(e), "error");
+      showToast(formatWalletTxError(e), "error");
     } finally {
       setBusyPhase("idle");
       setSequentialBusy(false);
+      setClaimBatch(null);
     }
   }, [
     bets,
@@ -224,9 +294,11 @@ export function ClaimAllBetsButton({
   const loadingLabel =
     busyPhase === "pages"
       ? "Loading bets…"
-      : loading
-        ? "Claiming…"
-        : null;
+      : busyPhase === "claim" && claimBatch && claimBatch.total > 0
+        ? `Claiming ${claimBatch.done}/${claimBatch.total}…`
+        : loading
+          ? "Claiming…"
+          : null;
 
   const summaryToPayout = Number.parseFloat(summary?.toPayout ?? "0");
   const summaryShowsClaim =
@@ -240,11 +312,6 @@ export function ClaimAllBetsButton({
     return null;
   }
 
-  /*
-   * While `hasNextPage` is true, `claimableLoaded` only reflects loaded slices; the number
-   * jumps (39 → 59 → …) as TanStack merges pages or refetches. Show a count only once the
-   * settled infinite query has finished loading every page (`!hasNextPage`).
-   */
   const countIsComplete = !fetchNextPage || !hasNextPage;
   const claimCountLabel = !countIsComplete
     ? "Claim all"
@@ -252,29 +319,63 @@ export function ClaimAllBetsButton({
       ? "Claim all"
       : `Claim all (${claimableLoaded.length})`;
 
+  const helpText =
+    fetchNextPage != null
+      ? "Until every settled page is loaded, the button does not show a bet count (only loaded pages are counted and the number can jump). Click to load all, then claim in batches (up to 6 per tx). If your wallet caps fees, batches split automatically."
+      : "Claims redeemable wins in on-chain batches (up to 6 per tx). If your wallet caps fees, batches split automatically.";
+
   return (
     <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:items-end">
       {!azuroChain.onBetChain ? (
-        <AzuroWrongChainCallout
-          appChainName={azuroChain.appChainName}
-          walletChainName={azuroChain.walletChainName}
-          switchPending={azuroChain.switchPending}
-          onSwitch={() => void azuroChain.switchToAppChain().catch(() => {})}
-        />
+        <div className="w-full">
+          <AzuroWrongChainCallout
+            appChainName={azuroChain.appChainName}
+            walletChainName={azuroChain.walletChainName}
+            switchPending={azuroChain.switchPending}
+            onSwitch={() => void azuroChain.switchToAppChain().catch(() => {})}
+          />
+        </div>
       ) : null}
       <button
         type="button"
         disabled={loading || !azuroChain.onBetChain}
-        title={
-          fetchNextPage
-            ? "Until every settled page is loaded, the button does not show a bet count (only loaded pages are counted and the number can jump). Click to load all, then claim in batches (up to 6 per tx). If your wallet caps fees, batches split automatically."
-            : "Claims redeemable wins in on-chain batches (up to 6 per tx). If your wallet caps fees, batches split automatically."
-        }
+        title={helpText}
         onClick={() => void handleClaimAll()}
         className="min-h-11 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 md:min-h-0"
       >
         {loadingLabel ?? claimCountLabel}
       </button>
+      <p className="hidden max-w-md text-left text-[11px] leading-snug text-zinc-500 md:block">
+        {helpText}
+      </p>
+      {mismatchOpen && summaryShowsClaim ? (
+        <div
+          className="flex max-w-md flex-col gap-2 rounded-lg border border-amber-800/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-100"
+          role="region"
+          aria-label="Claim data mismatch actions"
+        >
+          <p className="text-amber-50/95">
+            Azuro summary and loaded slips disagree. Try refetching both feeds, or copy a
+            debug slice for support.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-md bg-amber-600 px-3 py-1.5 font-medium text-zinc-950 hover:bg-amber-500"
+              onClick={() => void handleRetryRefetch()}
+            >
+              Retry / refetch
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-amber-700/80 px-3 py-1.5 font-medium text-amber-100 hover:bg-amber-950/50"
+              onClick={() => void handleReportMismatch(lastMergedBetsRef.current)}
+            >
+              Report (copy)
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

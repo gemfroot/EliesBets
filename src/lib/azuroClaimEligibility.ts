@@ -23,3 +23,32 @@ export function betIsClaimable(bet: Bet): boolean {
     bet.possibleWin > 0
   );
 }
+
+/** Expected wallet credit per slip; matches what Claim uses (payout when set, else possibleWin). */
+function claimableExpectedPayout(bet: Bet): number {
+  if (
+    bet.payout != null &&
+    Number.isFinite(bet.payout) &&
+    bet.payout > 0
+  ) {
+    return bet.payout;
+  }
+  if (Number.isFinite(bet.possibleWin) && bet.possibleWin > 0) {
+    return bet.possibleWin;
+  }
+  return 0;
+}
+
+/**
+ * Sum of expected payouts for every claimable bet in `bets`. With the full settled
+ * list loaded, this tracks wallet simulation / Claim all more closely than
+ * `useBetsSummary().toPayout`, which can lag the subgraph.
+ */
+export function sumClaimableExpectedPayout(bets: readonly Bet[]): number {
+  let s = 0;
+  for (const b of bets) {
+    if (!betIsClaimable(b)) continue;
+    s += claimableExpectedPayout(b);
+  }
+  return s;
+}

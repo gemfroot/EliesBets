@@ -1,11 +1,12 @@
 "use client";
 
 import type { Clock, ScoreBoard } from "@azuro-org/sdk";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   formatLiveBadgeTimer,
   formatLivePeriodLabel,
 } from "@/lib/useCountdown";
+import { useGlobalSeconds } from "@/lib/useGlobalSeconds";
 
 export function LiveBadge({
   startsAt,
@@ -18,12 +19,7 @@ export function LiveBadge({
   scoreBoard?: ScoreBoard | null;
   clock?: Clock | null;
 }) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
+  const now = useGlobalSeconds();
 
   const timer = useMemo(
     () =>

@@ -15,6 +15,8 @@ export type PendingBet = {
   txHash: `0x${string}`;
   /** Block number the wager was mined in; undefined until receipt known. */
   blockNumber?: string; // bigint serialized
+  /** Highest block scanned for `Roll` logs on the last poll tick (shrinks RPC range). */
+  lastCheckedBlock?: string;
   /** Stake amount + token for display (wei as string). */
   stakeWei: string;
   tokenSymbol: string;

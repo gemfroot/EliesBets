@@ -11,14 +11,14 @@ import {
   type RouletteNumber,
 } from "@betswirl/sdk-core";
 import { formatUnits, isAddress, parseUnits } from "viem";
-import { useAccount, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
+import { useConnection, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
 import { useWalletChainId } from "@/lib/useWalletChainId";
 import { polygon } from "viem/chains";
 import { RouletteAnimation, type RoulettePhase } from "@/components/RouletteAnimation";
 import { useRoulette, type RouletteBetData } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
 import { chainName, explorerTxUrl } from "@/lib/chains";
-import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+import { formatWalletTxError } from "@/lib/userFacingTxError";
 
 const BET_HISTORY_DISPLAY_CAP = 12;
 
@@ -70,7 +70,7 @@ const PRESET_ORDER: readonly ROULETTE_INPUT_BUNDLE[] = [
 ];
 
 export function RouletteGame() {
-  const { isConnected, address: connected } = useAccount();
+  const { isConnected, address: connected } = useConnection();
   const chainId = useWalletChainId();
   const { switchChain } = useSwitchChain();
 
@@ -752,7 +752,7 @@ export function RouletteGame() {
 
                 {error ? (
                   <p className="type-body text-red-400" role="alert">
-                    {formatUserFacingTxError(error)}
+                    {formatWalletTxError(error)}
                   </p>
                 ) : null}
 

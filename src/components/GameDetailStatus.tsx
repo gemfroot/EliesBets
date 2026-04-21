@@ -3,18 +3,12 @@
 import { useLiveStatistics } from "@azuro-org/sdk";
 import { GameState } from "@azuro-org/toolkit";
 import { LiveBadge } from "@/components/LiveBadge";
-import { formatLiveScoreBoard, parseStartsAtMs, useCountdown } from "@/lib/useCountdown";
-
-function formatStartTime(startsAt: string): string {
-  const ms = parseStartsAtMs(startsAt);
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(ms));
-}
+import {
+  formatLiveScoreBoard,
+  formatStartTime,
+  parseStartsAtMs,
+  useCountdown,
+} from "@/lib/useCountdown";
 
 export function GameDetailStatus({
   gameId,

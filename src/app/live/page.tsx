@@ -6,6 +6,7 @@ import {
   type GameData,
 } from "@azuro-org/toolkit";
 import { LiveGamesList } from "@/components/LiveGamesList";
+import { formatServerFetchError } from "@/lib/serverFetchError";
 import { getSportsChainId } from "@/lib/sportsChain";
 import type { SportsChainId } from "@/lib/sportsChainConstants";
 import type { Metadata } from "next";
@@ -47,7 +48,10 @@ export default async function LivePage() {
   try {
     games = await fetchAllLiveGames(chainId);
   } catch (e) {
-    loadError = e instanceof Error ? e.message : "Failed to load live games.";
+    if (process.env.NODE_ENV === "development") {
+      console.error("[LivePage] fetchAllLiveGames", e);
+    }
+    loadError = formatServerFetchError(e);
   }
 
   return (

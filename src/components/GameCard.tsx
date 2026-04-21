@@ -2,25 +2,23 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { useState } from "react";
+import { useActiveConditions } from "@azuro-org/sdk";
 import { ConditionState, GameState, type GameData } from "@azuro-org/toolkit";
 import { FavoriteGameButton } from "@/components/FavoriteButton";
 import { OddsButton } from "@/components/OddsButton";
 import { useBetslipActions } from "@/components/Betslip";
-import type { TopOddsLine } from "@/lib/oddsUtils";
-import { useCountdown, parseStartsAtMs } from "@/lib/useCountdown";
+import {
+  countGameMarkets,
+  extractMainLineOdds,
+  extractOverUnderOdds,
+  type TopOddsLine,
+} from "@/lib/oddsUtils";
+import { useGlobalSeconds } from "@/lib/useGlobalSeconds";
+import { useCountdown, parseStartsAtMs, formatStartTime } from "@/lib/useCountdown";
 import { SportNavIcon } from "@/lib/sportNavIcon";
 import { getOutcomeDisplayLabel } from "@/lib/outcomeLabels";
-
-function formatStartTime(startsAt: string): string {
-  const ms = +startsAt < 32_503_680_000 ? +startsAt * 1000 : +startsAt;
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(ms));
-}
+import { encodeSlipDecimalOdds } from "@/lib/oddsFormat";
 
 function PrematchCountdown({
   startsAt,
@@ -52,6 +50,21 @@ function participantLine(game: GameData): string {
   return title;
 }
 
+function dedupeOuAgainstMain(
+  ou: TopOddsLine[] | null | undefined,
+  main: TopOddsLine[] | null | undefined,
+): TopOddsLine[] | null {
+  if (!ou?.length || !main?.length) {
+    return ou ?? null;
+  }
+  if (ou[0]!.conditionId === main[0]!.conditionId) {
+    return null;
+  }
+  return ou;
+}
+
+const LIST_ODDS_STALE_MS = 30_000;
+
 export type GameCardProps = {
   game: GameData;
   topOdds?: TopOddsLine[] | null;
@@ -59,6 +72,8 @@ export type GameCardProps = {
   overUnderOdds?: TopOddsLine[] | null;
   /** Markets not represented by the main + O/U rows; "+N" links to game detail. */
   extraMarketsCount?: number;
+  /** When list fetch is older than ~30s, odds stay disabled until the user hovers/taps and we refetch via `useActiveConditions`. */
+  oddsFetchedAt?: number | null;
   /** When set, replaces the default formatted start time under the title. */
   meta?: ReactNode;
   /** Stacked layout for home hero live grid: names → meta → odds, no side-by-side clash. */
@@ -72,12 +87,64 @@ export function GameCard({
   extraMarketsCount = 0,
   meta,
   variant = "default",
+  oddsFetchedAt = null,
 }: GameCardProps) {
+  const now = useGlobalSeconds();
   const { addSelection } = useBetslipActions();
   const names = participantLine(game);
   const when = formatStartTime(game.startsAt);
   const { participants } = game;
   const gameHref = `/games/${game.gameId}`;
+
+  const isStale =
+    typeof oddsFetchedAt === "number" &&
+    Number.isFinite(oddsFetchedAt) &&
+    now - oddsFetchedAt > LIST_ODDS_STALE_MS;
+  const [staleRefreshRequested, setStaleRefreshRequested] = useState(false);
+  const shouldRefetchStaleList = isStale && staleRefreshRequested;
+
+  const { data: listRefreshConditions, isFetching: listOddsRefreshing } =
+    useActiveConditions({
+      gameId: game.gameId,
+      query: {
+        enabled: shouldRefetchStaleList,
+        staleTime: 0,
+      },
+    });
+
+  const refreshedTop =
+    listRefreshConditions != null
+      ? extractMainLineOdds(listRefreshConditions)
+      : null;
+  const refreshedOuRaw =
+    listRefreshConditions != null
+      ? extractOverUnderOdds(listRefreshConditions)
+      : null;
+  const refreshedOu = dedupeOuAgainstMain(refreshedOuRaw, refreshedTop);
+
+  const topForUi = refreshedTop ?? topOdds ?? null;
+  const ouForUi = (refreshedOu ?? overUnderOdds) ?? null;
+
+  const totalMarketsAfterRefresh =
+    listRefreshConditions != null
+      ? countGameMarkets(listRefreshConditions)
+      : null;
+  const marketsShownCount =
+    (topForUi?.length ? 1 : 0) + (ouForUi?.length ? 1 : 0);
+  const extraMarketsForUi =
+    totalMarketsAfterRefresh != null
+      ? Math.max(0, totalMarketsAfterRefresh - marketsShownCount)
+      : extraMarketsCount;
+
+  const showListOddsSkeleton =
+    shouldRefetchStaleList && listOddsRefreshing && refreshedTop == null;
+  const listOddsRefreshFailed =
+    isStale &&
+    staleRefreshRequested &&
+    !listOddsRefreshing &&
+    refreshedTop == null;
+  const needsStaleListInteraction =
+    isStale && refreshedTop == null && !showListOddsSkeleton;
 
   const outcomeCtx = {
     sportSlug: game.sport.slug,
@@ -92,123 +159,180 @@ export function GameCard({
       outcomeName: displayLabel,
       odds:
         Number.isFinite(line.odds) && line.odds > 0
-          ? line.odds.toFixed(2)
+          ? encodeSlipDecimalOdds(line.odds)
           : "—",
       outcomeId: line.outcomeId,
       conditionId: line.conditionId,
       isExpressForbidden: line.isExpressForbidden,
+      listConditionStateAtAdd: line.conditionState,
     });
   };
 
-  const hasMain = topOdds && topOdds.length > 0;
-  const hasOu = overUnderOdds && overUnderOdds.length > 0;
+  const lineDisabled = (line: TopOddsLine) =>
+    line.conditionState !== ConditionState.Active || needsStaleListInteraction;
+
+  const staleHint = needsStaleListInteraction ? (
+    <p className="text-[10px] leading-snug text-amber-500/85">
+      List prices may be stale — hover or tap this card to refresh.
+    </p>
+  ) : listOddsRefreshFailed ? (
+    <p className="text-[10px] leading-snug text-red-400/90">
+      Could not refresh odds.{" "}
+      <Link href={gameHref} className="underline hover:text-red-300">
+        Open game
+      </Link>
+    </p>
+  ) : null;
+
+  const onStaleListPointerEnter = () => {
+    if (isStale && !staleRefreshRequested) {
+      setStaleRefreshRequested(true);
+    }
+  };
+
+  const hasMain = topForUi && topForUi.length > 0;
+  const hasOu = ouForUi && ouForUi.length > 0;
 
   const oddsBlock =
     hasMain || hasOu ? (
       variant === "heroLive" ? (
         <div className="flex w-full min-w-0 flex-col gap-1.5">
-          <div className="flex w-full min-w-0 flex-row gap-1.5" aria-label="Odds">
-            {hasMain
-              ? topOdds.map((line) => {
-                  const displayLabel = getOutcomeDisplayLabel(line.label, outcomeCtx);
-                  return (
-                    <OddsButton
-                      key={line.outcomeId}
-                      gameId={game.gameId}
-                      outcomeName={displayLabel}
-                      outcomeId={line.outcomeId}
-                      odds={line.odds}
-                      disabled={line.conditionState !== ConditionState.Active}
-                      label={displayLabel}
-                      className="min-h-10 min-w-0 flex-1 py-1.5"
-                      onClick={() => addLine(line)}
-                    />
-                  );
-                })
-              : null}
-            {hasMain && hasOu ? (
-              <div className="w-px shrink-0 self-stretch bg-zinc-700/60" />
-            ) : null}
-            {hasOu
-              ? overUnderOdds.map((line) => {
-                  const displayLabel = getOutcomeDisplayLabel(line.label, outcomeCtx);
-                  return (
-                    <OddsButton
-                      key={line.outcomeId}
-                      gameId={game.gameId}
-                      outcomeName={displayLabel}
-                      outcomeId={line.outcomeId}
-                      odds={line.odds}
-                      disabled={line.conditionState !== ConditionState.Active}
-                      label={displayLabel}
-                      className="min-h-10 min-w-0 flex-1 py-1.5"
-                      onClick={() => addLine(line)}
-                    />
-                  );
-                })
-              : null}
-          </div>
-          {extraMarketsCount > 0 ? (
+          {staleHint}
+          {showListOddsSkeleton ? (
+            <div className="flex w-full min-w-0 flex-col gap-1" aria-busy="true">
+              <p className="text-[10px] text-amber-500/90">Refreshing odds…</p>
+              <div className="flex w-full min-w-0 flex-row gap-1.5" aria-label="Odds">
+                <div className="h-10 min-w-0 flex-1 animate-pulse rounded-md bg-zinc-800/80" />
+                <div className="h-10 min-w-0 flex-1 animate-pulse rounded-md bg-zinc-800/80" />
+              </div>
+            </div>
+          ) : (
+            <div className="flex w-full min-w-0 flex-row gap-1.5" aria-label="Odds">
+              {hasMain
+                ? topForUi!.map((line) => {
+                    const displayLabel = getOutcomeDisplayLabel(
+                      line.label,
+                      outcomeCtx,
+                    );
+                    return (
+                      <OddsButton
+                        key={line.outcomeId}
+                        gameId={game.gameId}
+                        outcomeName={displayLabel}
+                        outcomeId={line.outcomeId}
+                        odds={line.odds}
+                        disabled={lineDisabled(line)}
+                        label={displayLabel}
+                        className="min-h-10 min-w-0 flex-1 py-1.5"
+                        onClick={() => addLine(line)}
+                      />
+                    );
+                  })
+                : null}
+              {hasMain && hasOu ? (
+                <div className="w-px shrink-0 self-stretch bg-zinc-700/60" />
+              ) : null}
+              {hasOu
+                ? ouForUi!.map((line) => {
+                    const displayLabel = getOutcomeDisplayLabel(
+                      line.label,
+                      outcomeCtx,
+                    );
+                    return (
+                      <OddsButton
+                        key={line.outcomeId}
+                        gameId={game.gameId}
+                        outcomeName={displayLabel}
+                        outcomeId={line.outcomeId}
+                        odds={line.odds}
+                        disabled={lineDisabled(line)}
+                        label={displayLabel}
+                        className="min-h-10 min-w-0 flex-1 py-1.5"
+                        onClick={() => addLine(line)}
+                      />
+                    );
+                  })
+                : null}
+            </div>
+          )}
+          {extraMarketsForUi > 0 ? (
             <Link
               href={gameHref}
               className="self-end text-[11px] font-medium tabular-nums text-zinc-500 transition-colors hover:text-zinc-300"
             >
-              +{extraMarketsCount} markets
+              +{extraMarketsForUi} markets
             </Link>
           ) : null}
         </div>
       ) : (
         <div className="flex w-full min-w-0 shrink flex-col gap-1.5 md:w-auto md:max-w-[min(100%,26rem)] md:items-end">
-          <div className="flex w-full min-w-0 flex-row items-stretch gap-1.5">
-            {hasMain
-              ? topOdds.map((line) => {
-                  const displayLabel = getOutcomeDisplayLabel(line.label, outcomeCtx);
-                  return (
-                    <OddsButton
-                      key={line.outcomeId}
-                      gameId={game.gameId}
-                      outcomeName={displayLabel}
-                      outcomeId={line.outcomeId}
-                      odds={line.odds}
-                      disabled={line.conditionState !== ConditionState.Active}
-                      label={displayLabel}
-                      className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
-                      onClick={() => addLine(line)}
-                    />
-                  );
-                })
-              : null}
-            {hasMain && hasOu ? (
-              <div className="hidden w-px shrink-0 self-stretch bg-zinc-700/60 md:block" />
-            ) : null}
-            {hasOu
-              ? overUnderOdds.map((line) => {
-                  const displayLabel = getOutcomeDisplayLabel(line.label, outcomeCtx);
-                  return (
-                    <OddsButton
-                      key={line.outcomeId}
-                      gameId={game.gameId}
-                      outcomeName={displayLabel}
-                      outcomeId={line.outcomeId}
-                      odds={line.odds}
-                      disabled={line.conditionState !== ConditionState.Active}
-                      label={displayLabel}
-                      className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
-                      onClick={() => addLine(line)}
-                    />
-                  );
-                })
-              : null}
-            {extraMarketsCount > 0 ? (
-              <Link
-                href={gameHref}
-                className="inline-flex min-h-11 min-w-[2.75rem] shrink-0 items-center justify-center self-stretch rounded-md border border-zinc-700 bg-zinc-800/80 px-2 text-xs font-semibold tabular-nums text-zinc-300 transition-colors hover:bg-zinc-700/90 md:min-h-0"
-                aria-label={`${extraMarketsCount} more markets`}
-              >
-                +{extraMarketsCount}
-              </Link>
-            ) : null}
-          </div>
+          {staleHint}
+          {showListOddsSkeleton ? (
+            <div className="flex w-full min-w-0 flex-col gap-1" aria-busy="true">
+              <p className="text-[10px] text-amber-500/90">Refreshing odds…</p>
+              <div className="flex w-full min-w-0 flex-row items-stretch gap-1.5">
+                <div className="h-11 min-w-0 flex-1 animate-pulse rounded-md bg-zinc-800/80 md:min-h-0" />
+                <div className="h-11 min-w-0 flex-1 animate-pulse rounded-md bg-zinc-800/80 md:min-h-0" />
+              </div>
+            </div>
+          ) : (
+            <div className="flex w-full min-w-0 flex-row items-stretch gap-1.5">
+              {hasMain
+                ? topForUi!.map((line) => {
+                    const displayLabel = getOutcomeDisplayLabel(
+                      line.label,
+                      outcomeCtx,
+                    );
+                    return (
+                      <OddsButton
+                        key={line.outcomeId}
+                        gameId={game.gameId}
+                        outcomeName={displayLabel}
+                        outcomeId={line.outcomeId}
+                        odds={line.odds}
+                        disabled={lineDisabled(line)}
+                        label={displayLabel}
+                        className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
+                        onClick={() => addLine(line)}
+                      />
+                    );
+                  })
+                : null}
+              {hasMain && hasOu ? (
+                <div className="hidden w-px shrink-0 self-stretch bg-zinc-700/60 md:block" />
+              ) : null}
+              {hasOu
+                ? ouForUi!.map((line) => {
+                    const displayLabel = getOutcomeDisplayLabel(
+                      line.label,
+                      outcomeCtx,
+                    );
+                    return (
+                      <OddsButton
+                        key={line.outcomeId}
+                        gameId={game.gameId}
+                        outcomeName={displayLabel}
+                        outcomeId={line.outcomeId}
+                        odds={line.odds}
+                        disabled={lineDisabled(line)}
+                        label={displayLabel}
+                        className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
+                        onClick={() => addLine(line)}
+                      />
+                    );
+                  })
+                : null}
+              {extraMarketsForUi > 0 ? (
+                <Link
+                  href={gameHref}
+                  className="inline-flex min-h-11 min-w-[2.75rem] shrink-0 items-center justify-center self-stretch rounded-md border border-zinc-700 bg-zinc-800/80 px-2 text-xs font-semibold tabular-nums text-zinc-300 transition-colors hover:bg-zinc-700/90 md:min-h-0"
+                  aria-label={`${extraMarketsForUi} more markets`}
+                >
+                  +{extraMarketsForUi}
+                </Link>
+              ) : null}
+            </div>
+          )}
         </div>
       )
     ) : (
@@ -254,7 +378,10 @@ export function GameCard({
       );
 
     return (
-      <article className="flex h-full min-h-0 flex-col rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
+      <article
+        className="flex h-full min-h-0 flex-col rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3"
+        onPointerEnter={onStaleListPointerEnter}
+      >
         <div className="mb-1.5 flex min-w-0 items-center gap-1.5">
           <SportNavIcon slug={game.sport.slug} className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
           <span className="truncate text-[11px] text-zinc-500">
@@ -279,7 +406,10 @@ export function GameCard({
   }
 
   return (
-    <article className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
+    <article
+      className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3"
+      onPointerEnter={onStaleListPointerEnter}
+    >
       {variant === "default" && (
         <div className="mb-1.5 flex min-w-0 items-center gap-1.5">
           <SportNavIcon slug={game.sport.slug} className="h-3.5 w-3.5 shrink-0 text-zinc-500" />

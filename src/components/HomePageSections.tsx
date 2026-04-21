@@ -14,7 +14,7 @@ import { RetryCallout } from "@/components/RetryCallout";
 import { getSportsChainId } from "@/lib/sportsChain";
 import type { SportsChainId } from "@/lib/sportsChainConstants";
 import { SportNavIcon } from "@/lib/sportNavIcon";
-import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+import { formatServerFetchError } from "@/lib/serverFetchError";
 
 const HERO_LIVE_LIMIT = 6;
 const HERO_FETCH_PER_PAGE = 24;
@@ -76,7 +76,7 @@ export async function HomeHeroSection() {
   try {
     heroGames = await fetchHeroLiveGames(chainId);
   } catch (e) {
-    heroError = formatUserFacingTxError(e);
+    heroError = formatServerFetchError(e);
   }
 
   return (
@@ -144,7 +144,7 @@ export async function HomeSportsNavSection() {
       name: s.name,
     }));
   } catch (e) {
-    sportsError = formatUserFacingTxError(e);
+    sportsError = formatServerFetchError(e);
   }
 
   if (sportsError) {
@@ -199,13 +199,13 @@ export async function HomePopularUpcomingSections() {
   if (popularOutcome.status === "fulfilled") {
     popularGames = popularOutcome.value;
   } else {
-    popularError = formatUserFacingTxError(popularOutcome.reason);
+    popularError = formatServerFetchError(popularOutcome.reason);
   }
 
   if (upcomingOutcome.status === "fulfilled") {
     upcomingGames = upcomingOutcome.value;
   } else {
-    upcomingError = formatUserFacingTxError(upcomingOutcome.reason);
+    upcomingError = formatServerFetchError(upcomingOutcome.reason);
   }
 
   const staticGameIds = [
@@ -248,7 +248,9 @@ export async function HomePopularUpcomingSections() {
                 <GameCard
                   game={game}
                   topOdds={oddsByGameId.get(game.gameId)?.topOdds ?? null}
+                  overUnderOdds={oddsByGameId.get(game.gameId)?.overUnderOdds ?? null}
                   extraMarketsCount={Math.max(0, (oddsByGameId.get(game.gameId)?.marketCount ?? 0) - 1)}
+                  oddsFetchedAt={oddsByGameId.get(game.gameId)?.fetchedAt}
                 />
               </li>
             ))}
@@ -282,7 +284,9 @@ export async function HomePopularUpcomingSections() {
                 <GameCard
                   game={game}
                   topOdds={oddsByGameId.get(game.gameId)?.topOdds ?? null}
+                  overUnderOdds={oddsByGameId.get(game.gameId)?.overUnderOdds ?? null}
                   extraMarketsCount={Math.max(0, (oddsByGameId.get(game.gameId)?.marketCount ?? 0) - 1)}
+                  oddsFetchedAt={oddsByGameId.get(game.gameId)?.fetchedAt}
                 />
               </li>
             ))}

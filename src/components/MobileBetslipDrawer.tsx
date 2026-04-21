@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { BetslipPanel, useBetslipMobileDrawer } from "@/components/Betslip";
 
 export function MobileBetslipDrawer() {
   const { open, closeDrawer } = useBetslipMobileDrawer();
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (open) {
+      restoreFocusRef.current = document.activeElement as HTMLElement | null;
+    } else {
+      const el = restoreFocusRef.current;
+      restoreFocusRef.current = null;
+      el?.focus?.();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) {

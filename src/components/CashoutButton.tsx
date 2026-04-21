@@ -14,7 +14,7 @@ import { useConnection } from "wagmi";
 import { useAzuroActionChain } from "@/lib/useAzuroActionChain";
 import { AzuroWrongChainCallout } from "@/components/AzuroWrongChainCallout";
 import { useToast } from "@/components/Toast";
-import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+import { formatWalletTxError } from "@/lib/userFacingTxError";
 
 export type CashoutButtonProps = {
   bet: Bet;
@@ -75,7 +75,7 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
       },
       onError: (err) => {
         pendingCashoutAfterApprove.current = false;
-        setActionError(formatUserFacingTxError(err ?? new Error("Cashout failed")));
+        setActionError(formatWalletTxError(err ?? new Error("Cashout failed")));
       },
     });
 
@@ -93,6 +93,21 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
     approveTx.isPending ||
     approveTx.isProcessing;
 
+  useEffect(() => {
+    if (!dialogOpen) {
+      return;
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape" && !isBusy) {
+        e.preventDefault();
+        pendingCashoutAfterApprove.current = false;
+        setDialogOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [dialogOpen, isBusy]);
+
   const handleConfirm = async () => {
     setActionError(null);
     try {
@@ -102,7 +117,7 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
       await submit();
     } catch (e) {
       pendingCashoutAfterApprove.current = false;
-      setActionError((prev) => prev ?? formatUserFacingTxError(e));
+      setActionError((prev) => prev ?? formatWalletTxError(e));
     }
   };
 

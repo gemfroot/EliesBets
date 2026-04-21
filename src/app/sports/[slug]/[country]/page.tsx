@@ -5,9 +5,10 @@ import { GameCard } from "@/components/GameCard";
 import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
 import { fetchGamesForSportCountry } from "@/lib/sportGames";
+import { formatServerFetchError } from "@/lib/serverFetchError";
 import { getSportsChainId } from "@/lib/sportsChain";
 
-export const revalidate = 45;
+// Cookie-driven chain id → dynamic route; `revalidate` would not apply as ISR.
 
 type Props = {
   params: Promise<{ slug: string; country: string }>;
@@ -52,7 +53,10 @@ export default async function SportCountryPage({ params }: Props) {
   try {
     games = await fetchGamesForSportCountry(slug, countrySlug, chainId);
   } catch (e) {
-    loadError = e instanceof Error ? e.message : "Failed to load games.";
+    if (process.env.NODE_ENV === "development") {
+      console.error("[SportCountryPage] fetchGamesForSportCountry", e);
+    }
+    loadError = formatServerFetchError(e);
   }
 
   const countryName =
@@ -121,7 +125,9 @@ export default async function SportCountryPage({ params }: Props) {
                     <GameCard
                       game={game}
                       topOdds={oddsByGameId.get(game.gameId)?.topOdds ?? null}
+                      overUnderOdds={oddsByGameId.get(game.gameId)?.overUnderOdds ?? null}
                       extraMarketsCount={Math.max(0, (oddsByGameId.get(game.gameId)?.marketCount ?? 0) - 1)}
+                      oddsFetchedAt={oddsByGameId.get(game.gameId)?.fetchedAt}
                     />
                   </li>
                 ))}

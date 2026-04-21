@@ -1,13 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { Clock, ScoreBoard } from "@azuro-org/sdk";
+import { useGlobalSeconds } from "@/lib/useGlobalSeconds";
 
 const FOOTBALL_SLUGS = new Set(["football", "soccer", "futsal"]);
 
 export function parseStartsAtMs(startsAt: string): number {
   const n = +startsAt;
   return n < 32_503_680_000 ? n * 1000 : n;
+}
+
+/** Shared start-time label for cards and bet history (seconds vs ms heuristic). */
+export function formatStartTime(
+  startsAt: string,
+  opts?: Intl.DateTimeFormatOptions,
+): string {
+  const ms = parseStartsAtMs(startsAt);
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    ...opts,
+  }).format(new Date(ms));
 }
 
 function isSoccerScoreBoard(
@@ -22,6 +38,38 @@ function isBasketballScoreBoard(
   return Boolean(board && "total" in board && board.total);
 }
 
+/** Match minute is never a Unix epoch; providers sometimes mis-send ms in `clock_tm`. */
+function isPlausibleFootballMinuteToken(s: string): boolean {
+  const t = s.trim();
+  if (!/^\d+$/.test(t)) {
+    return true;
+  }
+  const n = Number(t);
+  return n >= 0 && n <= 300;
+}
+
+/** Reject clock strings that are Unix ms / epoch garbage (any all-digit token > 10_000). */
+export function isSuspiciousLiveClockToken(s: string): boolean {
+  const t = s.trim();
+  if (!/^\d+$/.test(t)) {
+    return false;
+  }
+  const n = Number(t);
+  return Number.isFinite(n) && n > 10_000;
+}
+
+/** True when an all-digit token is kickoff time in ms (feed sometimes puts `startsAt` into `clock_tm`). */
+export function isKickoffMsClockToken(token: string, startsAt: string): boolean {
+  const t = token.trim();
+  if (!/^\d+$/.test(t)) {
+    return false;
+  }
+  const n = Number(t);
+  if (!Number.isFinite(n)) return false;
+  const startMs = parseStartsAtMs(startsAt);
+  return Math.abs(n - startMs) < 120_000;
+}
+
 /** Match minute for football from live clock or scoreboard (e.g. `45+2'`). */
 export function formatFootballLiveMinute(
   scoreBoard: ScoreBoard | null | undefined,
@@ -30,11 +78,16 @@ export function formatFootballLiveMinute(
   const raw = clock?.clock_tm;
   const tm = raw != null ? String(raw).trim() : "";
   if (tm) {
-    return /^\d+$/.test(tm) ? `${tm}'` : tm;
+    if (!/^\d+$/.test(tm) || isPlausibleFootballMinuteToken(tm)) {
+      return /^\d+$/.test(tm) ? `${tm}'` : tm;
+    }
   }
   if (isSoccerScoreBoard(scoreBoard)) {
     const t = scoreBoard.time != null ? String(scoreBoard.time).trim() : "";
     if (!t) {
+      return null;
+    }
+    if (/^\d+$/.test(t) && !isPlausibleFootballMinuteToken(t)) {
       return null;
     }
     if (/^\d+$/.test(t)) {
@@ -77,9 +130,33 @@ export function formatLiveBadgeTimer(
       return minute;
     }
   }
+  const rawClock = clock?.clock_tm != null ? String(clock.clock_tm).trim() : "";
+  if (rawClock) {
+    if (
+      !isSuspiciousLiveClockToken(rawClock) &&
+      !isKickoffMsClockToken(rawClock, startsAt)
+    ) {
+      return /^\d+$/.test(rawClock) ? `${rawClock}'` : rawClock;
+    }
+  }
   if (sportSlug === "basketball" && isBasketballScoreBoard(scoreBoard)) {
     const t = scoreBoard.time != null ? String(scoreBoard.time).trim() : "";
-    if (t) {
+    if (
+      t &&
+      !isSuspiciousLiveClockToken(t) &&
+      !isKickoffMsClockToken(t, startsAt)
+    ) {
+      return t;
+    }
+  }
+  if (isSoccerScoreBoard(scoreBoard)) {
+    const t = scoreBoard.time != null ? String(scoreBoard.time).trim() : "";
+    if (
+      t &&
+      !isSuspiciousLiveClockToken(t) &&
+      !isKickoffMsClockToken(t, startsAt) &&
+      !/^\d+$/.test(t)
+    ) {
       return t;
     }
   }
@@ -110,29 +187,7 @@ export function useCountdown(
   options?: UseCountdownOptions,
 ): { remainingMs: number; label: string; isPast: boolean } {
   const enabled = options?.enabled !== false;
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!enabled || !Number.isFinite(targetMs)) {
-      return;
-    }
-    const sync = () => {
-      const t = Date.now();
-      setNow(t);
-      return t >= targetMs;
-    };
-    if (sync()) {
-      return;
-    }
-    const id = window.setInterval(() => {
-      const t = Date.now();
-      setNow(t);
-      if (t >= targetMs) {
-        window.clearInterval(id);
-      }
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [targetMs, enabled]);
+  const now = useGlobalSeconds();
 
   if (!enabled) {
     return { remainingMs: 0, label: "Starting soon", isPast: true };

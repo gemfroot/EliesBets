@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PublicClient } from "viem";
 import {
   decodeFunctionResult,
   encodeFunctionData,
   isAddress,
 } from "viem";
-import { getBlockNumber, getContractEvents, getGasPrice } from "viem/actions";
+import { getBlockNumber, getContractEvents } from "viem/actions";
 import {
   MAX_HOUSE_EGDE,
   defaultCasinoGameParams,
@@ -16,7 +16,7 @@ import {
   type WeightedGameConfiguration,
 } from "@betswirl/sdk-core";
 import {
-  useAccount,
+  useConnection,
   usePublicClient,
   useReadContract,
   useReadContracts,
@@ -670,7 +670,7 @@ export function useCoinToss(betToken?: BetToken) {
   const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const coinToss = useMemo(() => getCasinoCoinTossAddress(chainId), [chainId]);
   const coinTossConfigured = isCasinoAddressConfigured(coinToss);
-  const { address: connected } = useAccount();
+  const { address: connected } = useConnection();
   const publicClient = usePublicClient();
   const {
     writeContractAsync,
@@ -733,7 +733,6 @@ export function useCoinToss(betToken?: BetToken) {
   });
 
   const [lastRoll, setLastRoll] = useState<RollResult | null>(null);
-  const rollCountRef = useRef(0);
   const [betHistory, setBetHistory] = useState<RollResult[]>([]);
   const [betHistoryLoading, setBetHistoryLoading] = useState(false);
   const [betHistoryError, setBetHistoryError] = useState<Error | undefined>(undefined);
@@ -839,7 +838,6 @@ export function useCoinToss(betToken?: BetToken) {
         face?: boolean;
       };
       if (!args.rolled || args.rolled.length === 0) return;
-      rollCountRef.current += 1;
       const roll: RollResult = {
         id: args.id ?? BigInt(0),
         rolled: args.rolled,
@@ -999,7 +997,7 @@ export function useDice(betToken?: BetToken) {
   const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const dice = useMemo(() => getCasinoDiceAddress(chainId), [chainId]);
   const diceConfigured = isCasinoAddressConfigured(dice);
-  const { address: connected } = useAccount();
+  const { address: connected } = useConnection();
   const publicClient = usePublicClient();
   const {
     writeContractAsync,
@@ -1062,7 +1060,6 @@ export function useDice(betToken?: BetToken) {
   });
 
   const [lastRoll, setLastRoll] = useState<DiceRollResult | null>(null);
-  const rollCountRef = useRef(0);
   const [betHistory, setBetHistory] = useState<DiceRollResult[]>([]);
   const [betHistoryLoading, setBetHistoryLoading] = useState(false);
   const [betHistoryError, setBetHistoryError] = useState<Error | undefined>(undefined);
@@ -1168,7 +1165,6 @@ export function useDice(betToken?: BetToken) {
         cap?: number;
       };
       if (!args.rolled || args.rolled.length === 0) return;
-      rollCountRef.current += 1;
       const roll: DiceRollResult = {
         id: args.id ?? BigInt(0),
         rolled: args.rolled,
@@ -1329,7 +1325,7 @@ export function useRoulette(betToken?: BetToken) {
   const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const roulette = useMemo(() => getCasinoRouletteAddress(chainId), [chainId]);
   const rouletteConfigured = isCasinoAddressConfigured(roulette);
-  const { address: connected } = useAccount();
+  const { address: connected } = useConnection();
   const publicClient = usePublicClient();
   const {
     writeContractAsync,
@@ -1392,7 +1388,6 @@ export function useRoulette(betToken?: BetToken) {
   });
 
   const [lastRoll, setLastRoll] = useState<RouletteRollResult | null>(null);
-  const rollCountRef = useRef(0);
   const [betHistory, setBetHistory] = useState<RouletteRollResult[]>([]);
   const [betHistoryLoading, setBetHistoryLoading] = useState(false);
   const [betHistoryError, setBetHistoryError] = useState<Error | undefined>(undefined);
@@ -1498,7 +1493,6 @@ export function useRoulette(betToken?: BetToken) {
         numbers?: bigint;
       };
       if (!args.rolled || args.rolled.length === 0) return;
-      rollCountRef.current += 1;
       const roll: RouletteRollResult = {
         id: args.id ?? BigInt(0),
         rolled: args.rolled,
@@ -1645,7 +1639,7 @@ export function useKeno(betToken?: BetToken) {
   const token = useMemo(() => betToken ?? getDefaultBetToken(chainId), [betToken, chainId]);
   const keno = useMemo(() => getCasinoKenoAddress(chainId), [chainId]);
   const kenoConfigured = isCasinoAddressConfigured(keno);
-  const { address: connected } = useAccount();
+  const { address: connected } = useConnection();
   const publicClient = usePublicClient();
   const {
     writeContractAsync,
@@ -1717,7 +1711,6 @@ export function useKeno(betToken?: BetToken) {
   });
 
   const [lastRoll, setLastRoll] = useState<KenoRollResult | null>(null);
-  const rollCountRef = useRef(0);
   const [betHistory, setBetHistory] = useState<KenoRollResult[]>([]);
   const [betHistoryLoading, setBetHistoryLoading] = useState(false);
   const [betHistoryError, setBetHistoryError] = useState<Error | undefined>(undefined);
@@ -1823,7 +1816,6 @@ export function useKeno(betToken?: BetToken) {
         numbers?: bigint;
       };
       if (!args.rolled || args.rolled.length === 0) return;
-      rollCountRef.current += 1;
       const roll: KenoRollResult = {
         id: args.id ?? BigInt(0),
         rolled: args.rolled,
@@ -1977,7 +1969,7 @@ function useWeightedWheelLikeGame(
 ) {
   const chainId = useWalletChainId();
   const token = useMemo(() => betTokenOverride ?? getDefaultBetToken(chainId), [betTokenOverride, chainId]);
-  const { address: connected } = useAccount();
+  const { address: connected } = useConnection();
   const publicClient = usePublicClient();
   const {
     writeContractAsync,
@@ -2100,7 +2092,6 @@ function useWeightedWheelLikeGame(
   const gameConfigs = gameConfigsRaw ?? [];
 
   const [lastRoll, setLastRoll] = useState<WheelRollResult | null>(null);
-  const rollCountRef = useRef(0);
   const [betHistory, setBetHistory] = useState<WheelRollResult[]>([]);
   const [betHistoryLoading, setBetHistoryLoading] = useState(false);
   const [betHistoryError, setBetHistoryError] = useState<Error | undefined>(undefined);
@@ -2206,7 +2197,6 @@ function useWeightedWheelLikeGame(
         configId?: number;
       };
       if (!args.rolled || args.rolled.length === 0) return;
-      rollCountRef.current += 1;
       const roll: WheelRollResult = {
         id: args.id ?? BigInt(0),
         rolled: args.rolled,

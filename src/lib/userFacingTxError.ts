@@ -78,10 +78,29 @@ function collectErrorText(err: unknown, depth = 0): string {
 }
 
 /**
+ * Known wallet / viem shapes we map explicitly (add rows here when QA captures a new
+ * `NEXT_PUBLIC_TX_DEBUG=1` generic hit). Substrings are matched on `collectErrorText`
+ * output (lowercased where noted in code).
+ *
+ * | Pattern in collected text | User-facing branch |
+ * |---------------------------|----------------------|
+ * | `user rejected`, `4001`, `action_rejected` | Cancelled in wallet |
+ * | `exceeds the configured cap` + `tx fee` | Rabby / fee-cap |
+ * | `rate limit`, `429`, `too many requests` | RPC rate limit |
+ * | `insufficient funds` | Not enough gas / balance |
+ * | `resource unavailable`, `-32603` | RPC node error |
+ * | `not configured` + `eip155:` | Wrong chain vs app |
+ * | `execution reverted` | Contract revert |
+ */
+
+/**
  * Maps viem / wagmi / wallet / RPC errors to short, actionable copy for UI.
  * Use for bet placement, claim, cashout, chain switch, connect, and casino txs.
+ *
+ * For subgraph / RSC / generic fetch failures, use {@link formatServerFetchError} from
+ * `@/lib/serverFetchError` instead so users never see raw upstream text.
  */
-export function formatUserFacingTxError(error: unknown): string {
+export function formatWalletTxError(error: unknown): string {
   const raw = collectErrorText(error);
   if (!raw) return "Something went wrong. Please try again.";
 
@@ -219,5 +238,17 @@ export function formatUserFacingTxError(error: unknown): string {
   if (raw.length > 420) {
     return `${raw.slice(0, 400).trim()}…`;
   }
+
+  if (
+    typeof process !== "undefined" &&
+    process.env.NEXT_PUBLIC_TX_DEBUG === "1"
+  ) {
+    console.warn("[formatWalletTxError] generic branch", error);
+  }
   return raw;
 }
+
+/**
+ * @deprecated Use {@link formatWalletTxError}. Kept for a short transition; same behavior.
+ */
+export const formatUserFacingTxError = formatWalletTxError;

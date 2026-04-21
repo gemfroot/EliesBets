@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 
-import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+import { formatServerFetchError } from "@/lib/serverFetchError";
 
 const MIN_QUERY = 3;
 
@@ -192,7 +192,7 @@ export function SearchBar() {
             return;
           }
           setGames([]);
-          setFetchError(formatUserFacingTxError(e));
+          setFetchError(formatServerFetchError(e));
         })
         .finally(() => {
           if (searchRequestId.current !== myId) {

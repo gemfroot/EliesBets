@@ -1,14 +1,19 @@
 "use client";
 
-import { useBets, useBetsSummary, BetType, type Bet } from "@azuro-org/sdk";
+import { useBets, useBetsSummary, BetType, useChain, type Bet } from "@azuro-org/sdk";
 import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { zeroAddress } from "viem";
 import { BetCard } from "@/components/BetCard";
 import { BetsSummaryStrip } from "@/components/BetsSummaryStrip";
 import { ClaimAllBetsButton } from "@/components/ClaimAllBetsButton";
+import {
+  clearSettledPrefetchSessionFlag,
+  useSettledBetsPrefetch,
+} from "@/components/SettledBetsPrefetchProvider";
 import { RetryCallout } from "@/components/RetryCallout";
 import { BetsListSkeleton } from "@/components/Skeleton";
+import { sumClaimableExpectedPayout } from "@/lib/azuroClaimEligibility";
 
 type FilterTab = "all" | "pending" | "won" | "lost";
 
@@ -67,6 +72,7 @@ const EMPTY_COPY: Record<
 
 export default function BetsPage() {
   const { address, isConnected } = useConnection();
+  const { appChain } = useChain();
   const [tab, setTab] = useState<FilterTab>("all");
 
   const bettor = address ?? zeroAddress;
@@ -103,30 +109,23 @@ export default function BetsPage() {
     query: { enabled: queryEnabled },
   });
 
-  /** Claim all must not follow the Pending tab filter (only open bets) or it would never see redeemable wins while “To claim” stays > 0. */
-  const settledFilter = useMemo(
-    () => ({ bettor, type: BetType.Settled as const }),
-    [bettor],
-  );
-
   const {
-    data: settledData,
+    settledBets: settledBetsForClaim,
     fetchNextPage: fetchSettledNextPage,
     hasNextPage: hasSettledNextPage,
     refetch: refetchSettled,
-  } = useBets({
-    filter: settledFilter,
-    query: { enabled: queryEnabled },
-  });
+    isPrefetchingAllSettled,
+    settledPrefetchHitCap,
+  } = useSettledBetsPrefetch();
 
   const allBets = useMemo(
     () => data?.pages.flatMap((p) => p.bets) ?? [],
-    [data],
+    [data?.pages],
   );
 
-  const settledBetsForClaim = useMemo(
-    () => settledData?.pages.flatMap((p) => p.bets) ?? [],
-    [settledData],
+  const claimableSlipTotal = useMemo(
+    () => sumClaimableExpectedPayout(settledBetsForClaim),
+    [settledBetsForClaim],
   );
 
   const visibleBets = useMemo(() => filterBets(allBets, tab), [allBets, tab]);
@@ -146,6 +145,9 @@ export default function BetsPage() {
             fetchNextPage={fetchSettledNextPage}
             hasNextPage={hasSettledNextPage}
             onDone={() => {
+              if (address) {
+                clearSettledPrefetchSessionFlag(address, appChain.id);
+              }
               void refetch();
               void refetchSettled();
               void refetchBetsSummary();
@@ -154,7 +156,13 @@ export default function BetsPage() {
         ) : null}
       </div>
 
-      {queryEnabled && !isError ? <BetsSummaryStrip /> : null}
+      {queryEnabled && !isError ? (
+        <BetsSummaryStrip
+          claimableSlipTotal={claimableSlipTotal}
+          isPrefetchingSettledPages={isPrefetchingAllSettled}
+          settledPrefetchHitCap={settledPrefetchHitCap}
+        />
+      ) : null}
 
       <div
         className="mt-6 flex flex-wrap gap-2 border-b border-zinc-800 pb-3"

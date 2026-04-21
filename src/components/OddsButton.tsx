@@ -14,8 +14,6 @@ import {
 import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { formatOddsValue } from "@/lib/oddsFormat";
 
-const FLASH_MS = 450;
-
 export type OddsButtonProps = {
   gameId: string;
   outcomeName: string;
@@ -61,27 +59,25 @@ export function OddsButton({
       return;
     }
     const prev = prevOddsRef.current;
-    let nextFlash: "up" | "down" | null = null;
-    if (prev !== null && prev > 0 && odds > 0) {
-      if (odds > prev) {
-        nextFlash = "up";
-      } else if (odds < prev) {
-        nextFlash = "down";
-      }
+    let raf = 0;
+    if (prev != null && prev > 0 && odds > 0 && prev !== odds) {
+      raf = window.requestAnimationFrame(() => {
+        setFlash(odds > prev ? "up" : "down");
+      });
     }
     prevOddsRef.current = odds;
-    if (!nextFlash) {
-      return;
-    }
-    const raf = requestAnimationFrame(() => setFlash(nextFlash));
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      if (raf) {
+        window.cancelAnimationFrame(raf);
+      }
+    };
   }, [odds, unavailable]);
 
   useEffect(() => {
     if (!flash) {
       return;
     }
-    const t = window.setTimeout(() => setFlash(null), FLASH_MS);
+    const t = window.setTimeout(() => setFlash(null), 450);
     return () => window.clearTimeout(t);
   }, [flash]);
 
@@ -96,9 +92,9 @@ export function OddsButton({
 
   const flashSurface =
     flash === "up"
-      ? "bg-emerald-600/40 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.45)]"
+      ? "animate-odds-flash-up"
       : flash === "down"
-        ? "bg-red-600/40 shadow-[inset_0_0_0_1px_rgba(239,68,68,0.45)]"
+        ? "animate-odds-flash-down"
         : "";
 
   const surface =
@@ -109,6 +105,10 @@ export function OddsButton({
   const base =
     "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center rounded-md px-2 py-2 text-center transition-[background-color,box-shadow,transform] duration-300 ease-out motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-500 md:min-h-0";
 
+  const oddsAriaLabel = unavailable
+    ? undefined
+    : `${typeof label === "string" && label.trim() ? label : outcomeName}, ${oddsText}`;
+
   return (
     <button
       {...rest}
@@ -116,6 +116,7 @@ export function OddsButton({
       disabled={unavailable}
       onClick={unavailable ? undefined : onClick}
       aria-pressed={selected}
+      aria-label={oddsAriaLabel}
       className={`${base} ${surface} ${className}`.trim()}
     >
       {label != null ? (
@@ -123,9 +124,7 @@ export function OddsButton({
           {label}
         </span>
       ) : null}
-      <span className="type-odds text-zinc-100">
-        {oddsText}
-      </span>
+      <span className="type-odds text-zinc-100">{oddsText}</span>
     </button>
   );
 }

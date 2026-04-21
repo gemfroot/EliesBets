@@ -4,14 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BP_VALUE, Dice } from "@betswirl/sdk-core";
 import { formatUnits, parseUnits } from "viem";
-import { useAccount, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
+import { useConnection, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
 import { useWalletChainId } from "@/lib/useWalletChainId";
 import { polygon } from "viem/chains";
 import { DiceAnimation, type DicePhase } from "@/components/DiceAnimation";
 import { useDice } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
 import { chainName, explorerTxUrl } from "@/lib/chains";
-import { formatUserFacingTxError } from "@/lib/userFacingTxError";
+import { formatWalletTxError } from "@/lib/userFacingTxError";
 
 const BET_HISTORY_DISPLAY_CAP = 12;
 const CAP_MIN = 2;
@@ -42,7 +42,7 @@ function rawChainRoll(rolled: readonly number[]): number | null {
 }
 
 export function DiceGame() {
-  const { isConnected } = useAccount();
+  const { isConnected } = useConnection();
   const chainId = useWalletChainId();
   const { switchChain } = useSwitchChain();
 
@@ -597,7 +597,7 @@ export function DiceGame() {
 
                 {error ? (
                   <p className="type-body text-red-400" role="alert">
-                    {formatUserFacingTxError(error)}
+                    {formatWalletTxError(error)}
                   </p>
                 ) : null}
 
