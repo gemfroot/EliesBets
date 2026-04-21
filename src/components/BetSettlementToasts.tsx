@@ -6,6 +6,9 @@ import { useConnection } from "wagmi";
 import { zeroAddress } from "viem";
 import { useToast } from "@/components/Toast";
 
+/** Cap auto-pagination so huge histories do not hammer the subgraph from this effect alone. */
+const MAX_SETTLEMENT_TOAST_PAGES = 30;
+
 /**
  * Shows win/loss toasts when a bet settles (from cached graph data).
  */
@@ -34,8 +37,12 @@ export function BetSettlementToasts() {
     if (!hasNextPage || isFetchingNextPage) {
       return;
     }
+    const loadedPages = data?.pages?.length ?? 0;
+    if (loadedPages >= MAX_SETTLEMENT_TOAST_PAGES) {
+      return;
+    }
     void fetchNextPage();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, data?.pages?.length]);
 
   useEffect(() => {
     if (!data?.pages?.length) {

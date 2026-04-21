@@ -32,7 +32,9 @@ export function BetsSummaryStrip() {
       className="mt-5 grid max-w-3xl grid-cols-2 gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-3 sm:grid-cols-4"
       aria-live="polite"
     >
-      <div>
+      <div
+        title={`Indexer total still owed to this wallet (${sym}). It can differ from the sum of “Payout” on each card until data syncs; it is not “per-bet payouts added up.”`}
+      >
         <p className="text-xs font-medium text-zinc-500">To claim</p>
         <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-zinc-100">
           {isFetching && !data ? "…" : `${fmtTokenAmount(data?.toPayout)} ${sym}`}
@@ -50,7 +52,7 @@ export function BetsSummaryStrip() {
           {isFetching && !data ? "…" : `${fmtTokenAmount(data?.totalProfit)} ${sym}`}
         </p>
       </div>
-      <div>
+      <div title="Win / loss / how many bet slips this wallet has on this chain (not a dollar total).">
         <p className="text-xs font-medium text-zinc-500">Record</p>
         <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-200">
           {isFetching && !data ? (
@@ -61,7 +63,7 @@ export function BetsSummaryStrip() {
               <span className="text-zinc-600"> · </span>
               <span className="text-red-400/90">{data.lostBetsCount}L</span>
               <span className="text-zinc-600"> · </span>
-              <span className="text-zinc-400">{data.betsCount} total</span>
+              <span className="text-zinc-400">{data.betsCount} bets</span>
             </>
           ) : (
             "—"

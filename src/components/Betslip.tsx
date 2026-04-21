@@ -22,7 +22,13 @@ import { erc20Abi, formatUnits, zeroAddress } from "viem";
 import dynamic from "next/dynamic";
 import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { useToast } from "@/components/Toast";
-import { formatOddsValue, formatStoredOddsString } from "@/lib/oddsFormat";
+import {
+  formatDriftDecimalPair,
+  formatOddsValue,
+  formatStoredOddsString,
+  oddsDriftedFromStored,
+  parseStoredDecimalOdds,
+} from "@/lib/oddsFormat";
 import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 
 const BetReceipt = dynamic(
@@ -311,6 +317,66 @@ const QUICK_STAKE_PRESETS = ["5", "10", "25", "50"] as const;
 
 type BetslipMode = "single" | "combo";
 
+type OddsDriftInfo = { hasDrift: boolean; summary: string };
+
+function computeOddsDrift(
+  activeSelections: BetslipSelection[],
+  sdkOdds: Record<string, number>,
+  sdkTotalOdds: number,
+  mode: BetslipMode,
+  multiPick: boolean,
+): OddsDriftInfo {
+  const parts: string[] = [];
+  for (const s of activeSelections) {
+    const key = `${s.conditionId}-${s.outcomeId}`;
+    const live = sdkOdds[key];
+    const locked = parseStoredDecimalOdds(s.odds);
+    if (
+      locked == null ||
+      typeof live !== "number" ||
+      !Number.isFinite(live) ||
+      live <= 0
+    ) {
+      continue;
+    }
+    if (oddsDriftedFromStored(locked, live)) {
+      parts.push(
+        `• ${s.outcomeName}: ${formatDriftDecimalPair(locked, live)} (decimal)`,
+      );
+    }
+  }
+  if (
+    multiPick &&
+    mode === "combo" &&
+    activeSelections.length > 1 &&
+    Number.isFinite(sdkTotalOdds) &&
+    sdkTotalOdds > 0
+  ) {
+    let prod = 1;
+    for (const s of activeSelections) {
+      const d = parseStoredDecimalOdds(s.odds);
+      if (d == null) {
+        prod = NaN;
+        break;
+      }
+      prod *= d;
+    }
+    if (
+      Number.isFinite(prod) &&
+      prod > 0 &&
+      oddsDriftedFromStored(prod, sdkTotalOdds)
+    ) {
+      parts.push(
+        `• Combined price: ${formatDriftDecimalPair(prod, sdkTotalOdds)} (decimal)`,
+      );
+    }
+  }
+  return {
+    hasDrift: parts.length > 0,
+    summary: parts.join("\n"),
+  };
+}
+
 function messageForBetslipDisableReason(
   reason: BetslipDisableReason | undefined,
 ): string | null {
@@ -319,7 +385,7 @@ function messageForBetslipDisableReason(
   }
   switch (reason) {
     case BetslipDisableReason.ConditionState:
-      return "One or more selections are no longer active. Remove or replace them.";
+      return "This market is paused or closed for betting. Remove the pick or choose another line. When only the price changes, the slip shows “Odds updated” instead.";
     case BetslipDisableReason.BetAmountGreaterThanMaxBet:
       return "Stake is above the maximum allowed for this bet.";
     case BetslipDisableReason.BetAmountLowerThanMinBet:
@@ -488,7 +554,31 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
 
   const receiptTotalOdds = totalOddsForBet;
 
-  const sdkDisableMessage = messageForBetslipDisableReason(disableReason);
+  const oddsDrift = useMemo(
+    () =>
+      computeOddsDrift(
+        activeSelections,
+        sdkOdds,
+        typeof sdkTotalOdds === "number" &&
+          Number.isFinite(sdkTotalOdds) &&
+          sdkTotalOdds > 0
+          ? sdkTotalOdds
+          : 0,
+        mode,
+        multiPick,
+      ),
+    [activeSelections, sdkOdds, sdkTotalOdds, mode, multiPick],
+  );
+
+  const sdkDisableMessage = useMemo(() => {
+    if (
+      disableReason === BetslipDisableReason.ConditionState &&
+      (isOddsFetching || isBetCalculationFetching)
+    ) {
+      return "Checking market availability…";
+    }
+    return messageForBetslipDisableReason(disableReason);
+  }, [disableReason, isOddsFetching, isBetCalculationFetching]);
 
   const { submit, approveTx, betTx, isApproveRequired } =
     useBet({
@@ -757,10 +847,36 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           {errorMessage}
         </p>
       ) : null}
+      {isConnected &&
+      activeSelections.length > 0 &&
+      oddsDrift.hasDrift &&
+      !isOddsFetching &&
+      !isBetCalculationFetching ? (
+        <p
+          className="rounded-md border border-amber-800/80 bg-amber-950/35 px-3 py-2 text-xs text-amber-100"
+          role="status"
+        >
+          <span className="font-medium text-amber-50">Odds updated.</span> Prices
+          no longer match when you added these picks (including small line moves). Tap
+          Place bet to confirm or cancel in the dialog.{" "}
+          <span className="block pt-1 font-mono text-[11px] leading-snug text-amber-200/90 whitespace-pre-line">
+            {oddsDrift.summary}
+          </span>
+        </p>
+      ) : null}
       <button
         type="button"
         disabled={!canSubmit}
-        onClick={() => void submit()}
+        onClick={() => {
+          if (!canSubmit) return;
+          if (oddsDrift.hasDrift) {
+            const ok = window.confirm(
+              `Prices changed since you added these picks:\n\n${oddsDrift.summary}\n\nPlace the bet at the current prices shown in the betslip?`,
+            );
+            if (!ok) return;
+          }
+          void submit();
+        }}
         className="min-h-11 rounded-md bg-amber-600 px-3 py-2.5 text-sm font-semibold text-zinc-950 transition-[background-color,transform,opacity] duration-200 ease-out hover:scale-[1.02] hover:bg-amber-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100 md:min-h-0 md:py-2"
       >
         {isBusy ? "Working…" : placeBetLabel}

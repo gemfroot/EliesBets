@@ -160,36 +160,99 @@ export function formatBetHistoryShareText(
 
 export type ShareBetTextResult = "shared" | "copied" | "aborted" | "failed";
 
+function copyViaExecCommand(value: string): boolean {
+  if (typeof document === "undefined") {
+    return false;
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = value;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    ta.style.top = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+async function tryNavigatorShare(text: string): Promise<"shared" | "aborted" | "skip"> {
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+    return "skip";
+  }
+
+  const payloads: ShareData[] = [
+    { text, title: `${APP_LABEL} bet` },
+    { text },
+  ];
+
+  for (const payload of payloads) {
+    if (
+      typeof navigator.canShare === "function" &&
+      !navigator.canShare(payload)
+    ) {
+      continue;
+    }
+    try {
+      await navigator.share(payload);
+      return "shared";
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        return "aborted";
+      }
+      /* Wrong payload / not allowed — try next shape or fall back to copy */
+    }
+  }
+
+  /* Some Chromium builds report `canShare` false for text-only yet `share({ text })` still works. */
+  try {
+    await navigator.share({ text });
+    return "shared";
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      return "aborted";
+    }
+  }
+
+  return "skip";
+}
+
 /**
- * Uses Web Share API when available (typical on mobile); otherwise copies to clipboard.
+ * Web Share when the browser allows it; otherwise clipboard (`writeText` or legacy
+ * `execCommand('copy')`). Desktop Chrome often reports `canShare` false for `{ text, title }`
+ * only, so we try `{ text }` as well before copying.
  */
 export async function shareOrCopyBetText(text: string): Promise<ShareBetTextResult> {
   if (typeof navigator === "undefined") {
     return "failed";
   }
 
-  const payload: ShareData = { text, title: `${APP_LABEL} bet` };
-
-  if (typeof navigator.share === "function") {
-    const can =
-      typeof navigator.canShare !== "function" || navigator.canShare(payload);
-    if (can) {
-      try {
-        await navigator.share(payload);
-        return "shared";
-      } catch (e) {
-        if (e instanceof DOMException && e.name === "AbortError") {
-          return "aborted";
-        }
-        // Fall through to clipboard
-      }
-    }
+  const shareResult = await tryNavigatorShare(text);
+  if (shareResult === "shared") {
+    return "shared";
+  }
+  if (shareResult === "aborted") {
+    return "aborted";
   }
 
   try {
-    await navigator.clipboard.writeText(text);
-    return "copied";
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return "copied";
+    }
   } catch {
-    return "failed";
+    /* fall through */
   }
+
+  if (copyViaExecCommand(text)) {
+    return "copied";
+  }
+
+  return "failed";
 }

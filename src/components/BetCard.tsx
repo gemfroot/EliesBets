@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useChain, useRedeemBet, type Bet } from "@azuro-org/sdk";
+import { useBetsSummary, useChain, useRedeemBet, type Bet } from "@azuro-org/sdk";
 import type { GameData } from "@azuro-org/toolkit";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
@@ -18,6 +18,8 @@ import {
   txExplorerUrlFromAppChain,
 } from "@/lib/betShare";
 import { formatOddsValue } from "@/lib/oddsFormat";
+import { betIsClaimable } from "@/lib/azuroClaimEligibility";
+import { logClaimFailure } from "@/lib/claimDebugLog";
 import { formatUserFacingTxError } from "@/lib/userFacingTxError";
 
 function participantLine(game: GameData): string {
@@ -69,16 +71,16 @@ export function BetCard({ bet }: BetCardProps) {
   const { address } = useConnection();
   const azuroChain = useAzuroActionChain();
   const queryClient = useQueryClient();
+  const { refetch: refetchBetsSummary } = useBetsSummary({
+    account: address ?? "",
+    query: { enabled: Boolean(address) },
+  });
   const { submit, isPending, isProcessing } = useRedeemBet();
   const [claimError, setClaimError] = useState<string | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
   const shareInFlightRef = useRef(false);
 
-  const showClaim =
-    bet.isWin &&
-    !bet.isCanceled &&
-    bet.isRedeemable &&
-    !bet.isRedeemed;
+  const showClaim = betIsClaimable(bet);
 
   const invalidateBalances = useCallback(() => {
     if (address) {
@@ -145,6 +147,8 @@ export function BetCard({ bet }: BetCardProps) {
         showToast("Shared.", "success");
       } else if (result === "copied") {
         showToast("Bet copied to clipboard.", "success");
+      } else if (result === "aborted") {
+        showToast("Share cancelled.", "info");
       } else if (result === "failed") {
         showToast("Could not share or copy.", "error");
       }
@@ -276,8 +280,10 @@ export function BetCard({ bet }: BetCardProps) {
               try {
                 await submit({ bets: [bet] });
                 invalidateBalances();
+                void refetchBetsSummary();
                 showToast("Winnings claimed.", "success");
               } catch (e) {
+                logClaimFailure("claim_single", e, [bet]);
                 setClaimError(formatUserFacingTxError(e));
               }
             }}

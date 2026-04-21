@@ -97,6 +97,8 @@ export function BetReceipt({
         showToast("Shared.", "success");
       } else if (result === "copied") {
         showToast("Bet receipt copied to clipboard.", "success");
+      } else if (result === "aborted") {
+        showToast("Share cancelled.", "info");
       } else if (result === "failed") {
         showToast("Could not share or copy.", "error");
       }

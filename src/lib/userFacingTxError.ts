@@ -213,7 +213,7 @@ export function formatUserFacingTxError(error: unknown): string {
     t.includes("exceeds the configured cap") ||
     (t.includes("tx fee") && t.includes("configured cap"))
   ) {
-    return "Your wallet blocked this transaction because the estimated network fee hit its safety cap (common in Rabby / MetaMask). Raise the max fee cap in wallet settings, or claim one bet at a time instead of Claim all.";
+    return "Your wallet blocked this transaction because the estimated network fee hit its safety cap (common in Rabby / MetaMask). Raise the max fee cap in wallet settings, or retry after a moment — Claim all already tries smaller on-chain batches when this happens.";
   }
 
   if (raw.length > 420) {

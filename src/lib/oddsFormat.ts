@@ -126,6 +126,40 @@ export function formatOddsValue(decimal: number, format: OddsFormat): string {
   }
 }
 
+/** Slip odds are stored as a decimal string (e.g. "2.10"); used to detect line moves vs live prices. */
+export function parseStoredDecimalOdds(stored: string): number | null {
+  const trimmed = stored.trim();
+  if (trimmed === "" || trimmed === "—") {
+    return null;
+  }
+  const n = Number.parseFloat(trimmed.replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+const DRIFT_COMPARE_SCALE = 1e6;
+
+/**
+ * True when the live decimal price differs from the slip’s stored price in any way
+ * that survives a stable fixed-scale comparison (filters binary float noise only).
+ */
+export function oddsDriftedFromStored(locked: number, live: number): boolean {
+  if (!Number.isFinite(locked) || !Number.isFinite(live) || locked <= 0 || live <= 0) {
+    return false;
+  }
+  return (
+    Math.round(locked * DRIFT_COMPARE_SCALE) !==
+    Math.round(live * DRIFT_COMPARE_SCALE)
+  );
+}
+
+/** Human-readable endpoints for drift copy (2dp when enough, else 4dp). */
+export function formatDriftDecimalPair(locked: number, live: number): string {
+  if (locked.toFixed(2) !== live.toFixed(2)) {
+    return `${locked.toFixed(2)} → ${live.toFixed(2)}`;
+  }
+  return `${locked.toFixed(4)} → ${live.toFixed(4)}`;
+}
+
 /**
  * Parse stored slip odds (decimal string or "—") and format for display.
  */
@@ -133,10 +167,9 @@ export function formatStoredOddsString(
   stored: string,
   format: OddsFormat,
 ): string {
-  const trimmed = stored.trim();
-  if (trimmed === "" || trimmed === "—") {
+  const n = parseStoredDecimalOdds(stored);
+  if (n == null) {
     return "—";
   }
-  const n = Number.parseFloat(trimmed.replace(",", "."));
   return formatOddsValue(n, format);
 }

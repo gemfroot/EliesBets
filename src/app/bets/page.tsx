@@ -1,6 +1,6 @@
 "use client";
 
-import { useBets, BetType, type Bet } from "@azuro-org/sdk";
+import { useBets, useBetsSummary, BetType, type Bet } from "@azuro-org/sdk";
 import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { zeroAddress } from "viem";
@@ -71,7 +71,8 @@ export default function BetsPage() {
 
   const bettor = address ?? zeroAddress;
 
-  const filter = useMemo(() => {
+  /** Drives the list under the tab (pending / settled / all). */
+  const listFilter = useMemo(() => {
     const base = { bettor };
     if (tab === "pending") {
       return { ...base, type: BetType.Accepted as const };
@@ -84,6 +85,11 @@ export default function BetsPage() {
 
   const queryEnabled = Boolean(isConnected && address);
 
+  const { refetch: refetchBetsSummary } = useBetsSummary({
+    account: address ?? "",
+    query: { enabled: queryEnabled },
+  });
+
   const {
     data,
     isFetching,
@@ -93,13 +99,34 @@ export default function BetsPage() {
     isFetchingNextPage,
     refetch,
   } = useBets({
-    filter,
+    filter: listFilter,
+    query: { enabled: queryEnabled },
+  });
+
+  /** Claim all must not follow the Pending tab filter (only open bets) or it would never see redeemable wins while “To claim” stays > 0. */
+  const settledFilter = useMemo(
+    () => ({ bettor, type: BetType.Settled as const }),
+    [bettor],
+  );
+
+  const {
+    data: settledData,
+    fetchNextPage: fetchSettledNextPage,
+    hasNextPage: hasSettledNextPage,
+    refetch: refetchSettled,
+  } = useBets({
+    filter: settledFilter,
     query: { enabled: queryEnabled },
   });
 
   const allBets = useMemo(
     () => data?.pages.flatMap((p) => p.bets) ?? [],
     [data],
+  );
+
+  const settledBetsForClaim = useMemo(
+    () => settledData?.pages.flatMap((p) => p.bets) ?? [],
+    [settledData],
   );
 
   const visibleBets = useMemo(() => filterBets(allBets, tab), [allBets, tab]);
@@ -115,8 +142,14 @@ export default function BetsPage() {
         </div>
         {queryEnabled && !isError ? (
           <ClaimAllBetsButton
-            bets={allBets}
-            onDone={() => void refetch()}
+            bets={settledBetsForClaim}
+            fetchNextPage={fetchSettledNextPage}
+            hasNextPage={hasSettledNextPage}
+            onDone={() => {
+              void refetch();
+              void refetchSettled();
+              void refetchBetsSummary();
+            }}
           />
         ) : null}
       </div>

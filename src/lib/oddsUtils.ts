@@ -1,4 +1,5 @@
 import {
+  ConditionState,
   getConditionsByGameIds,
   groupConditionsByMarket,
   type ConditionDetailedData,
@@ -18,6 +19,8 @@ export type TopOddsLine = {
   outcomeId: string;
   conditionId: string;
   isExpressForbidden: boolean;
+  /** Same as game detail: list cards should not add legs when not Active. */
+  conditionState: ConditionState;
 };
 
 /** First segment of Azuro `marketKey` (e.g. `"1-1-1"` → `"1"`). Family `"4"` is Over/Under. */
@@ -56,6 +59,7 @@ export function extractMainLineOdds(
       outcomeId: o.outcomeId,
       conditionId: firstCondition.conditionId,
       isExpressForbidden: o.isExpressForbidden,
+      conditionState: firstCondition.state,
     }));
   } catch {
     return null;
@@ -91,6 +95,7 @@ export function extractOverUnderOdds(
       outcomeId: o.outcomeId,
       conditionId: firstCondition.conditionId,
       isExpressForbidden: o.isExpressForbidden,
+      conditionState: firstCondition.state,
     }));
   } catch {
     return null;

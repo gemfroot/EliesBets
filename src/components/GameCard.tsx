@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { GameState, type GameData } from "@azuro-org/toolkit";
+import { ConditionState, GameState, type GameData } from "@azuro-org/toolkit";
 import { FavoriteGameButton } from "@/components/FavoriteButton";
 import { OddsButton } from "@/components/OddsButton";
 import { useBetslipActions } from "@/components/Betslip";
@@ -118,6 +118,7 @@ export function GameCard({
                       outcomeName={displayLabel}
                       outcomeId={line.outcomeId}
                       odds={line.odds}
+                      disabled={line.conditionState !== ConditionState.Active}
                       label={displayLabel}
                       className="min-h-10 min-w-0 flex-1 py-1.5"
                       onClick={() => addLine(line)}
@@ -138,6 +139,7 @@ export function GameCard({
                       outcomeName={displayLabel}
                       outcomeId={line.outcomeId}
                       odds={line.odds}
+                      disabled={line.conditionState !== ConditionState.Active}
                       label={displayLabel}
                       className="min-h-10 min-w-0 flex-1 py-1.5"
                       onClick={() => addLine(line)}
@@ -168,6 +170,7 @@ export function GameCard({
                       outcomeName={displayLabel}
                       outcomeId={line.outcomeId}
                       odds={line.odds}
+                      disabled={line.conditionState !== ConditionState.Active}
                       label={displayLabel}
                       className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
                       onClick={() => addLine(line)}
@@ -188,6 +191,7 @@ export function GameCard({
                       outcomeName={displayLabel}
                       outcomeId={line.outcomeId}
                       odds={line.odds}
+                      disabled={line.conditionState !== ConditionState.Active}
                       label={displayLabel}
                       className="min-h-11 min-w-0 flex-1 py-2 md:min-h-0 md:py-1.5"
                       onClick={() => addLine(line)}
