@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BP_VALUE } from "@betswirl/sdk-core";
-import { formatUnits, parseUnits } from "viem";
+import { decodeEventLog, formatUnits, parseUnits } from "viem";
+import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
 import { useConnection, useSwitchChain, useWaitForTransactionReceipt } from "wagmi";
 import { useWalletChainId } from "@/lib/useWalletChainId";
 import { base } from "viem/chains";
@@ -76,7 +77,7 @@ export function CoinTossGame() {
 
   const stakePresets = STAKE_PRESETS_BY_SYMBOL[betToken.symbol] ?? DEFAULT_PRESETS;
   const usdPerUnit = useTokenUsdPrice(chainId, betToken);
-  const { addPending, markBlock, resolve: resolvePending } = usePendingBets();
+  const { addPending, markBlock, setOnChainBetId, resolve: resolvePending } = usePendingBets();
   const pendingIdRef = useRef<string | null>(null);
 
   const [betHeads, setBetHeads] = useState(true);
@@ -172,7 +173,38 @@ export function CoinTossGame() {
     if (pendingIdRef.current && receipt.blockNumber) {
       markBlock(pendingIdRef.current, receipt.blockNumber);
     }
-  }, [phase, receipt, receiptLoading, txHash, markBlock, resolvePending]);
+    // Decode PlaceBet from the wager receipt to recover the on-chain bet id.
+    // We need this to call refundBet(id) in the event the VRF never fulfills
+    // (under-funded subscription, node outage, etc.).
+    if (pendingIdRef.current) {
+      for (const log of receipt.logs) {
+        try {
+          const d = decodeEventLog({
+            abi: coinTossAbi,
+            data: log.data,
+            topics: log.topics,
+          });
+          if (d.eventName === "PlaceBet") {
+            const args = d.args as unknown as { id?: bigint };
+            if (typeof args?.id === "bigint") {
+              setOnChainBetId(pendingIdRef.current, args.id);
+              break;
+            }
+          }
+        } catch {
+          /* not a PlaceBet log */
+        }
+      }
+    }
+  }, [
+    phase,
+    receipt,
+    receiptLoading,
+    txHash,
+    markBlock,
+    resolvePending,
+    setOnChainBetId,
+  ]);
 
   // Roll event arrives from VRF callback → show result
   useEffect(() => {

@@ -21,6 +21,12 @@ export type PendingBet = {
   stakeWei: string;
   tokenSymbol: string;
   tokenDecimals: number;
+  /**
+   * On-chain bet id emitted in the PlaceBet event (uint256 as string).
+   * Needed to call `refundBet(id)` when a VRF request never fulfills —
+   * without it, users would have to fish the id out of Basescan themselves.
+   */
+  onChainBetId?: string;
   /** Unix ms when the bet was placed. */
   placedAt: number;
   /** Last roll id we had on hand at placement — so the resolver can diff. */
@@ -37,6 +43,10 @@ export type PendingBetsContext = {
   addPending: (bet: Omit<PendingBet, "status" | "placedAt" | "id"> & { id?: string; placedAt?: number }) => string;
   markBlock: (id: string, blockNumber: bigint) => void;
   markStalled: (id: string) => void;
+  /** Set the on-chain bet id once the wager tx receipt is decoded. */
+  setOnChainBetId: (id: string, onChainBetId: bigint) => void;
+  /** Mark a bet as refunded (user successfully called refundBet on chain). */
+  markRefunded: (id: string) => void;
   resolve: (id: string, outcome: string, netWei: bigint) => void;
   dismiss: (id: string) => void;
   clear: () => void;
@@ -51,6 +61,8 @@ export const PendingBetsCtx = createContext<PendingBetsContext>({
   addPending: noop as never,
   markBlock: noop,
   markStalled: noop,
+  setOnChainBetId: noop,
+  markRefunded: noop,
   resolve: noop,
   dismiss: noop,
   clear: noop,

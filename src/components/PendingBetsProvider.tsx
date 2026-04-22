@@ -156,6 +156,26 @@ export function PendingBetsProvider({ children }: { children: React.ReactNode })
     );
   }, []);
 
+  const setOnChainBetId = useCallback((id: string, onChainBetId: bigint) => {
+    setPending((prev) =>
+      prev.map((b) =>
+        b.id === id ? { ...b, onChainBetId: onChainBetId.toString() } : b,
+      ),
+    );
+  }, []);
+
+  const markRefunded = useCallback((id: string) => {
+    setPending((prev) =>
+      prev.map((b) =>
+        b.id === id ? { ...b, status: "refunded" } : b,
+      ),
+    );
+    // Drop the refunded entry after a short display window so the drawer clears.
+    window.setTimeout(() => {
+      setPending((prev) => prev.filter((b) => b.id !== id));
+    }, 30_000);
+  }, []);
+
   const resolve = useCallback((id: string, outcome: string, netWei: bigint) => {
     setPending((prev) =>
       prev.map((b) =>
@@ -278,8 +298,28 @@ export function PendingBetsProvider({ children }: { children: React.ReactNode })
   }, [publicClient, address, chainId, pending, resolve, markStalled]);
 
   const value = useMemo(
-    () => ({ pending, addPending, markBlock, markStalled, resolve, dismiss, clear }),
-    [pending, addPending, markBlock, markStalled, resolve, dismiss, clear],
+    () => ({
+      pending,
+      addPending,
+      markBlock,
+      markStalled,
+      setOnChainBetId,
+      markRefunded,
+      resolve,
+      dismiss,
+      clear,
+    }),
+    [
+      pending,
+      addPending,
+      markBlock,
+      markStalled,
+      setOnChainBetId,
+      markRefunded,
+      resolve,
+      dismiss,
+      clear,
+    ],
   );
 
   return <PendingBetsCtx.Provider value={value}>{children}</PendingBetsCtx.Provider>;

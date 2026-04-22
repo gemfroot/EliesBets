@@ -3,8 +3,31 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { formatUnits } from "viem";
+import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { usePendingBets } from "@/lib/casino/pendingBets";
 import { explorerTxUrl } from "@/lib/chains";
+import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
+import { diceAbi } from "@/lib/casino/abis/Dice";
+import { kenoAbi } from "@/lib/casino/abis/Keno";
+import { rouletteAbi } from "@/lib/casino/abis/Roulette";
+import { wheelAbi } from "@/lib/casino/abis/Wheel";
+import { formatWalletTxError } from "@/lib/userFacingTxError";
+
+/** BetSwirl's Game.sol sets refundTime per-deployment; we default to 24h (the
+ *  mainnet value) and surface the refund button slightly after that point. */
+const REFUND_AFTER_MS = 24 * 60 * 60 * 1000;
+
+/** Dispatch game type → ABI for the `refundBet(uint256)` call. All BetSwirl
+ *  games share the same function signature on Game.sol, so any game-specific
+ *  ABI works; we keep a map for type safety. */
+const GAME_ABI: Record<string, unknown> = {
+  coinToss: coinTossAbi,
+  dice: diceAbi,
+  roulette: rouletteAbi,
+  keno: kenoAbi,
+  wheel: wheelAbi,
+  plinko: wheelAbi, // plinko shares the weighted-game ABI surface
+};
 
 const GAME_HREF: Record<string, string> = {
   coinToss: "/casino/coin-toss",
@@ -33,10 +56,18 @@ function formatElapsed(ms: number): string {
 }
 
 export function PendingBetsIndicator() {
-  const { pending, dismiss } = usePendingBets();
+  const { pending, dismiss, markRefunded } = usePendingBets();
   const [open, setOpen] = useState(false);
   const [, force] = useState(0);
   const ref = useRef<HTMLDivElement | null>(null);
+  const [refundingId, setRefundingId] = useState<string | null>(null);
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const { writeContractAsync } = useWriteContract();
+  const [refundTxHash, setRefundTxHash] = useState<`0x${string}` | undefined>();
+  const { data: refundReceipt } = useWaitForTransactionReceipt({
+    hash: refundTxHash,
+    query: { enabled: Boolean(refundTxHash) },
+  });
 
   // Re-render every second so elapsed time updates.
   useEffect(() => {
@@ -53,6 +84,40 @@ export function PendingBetsIndicator() {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
+
+  // When the refund tx confirms, mark the local pending entry refunded.
+  useEffect(() => {
+    if (!refundingId || !refundReceipt || refundReceipt.status !== "success") return;
+    markRefunded(refundingId);
+    setRefundingId(null);
+    setRefundTxHash(undefined);
+  }, [refundReceipt, refundingId, markRefunded]);
+
+  const refundBet = async (bet: (typeof pending)[number]) => {
+    if (!bet.onChainBetId) {
+      setRefundError(
+        "This bet's on-chain id wasn't captured — refund has to be done manually via the contract's refundBet(id).",
+      );
+      return;
+    }
+    setRefundError(null);
+    setRefundingId(bet.id);
+    try {
+      const abi = GAME_ABI[bet.game];
+      if (!abi) throw new Error("Unknown game for refund");
+      const hash = await writeContractAsync({
+        address: bet.contract,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        abi: abi as any,
+        functionName: "refundBet",
+        args: [BigInt(bet.onChainBetId)],
+      });
+      setRefundTxHash(hash);
+    } catch (e) {
+      setRefundError(formatWalletTxError(e));
+      setRefundingId(null);
+    }
+  };
 
   if (pending.length === 0) return null;
 
@@ -107,6 +172,11 @@ export function PendingBetsIndicator() {
                   return null;
                 }
               })();
+              const ageMs = Date.now() - bet.placedAt;
+              const isRefundable =
+                bet.status !== "resolved" &&
+                bet.status !== "refunded" &&
+                ageMs > REFUND_AFTER_MS;
 
               return (
                 <li key={bet.id} className="px-3 py-2.5 text-sm">
@@ -166,10 +236,32 @@ export function PendingBetsIndicator() {
                       dismiss
                     </button>
                   </div>
+                  {isRefundable ? (
+                    <div className="mt-2 rounded border border-amber-800/70 bg-amber-950/30 px-2 py-1.5">
+                      <p className="text-[11px] text-amber-100">
+                        This bet has been pending for &gt; 24h — VRF likely never
+                        responded (often a low-LINK subscription). You can recover
+                        the stake. VRF fee is not refundable.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={refundingId === bet.id}
+                        onClick={() => void refundBet(bet)}
+                        className="mt-1.5 rounded bg-amber-600 px-2 py-0.5 text-[11px] font-medium text-zinc-950 hover:bg-amber-500 disabled:opacity-60"
+                      >
+                        {refundingId === bet.id ? "Refunding…" : "Refund stake"}
+                      </button>
+                    </div>
+                  ) : null}
                 </li>
               );
             })}
           </ul>
+          {refundError ? (
+            <p className="border-t border-zinc-800 px-3 py-2 text-[11px] text-red-300">
+              {refundError}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>
