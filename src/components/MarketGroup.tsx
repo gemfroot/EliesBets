@@ -39,7 +39,10 @@ function OutcomeButton({
     Number.isFinite(outcome.odds) && outcome.odds > 0
       ? encodeSlipDecimalOdds(outcome.odds)
       : "—";
-  const suspended = conditionState !== ConditionState.Active;
+  const suspended =
+    conditionState === ConditionState.Canceled ||
+    conditionState === ConditionState.Removed ||
+    conditionState === ConditionState.Resolved;
   const displayName = getOutcomeDisplayLabel(outcome.selectionName, {
     sportSlug,
     participants,

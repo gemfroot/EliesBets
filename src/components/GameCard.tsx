@@ -173,8 +173,22 @@ export function GameCard({
     });
   };
 
-  const lineDisabled = (line: TopOddsLine) =>
-    line.conditionState !== ConditionState.Active || needsStaleListInteraction;
+  /**
+   * Only block on terminal states. Live feeds flicker `Active ↔ Stopped` during
+   * paused play and an older check of `!== Active` made the whole card unclickable
+   * whenever the feed dropped out of `Active` for a tick. The betslip validates
+   * state on add (`useConditionsState`) and surfaces pause/price-change copy there.
+   */
+  const lineDisabled = (line: TopOddsLine) => {
+    switch (line.conditionState) {
+      case ConditionState.Canceled:
+      case ConditionState.Removed:
+      case ConditionState.Resolved:
+        return true;
+      default:
+        return needsStaleListInteraction;
+    }
+  };
 
   const staleHint = showStaleHint ? (
     <p className="text-[10px] leading-snug text-amber-500/85">
