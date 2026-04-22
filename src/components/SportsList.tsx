@@ -34,13 +34,28 @@ function Chevron({ open }: { open: boolean }) {
   );
 }
 
+// Stable reference so useSports doesn't rebuild its query key on every
+// render — without this, each render can invalidate the cache and re-flash
+// the skeleton over the whole list.
+const SPORTS_OPTIONS = {
+  isLive: false,
+  filter: { maxGamesPerLeague: 10 },
+  sortLeaguesAndCountriesByName: true,
+} as const;
+
 export function SportsList() {
   const chain = useChainSlug();
-  const { data: sports, isLoading, isError, refetch } = useSports({
-    isLive: false,
-    filter: { maxGamesPerLeague: 10 },
-    sortLeaguesAndCountriesByName: true,
-  });
+  const { data: sportsRaw, isLoading, isError, refetch } = useSports(
+    SPORTS_OPTIONS,
+  );
+
+  // The SDK sorts countries/leagues inside each sport alphabetically, but the
+  // top-level sports array comes back in subgraph order and reshuffles on
+  // re-fetch. Sort by name here so the sidebar is deterministic across loads.
+  const sports = useMemo(() => {
+    if (!sportsRaw) return sportsRaw;
+    return [...sportsRaw].sort((a, b) => a.name.localeCompare(b.name));
+  }, [sportsRaw]);
 
   const [openSportIds, setOpenSportIds] = useState<Set<number>>(() => new Set());
   const [openCountryKeys, setOpenCountryKeys] = useState<Set<string>>(
