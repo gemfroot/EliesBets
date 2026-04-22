@@ -193,6 +193,14 @@ export function useCountdown(
     return { remainingMs: 0, label: "Starting soon", isPast: true };
   }
 
+  // `useGlobalSeconds` returns `0` during SSR + the first client render so
+  // hydration stays byte-identical. Treat that as "clock not ready" and emit
+  // a stable placeholder — computing `targetMs - 0` would render absurd
+  // "20013d" labels for a fraction of a second before the real tick lands.
+  if (!now) {
+    return { remainingMs: 0, label: "—", isPast: false };
+  }
+
   const remainingMs = Number.isFinite(targetMs) ? targetMs - now : Number.NaN;
   const isPast = !Number.isFinite(targetMs) || remainingMs <= 0;
   if (isPast) {
