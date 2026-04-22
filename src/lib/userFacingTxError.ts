@@ -204,7 +204,21 @@ export function formatWalletTxError(error: unknown): string {
   }
 
   if (t.includes("execution reverted") || t.includes("transaction reverted")) {
-    return "The contract reverted this transaction. Check amounts, approvals, and that you are on the correct network, then try again.";
+    // viem puts the decoded reason on error.shortMessage / metaMessages, e.g.
+    // "execution reverted: LP: condition isn't running" or "…with reason: x".
+    // Surface whatever fragment we can so the next attempt isn't a black box.
+    const m =
+      raw.match(/execution reverted[^:]*:\s*([^\n]+?)(?:\s*Contract Call:|$)/i) ??
+      raw.match(/reverted with (?:the following )?(?:reason|custom error)[^:]*:\s*([^\n]+?)(?:\n|$)/i) ??
+      raw.match(/reason:\s*([^\n]+?)(?:\n|$)/i);
+    const reason = m?.[1]?.trim().replace(/\.$/, "");
+    if (typeof console !== "undefined") {
+      // Always log so the owner can screenshot devtools if they want the full chain.
+      console.error("[formatWalletTxError] contract revert", error);
+    }
+    const base =
+      "The contract reverted this transaction. Check amounts, approvals, and that you are on the correct network, then try again.";
+    return reason && reason.length < 200 ? `${base} (reason: ${reason})` : base;
   }
 
   if (
