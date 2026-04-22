@@ -803,16 +803,16 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     betTx.isPending ||
     betTx.isProcessing;
 
-  // SDK's `useOdds` runs its own `condition-batch` fetch on mount (7–10s on
-  // `onchainfeed.org`). During that window `sdkOdds={}` → `totalOdds=0.99` →
-  // `disableReason=TotalOddsTooLow`, which is spurious. When the user has a
-  // fresh list-card price in `effectiveOddsRecord`, treat that quirk as a
-  // no-op so the submit button doesn't needlessly wait. Real blockers
-  // (paused condition, over-max stake, drifted price) are still honored via
-  // `isStatesFetching`, `maxBet`, and the drift banner respectively. Drop the
-  // `!isBetCalculationFetching` wait too: during that window the SDK's
-  // `isAmountLowerThanMaxBet` returns true (maxBet undefined), and the
-  // relayer enforces limits on submit regardless.
+  // SDK's `useOdds` and `useConditionsState` both hit the slow
+  // `condition-batch` upstream (7–10s). While they're loading:
+  //   - `sdkOdds = {}` → `totalOdds = 0.99` → `TotalOddsTooLow` (spurious)
+  //   - `states = {}` → `isConditionsInActiveState = true` (vacuous ∀-check)
+  // So with a valid `effectiveOddsRecord` the only SDK-hydration blocker is
+  // the `TotalOddsTooLow` quirk. Bypass it and drop the `!isStatesFetching`
+  // wait entirely — once states land, a real pause surfaces as
+  // `disableReason = ConditionState` and re-gates the button. Same story for
+  // `!isBetCalculationFetching`: the SDK treats undefined `maxBet` as
+  // unbounded and the relayer enforces limits on submit.
   const isOddsHydrationQuirk =
     disableReason === BetslipDisableReason.TotalOddsTooLow && isOddsFetching;
 
@@ -823,7 +823,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     isConnected &&
     Boolean(address) &&
     !isBusy &&
-    !isStatesFetching &&
     (isBetAllowed || isOddsHydrationQuirk);
 
   // Stabilise the enabled state: once disabled, hold for 200ms before
