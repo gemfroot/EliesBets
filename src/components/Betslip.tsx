@@ -642,6 +642,16 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     ) {
       return "Checking market availability…";
     }
+    // SDK's useOdds starts with an empty odds map, which makes totalOdds resolve to
+    // ~0.99 via calcMinOdds's combo-fee modifier → disableReason = TotalOddsTooLow
+    // even though the selection is perfectly fine. Show loading copy until the first
+    // odds update lands, so users don't see a scary "odds too low" while picks resolve.
+    if (
+      disableReason === BetslipDisableReason.TotalOddsTooLow &&
+      (isOddsFetching || isBetCalculationFetching || isStatesFetching)
+    ) {
+      return "Loading odds…";
+    }
     // SDK maps !isMaxBetBiggerThanZero to SelectedOutcomesTemporarySuspended (misnamed).
     if (
       disableReason ===
