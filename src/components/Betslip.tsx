@@ -8,7 +8,12 @@ import {
   useChain,
   useDetailedBetslip,
 } from "@azuro-org/sdk";
-import { ConditionState } from "@azuro-org/toolkit";
+import {
+  BetRestrictionType,
+  BonusStatus,
+  ConditionState,
+  FreebetType,
+} from "@azuro-org/toolkit";
 import {
   createContext,
   useCallback,
@@ -503,6 +508,36 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       ? Math.min(singleLegIndex, maxLegIndex)
       : 0;
 
+  // `useAvailableFreebets` server-filters by selections but keeps expired /
+  // used / bet-type-restricted bonuses in the list. Hide them from the UI so
+  // users don't pick something the relayer will reject at submit time.
+  const isComboBet = multiPick && mode === "combo";
+  const applicableFreebets = useMemo(() => {
+    if (!freebets) return [];
+    const now = Date.now();
+    return freebets.filter((fb) => {
+      if (fb.status !== BonusStatus.Available) return false;
+      if (fb.expiresAt <= now) return false;
+      const restriction = fb.settings.betRestriction.type;
+      if (restriction === BetRestrictionType.Ordinar && isComboBet) return false;
+      if (restriction === BetRestrictionType.Combo && !isComboBet) return false;
+      return true;
+    });
+  }, [freebets, isComboBet]);
+
+  // When the previously-selected freebet is no longer applicable (e.g. user
+  // switched single↔combo, or it expired while the slip was open), drop it
+  // so `useBet` doesn't submit a stale freebet id.
+  useEffect(() => {
+    if (!selectedFreebet) return;
+    const stillApplicable = applicableFreebets.some(
+      (f) => f.id === selectedFreebet.id,
+    );
+    if (!stillApplicable) {
+      selectFreebet(undefined);
+    }
+  }, [applicableFreebets, selectedFreebet, selectFreebet]);
+
   const activeSelections = useMemo(() => {
     if (!multiPick || mode === "combo") {
       return selections;
@@ -882,7 +917,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           </div>
         </div>
       ) : null}
-      {freebets && freebets.length > 0 ? (
+      {applicableFreebets.length > 0 ? (
         <div className="flex flex-col gap-1.5">
           <label
             className="text-xs font-medium text-zinc-400"
@@ -899,18 +934,24 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
                 selectFreebet(undefined);
                 return;
               }
-              const fb = freebets.find((f) => String(f.id) === v);
+              const fb = applicableFreebets.find((f) => String(f.id) === v);
               selectFreebet(fb);
             }}
             disabled={isFreebetsFetching}
             className="min-h-11 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:opacity-50 md:min-h-0"
           >
             <option value="">Pay with wallet</option>
-            {freebets.map((f) => (
-              <option key={String(f.id)} value={String(f.id)}>
-                Free bet {f.amount} {betToken.symbol}
-              </option>
-            ))}
+            {applicableFreebets.map((f) => {
+              const kind =
+                f.settings.type === FreebetType.AllWin
+                  ? "full payout"
+                  : "profit only";
+              return (
+                <option key={String(f.id)} value={String(f.id)}>
+                  Free bet {f.amount} {betToken.symbol} · {kind}
+                </option>
+              );
+            })}
           </select>
           {selectedFreebet ? (
             <p className="text-xs text-zinc-500">

@@ -122,22 +122,43 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
   };
 
   const { cashoutAmount, isAvailable: precalcAvailable } = precalc.data ?? {};
+
+  // `usePrecalculatedCashouts` auto-refetches every ~60s, which flickers
+  // `precalc.isFetching` → disables the button and "—"s the amount for the
+  // duration. Hold the last-known-good values so the UI stays stable during
+  // a background refetch. Same pattern as min/max bet in `Betslip.tsx`.
+  const stableCashoutAmountRef = useRef(cashoutAmount);
+  const stablePrecalcAvailableRef = useRef(precalcAvailable);
+  const stableIsCashoutAvailableRef = useRef(isCashoutAvailable);
+  if (cashoutAmount != null && Number.isFinite(cashoutAmount)) {
+    stableCashoutAmountRef.current = cashoutAmount;
+  }
+  if (precalcAvailable !== undefined) {
+    stablePrecalcAvailableRef.current = precalcAvailable;
+  }
+  if (isCashoutAvailable !== undefined) {
+    stableIsCashoutAvailableRef.current = isCashoutAvailable;
+  }
+  const stableCashoutAmount = cashoutAmount ?? stableCashoutAmountRef.current;
+  const stablePrecalcAvailable =
+    precalcAvailable ?? stablePrecalcAvailableRef.current;
+  const stableIsCashoutAvailable =
+    isCashoutAvailable ?? stableIsCashoutAvailableRef.current;
+
   const cashoutDisplay =
-    precalc.isLoading && cashoutAmount === undefined
-      ? "…"
-      : cashoutAmount != null && Number.isFinite(cashoutAmount)
-        ? cashoutAmount.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })
+    stableCashoutAmount != null && Number.isFinite(stableCashoutAmount)
+      ? stableCashoutAmount.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : precalc.isLoading
+        ? "…"
         : "—";
 
   const canTryCashout =
     azuroChain.onBetChain &&
-    Boolean(precalcAvailable) &&
-    !precalc.isLoading &&
-    isCashoutAvailable &&
-    !calculationQuery.isFetching &&
+    Boolean(stablePrecalcAvailable) &&
+    Boolean(stableIsCashoutAvailable) &&
     !calculationQuery.isError;
 
   if (!showCashoutUi) {

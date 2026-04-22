@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useConditionsState } from "@azuro-org/sdk";
 import { ConditionState, type Market, type MarketOutcome } from "@azuro-org/toolkit";
 import { OddsButton } from "@/components/OddsButton";
 import { useBetslipActions } from "@/components/Betslip";
@@ -32,6 +33,7 @@ function OutcomeButton({
   sportSlug: string;
   participants: readonly { name: string }[];
   outcome: MarketOutcome;
+  /** Effective condition state (SDK `useConditionsState` live value). */
   conditionState: ConditionState;
 }) {
   const { addSelection } = useBetslipActions();
@@ -137,6 +139,29 @@ export function MarketGroup({
 }: MarketGroupProps) {
   const [open, setOpen] = useState(defaultOpen);
 
+  // Seed `useConditionsState` with the SSR-fetched state per condition so
+  // disabled/available transitions propagate via the shared feed socket.
+  // Without seeding, the hook's empty initial state + upstream round-trip
+  // would flash buttons as enabled before pulling the real state.
+  const { conditionIds, initialStates } = useMemo(() => {
+    const ids: string[] = [];
+    const states: Record<string, ConditionState> = {};
+    const seen = new Set<string>();
+    for (const market of markets) {
+      for (const cond of market.conditions) {
+        if (seen.has(cond.conditionId)) continue;
+        seen.add(cond.conditionId);
+        ids.push(cond.conditionId);
+        states[cond.conditionId] = cond.state;
+      }
+    }
+    return { conditionIds: ids, initialStates: states };
+  }, [markets]);
+  const { data: liveConditionStates } = useConditionsState({
+    conditionIds,
+    initialStates,
+  });
+
   return (
     <details
       className="group rounded-lg border border-zinc-800 bg-zinc-900/40"
@@ -172,7 +197,9 @@ export function MarketGroup({
                     gameTitle={gameTitle}
                     sportSlug={sportSlug}
                     participants={participants}
-                    conditionState={cond.state}
+                    conditionState={
+                      liveConditionStates[cond.conditionId] ?? cond.state
+                    }
                     label={
                       market.conditions.length > 1 && cond.margin ? (
                         <p className="text-xs text-zinc-400">{cond.margin}</p>

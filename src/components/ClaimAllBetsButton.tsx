@@ -95,7 +95,7 @@ function buildRedeemChunks(claimable: Bet[]): Bet[][] {
 
 type BetsInfinitePage = { bets: Bet[] };
 
-/** Merge every infinite page (Azuro `useBets`) using TanStack’s `hasNextPage` on each result — avoids stale React closures. */
+/** Drain every infinite page (Azuro `useBets`) and read TanStack's accumulated `data.pages` once at the end. */
 async function loadAllBetsPages(
   bets: Bet[],
   fetchNextPage: () => Promise<{
@@ -104,11 +104,10 @@ async function loadAllBetsPages(
   }>,
 ): Promise<Bet[]> {
   let res = await fetchNextPage();
-  let merged = (res.data?.pages ?? []).flatMap((p) => p.bets);
   while (res.hasNextPage) {
     res = await fetchNextPage();
-    merged = (res.data?.pages ?? []).flatMap((p) => p.bets);
   }
+  const merged = (res.data?.pages ?? []).flatMap((p) => p.bets);
   return merged.length > 0 ? merged : bets;
 }
 

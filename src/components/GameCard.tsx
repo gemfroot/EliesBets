@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useState } from "react";
-import { useActiveConditions } from "@azuro-org/sdk";
+import { useMemo, useState } from "react";
+import { useActiveConditions, useConditionsState } from "@azuro-org/sdk";
 import { ConditionState, GameState, type GameData } from "@azuro-org/toolkit";
 import { FavoriteGameButton } from "@/components/FavoriteButton";
 import { OddsButton } from "@/components/OddsButton";
@@ -125,6 +125,31 @@ export function GameCard({
   const topForUi = refreshedTop ?? topOdds ?? null;
   const ouForUi = (refreshedOu ?? overUnderOdds) ?? null;
 
+  // Seed `useConditionsState` with the state we already have (SSR or hover
+  // refresh) so the hook skips its own `batchFetchConditions` call and goes
+  // straight to live-subscribing via the shared feed socket. When Azuro pushes
+  // a state change (e.g. live market paused mid-view), the card reflects it
+  // without the 30s hover workaround. Matches the `initialStates` path in
+  // `@azuro-org/sdk`'s `useConditionsState`.
+  const { conditionIds, initialStates } = useMemo(() => {
+    const ids: string[] = [];
+    const states: Record<string, ConditionState> = {};
+    const seen = new Set<string>();
+    for (const line of [...(topForUi ?? []), ...(ouForUi ?? [])]) {
+      if (seen.has(line.conditionId)) continue;
+      seen.add(line.conditionId);
+      ids.push(line.conditionId);
+      states[line.conditionId] = line.conditionState;
+    }
+    return { conditionIds: ids, initialStates: states };
+  }, [topForUi, ouForUi]);
+  const { data: liveConditionStates } = useConditionsState({
+    conditionIds,
+    initialStates,
+  });
+  const effectiveStateFor = (line: TopOddsLine): ConditionState =>
+    liveConditionStates[line.conditionId] ?? line.conditionState;
+
   const totalMarketsAfterRefresh =
     listRefreshConditions != null
       ? countGameMarkets(listRefreshConditions)
@@ -169,7 +194,7 @@ export function GameCard({
       outcomeId: line.outcomeId,
       conditionId: line.conditionId,
       isExpressForbidden: line.isExpressForbidden,
-      listConditionStateAtAdd: line.conditionState,
+      listConditionStateAtAdd: effectiveStateFor(line),
     });
   };
 
@@ -180,7 +205,7 @@ export function GameCard({
    * state on add (`useConditionsState`) and surfaces pause/price-change copy there.
    */
   const lineDisabled = (line: TopOddsLine) => {
-    switch (line.conditionState) {
+    switch (effectiveStateFor(line)) {
       case ConditionState.Canceled:
       case ConditionState.Removed:
       case ConditionState.Resolved:
