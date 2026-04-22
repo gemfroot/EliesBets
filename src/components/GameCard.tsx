@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useActiveConditions, useConditionsState } from "@azuro-org/sdk";
 import { ConditionState, GameState, type GameData } from "@azuro-org/toolkit";
 import { FavoriteGameButton } from "@/components/FavoriteButton";
@@ -103,33 +103,6 @@ export function GameCard({
   const [staleRefreshRequested, setStaleRefreshRequested] = useState(false);
   const shouldRefetchStaleList = isStale && staleRefreshRequested;
 
-  // Auto-trigger the refresh as soon as a stale card enters the viewport, so
-  // the user doesn't have to hover. Pre-warm with a 200px rootMargin so odds
-  // are up-to-date by the time the card is actually on screen. On touch
-  // devices (no hover) this is the only trigger; on desktop it supersedes
-  // the previous pointer-enter gate.
-  const cardRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    const node = cardRef.current;
-    if (!node || typeof IntersectionObserver === "undefined" || !isStale || staleRefreshRequested) {
-      return;
-    }
-    const obs = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setStaleRefreshRequested(true);
-            obs.disconnect();
-            return;
-          }
-        }
-      },
-      { rootMargin: "200px", threshold: 0 },
-    );
-    obs.observe(node);
-    return () => obs.disconnect();
-  }, [isStale, staleRefreshRequested]);
-
   const { data: listRefreshConditions, isFetching: listOddsRefreshing } =
     useActiveConditions({
       gameId: game.gameId,
@@ -201,6 +174,7 @@ export function GameCard({
     !listOddsRefreshing &&
     refreshedTop == null;
   const needsStaleListInteraction = false;
+  const showStaleHint = isStale && refreshedTop == null && !listOddsRefreshing;
 
   const outcomeCtx = {
     sportSlug: game.sport.slug,
@@ -241,7 +215,11 @@ export function GameCard({
     }
   };
 
-  const staleHint = listOddsRefreshFailed ? (
+  const staleHint = showStaleHint ? (
+    <p className="text-[10px] leading-snug text-amber-500/85">
+      Odds refresh on hover.
+    </p>
+  ) : listOddsRefreshFailed ? (
     <p className="text-[10px] leading-snug text-red-400/90">
       Could not refresh odds.{" "}
       <Link href={gameHref} className="underline hover:text-red-300">
@@ -249,6 +227,12 @@ export function GameCard({
       </Link>
     </p>
   ) : null;
+
+  const onStaleListPointerEnter = () => {
+    if (isStale && !staleRefreshRequested) {
+      setStaleRefreshRequested(true);
+    }
+  };
 
   const hasMain = topForUi && topForUi.length > 0;
   const hasOu = ouForUi && ouForUi.length > 0;
@@ -439,8 +423,8 @@ export function GameCard({
 
     return (
       <article
-        ref={cardRef}
         className="flex h-full min-h-0 flex-col rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3"
+        onPointerEnter={onStaleListPointerEnter}
       >
         <div className="mb-1.5 flex min-w-0 items-center gap-1.5">
           <SportNavIcon slug={game.sport.slug} className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
@@ -467,8 +451,8 @@ export function GameCard({
 
   return (
     <article
-      ref={cardRef}
       className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3"
+      onPointerEnter={onStaleListPointerEnter}
     >
       {variant === "default" && (
         <div className="mb-1.5 flex min-w-0 items-center gap-1.5">
