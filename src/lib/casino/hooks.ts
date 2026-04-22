@@ -705,7 +705,10 @@ export function useCoinToss(betToken?: BetToken) {
           setVrfCost(cost);
           setVrfPending(false);
         }
-      } catch {
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[casino] fetchVrfCost failed:", e);
+        }
         if (!cancelled) setVrfPending(false);
       }
     }
@@ -1032,7 +1035,10 @@ export function useDice(betToken?: BetToken) {
           setVrfCost(cost);
           setVrfPending(false);
         }
-      } catch {
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[casino] fetchVrfCost failed:", e);
+        }
         if (!cancelled) setVrfPending(false);
       }
     }
@@ -1360,7 +1366,10 @@ export function useRoulette(betToken?: BetToken) {
           setVrfCost(cost);
           setVrfPending(false);
         }
-      } catch {
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[casino] fetchVrfCost failed:", e);
+        }
         if (!cancelled) setVrfPending(false);
       }
     }
@@ -1675,7 +1684,10 @@ export function useKeno(betToken?: BetToken) {
           setVrfCost(cost);
           setVrfPending(false);
         }
-      } catch {
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[casino] fetchVrfCost failed:", e);
+        }
         if (!cancelled) setVrfPending(false);
       }
     }
@@ -2005,7 +2017,10 @@ function useWeightedWheelLikeGame(
           setVrfCost(cost);
           setVrfPending(false);
         }
-      } catch {
+      } catch (e) {
+        if (typeof window !== "undefined") {
+          console.warn("[casino] fetchVrfCost failed:", e);
+        }
         if (!cancelled) setVrfPending(false);
       }
     }

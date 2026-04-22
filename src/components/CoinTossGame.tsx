@@ -89,6 +89,7 @@ export function CoinTossGame() {
   const [payoutWei, setPayoutWei] = useState<bigint | null>(null);
   const [waitingVrf, setWaitingVrf] = useState(false);
   const [vrfSoftTimeout, setVrfSoftTimeout] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const rollSnapshotRef = useRef<bigint | null>(null);
 
   const isSupportedChain = (CASINO_CHAIN_IDS as readonly number[]).includes(chainId);
@@ -272,6 +273,7 @@ export function CoinTossGame() {
       e.preventDefault();
       if (!canSubmit) return;
       reset?.();
+      setSubmitError(null);
       setOutcome(null);
       setPayoutWei(null);
       setWaitingVrf(false);
@@ -295,7 +297,9 @@ export function CoinTossGame() {
           tokenDecimals: betToken.decimals,
           baselineRollId: lastRoll?.id?.toString(),
         });
-      } catch {
+      } catch (err) {
+        console.error("[casino] CoinToss placeWager failed:", err);
+        setSubmitError(formatWalletTxError(err));
         setPhase("picking");
         setTxHash(undefined);
       }
@@ -655,9 +659,9 @@ export function CoinTossGame() {
                   </p>
                 ) : null}
 
-                {error ? (
+                {error || submitError ? (
                   <p className="type-body text-red-400" role="alert">
-                    {formatWalletTxError(error)}
+                    {submitError ?? formatWalletTxError(error)}
                   </p>
                 ) : null}
 
