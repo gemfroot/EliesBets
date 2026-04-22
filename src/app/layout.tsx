@@ -5,6 +5,7 @@ import { Providers } from "@/providers";
 import { BetslipPanel } from "@/components/Betslip";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { BetslipAsideGate } from "@/components/LayoutChrome";
 import { MobileLayoutChrome } from "@/components/MobileLayoutChrome";
 import { Sidebar } from "@/components/Sidebar";
 import "./globals.css";
@@ -93,12 +94,14 @@ export default function RootLayout({
               <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
                 {children}
               </main>
-              <aside
-                className="hidden w-64 shrink-0 border-l border-zinc-800 bg-zinc-900/40 p-4 lg:block"
-                aria-label="Betslip"
-              >
-                <BetslipPanel />
-              </aside>
+              <BetslipAsideGate>
+                <aside
+                  className="hidden w-64 shrink-0 border-l border-zinc-800 bg-zinc-900/40 p-4 lg:block"
+                  aria-label="Betslip"
+                >
+                  <BetslipPanel />
+                </aside>
+              </BetslipAsideGate>
             </div>
             <Footer />
             <MobileLayoutChrome />
