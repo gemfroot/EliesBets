@@ -161,6 +161,53 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
     Boolean(stableIsCashoutAvailable) &&
     !calculationQuery.isError;
 
+  /**
+   * Explain to users why the button is disabled. Before this, the button just
+   * greyed out with a not-allowed cursor — a cashoutable-looking amount next
+   * to an un-clickable button with no reason. Precedence matters: a real
+   * calculation error is more actionable than a generic "unavailable".
+   */
+  const disabledReasonCopy: string | null = (() => {
+    if (!azuroChain.onBetChain) {
+      return null; // AzuroWrongChainCallout already handles this.
+    }
+    if (calculationQuery.isError) {
+      return "Azuro's cashout service rejected this bet (often the market just suspended or the calculation expired). Try again in a few seconds.";
+    }
+    if (calculationQuery.isLoading) {
+      return "Fetching a fresh cashout quote from Azuro…";
+    }
+    if (!stableIsCashoutAvailable) {
+      return "Azuro has no cashout quote for this bet right now. Quotes refresh every ~60s — give it a moment or try again.";
+    }
+    if (!stablePrecalcAvailable) {
+      return "Cashout is currently suspended for this market (the line is moving or the market just paused). The quote above is the last Azuro sent us.";
+    }
+    return null;
+  })();
+
+  /**
+   * Log the underlying error once per (tokenId, error) pair so the browser
+   * console has diagnostic detail. Gated on a debug flag so normal runs don't
+   * spam users; set `NEXT_PUBLIC_CASHOUT_DEBUG=1` on the deploy to turn on.
+   */
+  const lastLoggedErrorRef = useRef<unknown>(null);
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_CASHOUT_DEBUG !== "1") return;
+    const err = calculationQuery.error;
+    if (err && err !== lastLoggedErrorRef.current) {
+      lastLoggedErrorRef.current = err;
+      console.warn("[cashout-debug] calculationQuery error", {
+        tokenId: bet.tokenId,
+        error: err,
+      });
+    }
+  }, [calculationQuery.error, bet.tokenId]);
+
+  const handleRetryCalculation = useCallback(() => {
+    void calculationQuery.refetch();
+  }, [calculationQuery]);
+
   if (!showCashoutUi) {
     return null;
   }
@@ -191,11 +238,31 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
             setActionError(null);
             setDialogOpen(true);
           }}
+          title={!canTryCashout && disabledReasonCopy ? disabledReasonCopy : undefined}
           className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Cash out
         </button>
       </div>
+      {!canTryCashout && disabledReasonCopy ? (
+        <div
+          className="flex flex-wrap items-start gap-2 text-[11px] leading-snug text-zinc-500"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="flex-1 min-w-0">{disabledReasonCopy}</span>
+          {calculationQuery.isError || !stableIsCashoutAvailable ? (
+            <button
+              type="button"
+              onClick={handleRetryCalculation}
+              disabled={calculationQuery.isFetching}
+              className="shrink-0 rounded border border-zinc-700 px-2 py-0.5 text-[11px] font-medium text-zinc-300 transition hover:border-zinc-500 hover:bg-zinc-800 disabled:opacity-60"
+            >
+              {calculationQuery.isFetching ? "Refetching…" : "Retry quote"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {dialogOpen ? (
         <div
