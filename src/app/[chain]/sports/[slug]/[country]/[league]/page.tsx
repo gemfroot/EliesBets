@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { GameData } from "@azuro-org/toolkit";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -5,11 +6,13 @@ import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { GameCard } from "@/components/GameCard";
 import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
+import { GameCardListSkeleton } from "@/components/Skeleton";
 import { fetchGamesForLeague } from "@/lib/sportGames";
 import { formatServerFetchError } from "@/lib/serverFetchError";
 import {
   chainIdFromSlug,
   isChainSlug,
+  type ChainSlug,
 } from "@/lib/sportsChainConstants";
 
 export const revalidate = 45;
@@ -35,29 +38,9 @@ export default async function SportCountryLeaguePage({ params }: Props) {
   if (!isChainSlug(chain)) {
     notFound();
   }
-  const chainId = chainIdFromSlug(chain);
   const sportTitle = titleFromSlug(slug);
-
-  let games: GameData[] = [];
-  let loadError: string | null = null;
-  try {
-    const fetched = await fetchGamesForLeague(slug, leagueSlug, chainId);
-    games = fetched.filter((g) => g.country.slug === countrySlug);
-  } catch (e) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("[SportCountryLeaguePage] fetchGamesForLeague", e);
-    }
-    loadError = formatServerFetchError(e);
-  }
-
-  const countryName = games[0]?.country.name ?? titleFromSlug(countrySlug);
-  const leagueName = games[0]?.league.name ?? titleFromSlug(leagueSlug);
-
-  const oddsByGameId = loadError
-    ? new Map<string, GameOddsData>()
-    : await fetchTopOddsByGameId(games.map((g) => g.gameId), chainId);
-
-  games = [...games].sort((a, b) => +a.startsAt - +b.startsAt);
+  const fallbackCountryName = titleFromSlug(countrySlug);
+  const fallbackLeagueName = titleFromSlug(leagueSlug);
 
   return (
     <div className="page-shell">
@@ -70,52 +53,103 @@ export default async function SportCountryLeaguePage({ params }: Props) {
           href={`/${chain}/sports/${slug}/${countrySlug}`}
           className="hover:text-zinc-300"
         >
-          {countryName}
+          {fallbackCountryName}
         </Link>
         <span className="text-zinc-600"> · </span>
-        <span className="text-zinc-400">{leagueName}</span>
+        <span className="text-zinc-400">{fallbackLeagueName}</span>
       </p>
       <div className="mt-2 flex items-start justify-between gap-2">
-        <h1 className="type-display">{leagueName}</h1>
+        <h1 className="type-display">{fallbackLeagueName}</h1>
         <LeagueFavoriteButton
           sportSlug={slug}
           countrySlug={countrySlug}
           leagueSlug={leagueSlug}
-          title={leagueName}
+          title={fallbackLeagueName}
         />
       </div>
       <p className="type-muted mt-1">
-        {sportTitle} · {countryName}
+        {sportTitle} · {fallbackCountryName}
       </p>
-
-      {loadError ? (
-        <RetryCallout
-          className="mt-6"
-          title="Could not load games"
-          description={loadError}
+      <Suspense
+        fallback={
+          <div className="mt-8">
+            <GameCardListSkeleton count={6} />
+          </div>
+        }
+      >
+        <LeagueGamesList
+          chain={chain}
+          slug={slug}
+          countrySlug={countrySlug}
+          leagueSlug={leagueSlug}
         />
-      ) : games.length === 0 ? (
-        <div className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-6">
-          <p className="text-sm font-medium text-zinc-200">No games</p>
-          <p className="mt-1 text-sm text-zinc-500">
-            This league has no upcoming fixtures. Try another league or check back later.
-          </p>
-        </div>
-      ) : (
-        <ul className="mt-8 flex flex-col gap-2">
-          {games.map((game) => (
-            <li key={game.gameId}>
-              <GameCard
-                game={game}
-                topOdds={oddsByGameId.get(game.gameId)?.topOdds ?? null}
-                overUnderOdds={oddsByGameId.get(game.gameId)?.overUnderOdds ?? null}
-                extraMarketsCount={Math.max(0, (oddsByGameId.get(game.gameId)?.marketCount ?? 0) - 1)}
-                oddsFetchedAt={oddsByGameId.get(game.gameId)?.fetchedAt}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
+      </Suspense>
     </div>
+  );
+}
+
+async function LeagueGamesList({
+  chain,
+  slug,
+  countrySlug,
+  leagueSlug,
+}: {
+  chain: ChainSlug;
+  slug: string;
+  countrySlug: string;
+  leagueSlug: string;
+}) {
+  const chainId = chainIdFromSlug(chain);
+  let games: GameData[] = [];
+  let loadError: string | null = null;
+  try {
+    const fetched = await fetchGamesForLeague(slug, leagueSlug, chainId);
+    games = fetched.filter((g) => g.country.slug === countrySlug);
+  } catch (e) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("[SportCountryLeaguePage] fetchGamesForLeague", e);
+    }
+    loadError = formatServerFetchError(e);
+  }
+
+  const oddsByGameId = loadError
+    ? new Map<string, GameOddsData>()
+    : await fetchTopOddsByGameId(games.map((g) => g.gameId), chainId);
+
+  games = [...games].sort((a, b) => +a.startsAt - +b.startsAt);
+
+  if (loadError) {
+    return (
+      <RetryCallout
+        className="mt-6"
+        title="Could not load games"
+        description={loadError}
+      />
+    );
+  }
+  if (games.length === 0) {
+    return (
+      <div className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-6">
+        <p className="text-sm font-medium text-zinc-200">No games</p>
+        <p className="mt-1 text-sm text-zinc-500">
+          This league has no upcoming fixtures. Try another league or check back later.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <ul className="mt-8 flex flex-col gap-2">
+      {games.map((game) => (
+        <li key={game.gameId}>
+          <GameCard
+            game={game}
+            topOdds={oddsByGameId.get(game.gameId)?.topOdds ?? null}
+            overUnderOdds={oddsByGameId.get(game.gameId)?.overUnderOdds ?? null}
+            extraMarketsCount={Math.max(0, (oddsByGameId.get(game.gameId)?.marketCount ?? 0) - 1)}
+            oddsFetchedAt={oddsByGameId.get(game.gameId)?.fetchedAt}
+          />
+        </li>
+      ))}
+    </ul>
   );
 }
