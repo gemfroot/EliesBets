@@ -10,17 +10,23 @@ import {
 } from "@/lib/casino/addresses";
 
 /**
- * Pre-flight read of the Bank's per-token bet cap. Purpose: stop users from
- * submitting a wager that will always revert — the Bank enforces a
- * balanceRisk cap so `maxBet` is effectively `bankBalance * risk% / (payout - 1)`.
- * Under-funded banks drop maxBet to a handful of wei and every wager reverts
- * with a cryptic "ExcessiveBetAmount" / division-by-zero.
+ * Pre-flight check against the Bank's `getBetRequirements(token, multiplier)`.
  *
- * We compute at a conservative 2x multiplier (19800 basis points). Games with
- * higher multipliers (dice at 99x, wheel, plinko) will bind even tighter — the
- * check here is "can *anything* be bet at all?", not the per-game ceiling.
+ * Returns `(isAllowedToken, maxBetAmount, maxBetCount)`. We use the first two
+ * fields here:
+ *  - `isAllowedToken=false`  → the token is paused or not registered.
+ *  - `maxBetAmount === 0n`   → no liquidity to cover any payout at this
+ *                              multiplier; every wager() reverts.
+ *  - any other value         → operational. `maxBetAmount` is exposed so the
+ *                              game UI can display / cap the user's stake.
  *
- * `multiplier` is in basis points: 19800 = 1.98x, 99_000_000 = 99x.
+ * (Earlier versions of this hook mistakenly treated the third return value
+ * as `minBet` and gated "under-funded" on `maxBet < minBet`. The third value
+ * is `maxBetCount` — how many rolls you can batch into one tx — and that
+ * comparison was meaningless.)
+ *
+ * `multiplier` is in basis points: 19800 = 1.98×, 20000 = 2×. Games with
+ * higher multipliers should pass their own value.
  */
 export function useCasinoBankState(
   chainId: number,
@@ -29,13 +35,13 @@ export function useCasinoBankState(
 ): {
   isOperational: boolean;
   statusLabel: string | null;
-  maxBet: bigint | undefined;
-  minBet: bigint | undefined;
+  maxBetAmount: bigint | undefined;
+  maxBetCount: bigint | undefined;
 } {
   const bank = useMemo(() => getCasinoBankAddress(chainId), [chainId]);
   const bankConfigured = bank !== zeroAddress;
 
-  const { data } = useReadContract({
+  const { data, isLoading, isError } = useReadContract({
     address: bank,
     abi: bankAbi,
     functionName: "getBetRequirements",
@@ -43,54 +49,54 @@ export function useCasinoBankState(
     query: { enabled: bankConfigured },
   });
 
-  const [allowed, minBet, maxBet] = (data as
-    | readonly [boolean, bigint, bigint]
-    | undefined) ?? [undefined, undefined, undefined];
-
   if (!bankConfigured) {
     return {
       isOperational: false,
       statusLabel: "Casino not configured on this network.",
-      maxBet: undefined,
-      minBet: undefined,
-    };
-  }
-  if (allowed === undefined || minBet === undefined || maxBet === undefined) {
-    // Still loading
-    return {
-      isOperational: false,
-      statusLabel: null,
-      maxBet: undefined,
-      minBet: undefined,
+      maxBetAmount: undefined,
+      maxBetCount: undefined,
     };
   }
 
-  if (!allowed) {
+  if (isLoading || !data) {
+    return {
+      isOperational: false,
+      statusLabel: isError
+        ? `Casino bank read failed on this network.`
+        : null,
+      maxBetAmount: undefined,
+      maxBetCount: undefined,
+    };
+  }
+
+  const [isAllowedToken, maxBetAmount, maxBetCount] = data as unknown as [
+    boolean,
+    bigint,
+    bigint,
+  ];
+
+  if (!isAllowedToken) {
     return {
       isOperational: false,
       statusLabel: `${betToken.symbol} bets are currently paused by the bank operator.`,
-      maxBet,
-      minBet,
+      maxBetAmount,
+      maxBetCount,
     };
   }
 
-  // "Effectively unfunded": a real maxBet should be meaningfully above minBet
-  // and above the VRF cost. If max < min, or max is a few wei, the bank just
-  // can't cover a payout. Use min as the threshold — if max < min the bank
-  // literally cannot accept a valid bet.
-  if (maxBet < minBet || maxBet === 0n) {
+  if (maxBetAmount === 0n) {
     return {
       isOperational: false,
-      statusLabel: `${betToken.symbol} bank is below the risk floor — no bets can be accepted until liquidity is topped up.`,
-      maxBet,
-      minBet,
+      statusLabel: `${betToken.symbol} bank is empty — no bets can be placed until liquidity is added.`,
+      maxBetAmount,
+      maxBetCount,
     };
   }
 
   return {
     isOperational: true,
     statusLabel: null,
-    maxBet,
-    minBet,
+    maxBetAmount,
+    maxBetCount,
   };
 }
