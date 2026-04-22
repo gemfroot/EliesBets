@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import {
   GameOrderBy,
   GameState,
@@ -20,28 +21,34 @@ export const metadata: Metadata = {
 };
 
 const GAMES_PER_PAGE = 100;
+/** Short TTL — the list drives live games, and client-side SDK WS pushes keep prices current. */
+const LIVE_CACHE_SECONDS = 15;
 
-async function fetchAllLiveGames(chainId: SportsChainId): Promise<GameData[]> {
-  const baseParams = {
-    chainId,
-    state: GameState.Live,
-    orderBy: GameOrderBy.StartsAt,
-    orderDir: OrderDirection.Asc,
-    perPage: GAMES_PER_PAGE,
-  } as const;
-  const first = await getGamesByFilters({ ...baseParams, page: 1 });
-  if (first.totalPages <= 1) {
-    return first.games;
-  }
-  const remainingPages = Array.from(
-    { length: first.totalPages - 1 },
-    (_, i) => i + 2,
-  );
-  const rest = await Promise.all(
-    remainingPages.map((page) => getGamesByFilters({ ...baseParams, page })),
-  );
-  return [...first.games, ...rest.flatMap((r) => r.games)];
-}
+const fetchAllLiveGames = unstable_cache(
+  async (chainId: SportsChainId): Promise<GameData[]> => {
+    const baseParams = {
+      chainId,
+      state: GameState.Live,
+      orderBy: GameOrderBy.StartsAt,
+      orderDir: OrderDirection.Asc,
+      perPage: GAMES_PER_PAGE,
+    } as const;
+    const first = await getGamesByFilters({ ...baseParams, page: 1 });
+    if (first.totalPages <= 1) {
+      return first.games;
+    }
+    const remainingPages = Array.from(
+      { length: first.totalPages - 1 },
+      (_, i) => i + 2,
+    );
+    const rest = await Promise.all(
+      remainingPages.map((page) => getGamesByFilters({ ...baseParams, page })),
+    );
+    return [...first.games, ...rest.flatMap((r) => r.games)];
+  },
+  ["fetchAllLiveGames"],
+  { revalidate: LIVE_CACHE_SECONDS },
+);
 
 export default async function LivePage() {
   const chainId = await getSportsChainId();

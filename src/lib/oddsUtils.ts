@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import {
   ConditionState,
   getConditionsByGameIds,
@@ -12,6 +13,13 @@ export const CONDITIONS_BATCH_SIZE = 40;
 
 /** How many condition batches to fetch in parallel (within each wave). */
 const CONDITIONS_FETCH_CONCURRENCY = 4;
+
+/**
+ * Short TTL — odds move, but list cards already show a stale hint and offer
+ * hover-refresh past 30s. 15s keeps SSR snappy without serving wildly outdated
+ * prices to the first paint.
+ */
+const ODDS_CACHE_REVALIDATE_SECONDS = 15;
 
 export type TopOddsLine = {
   label: string;
@@ -124,52 +132,76 @@ export type GameOddsData = {
   fetchedAt: number;
 };
 
+/**
+ * Inner impl returns a plain record so `unstable_cache` can serialize it
+ * (Next.js's cache strips Map instances on restore).
+ */
+const fetchTopOddsRecord = unstable_cache(
+  async (
+    sortedGameIds: string[],
+    chainId: SportsChainId,
+  ): Promise<Record<string, GameOddsData>> => {
+    const result: Record<string, GameOddsData> = {};
+    if (!sortedGameIds.length) {
+      return result;
+    }
+    const batches = chunk(sortedGameIds, CONDITIONS_BATCH_SIZE);
+    for (let i = 0; i < batches.length; i += CONDITIONS_FETCH_CONCURRENCY) {
+      const wave = batches.slice(i, i + CONDITIONS_FETCH_CONCURRENCY);
+      const partialMaps = await Promise.all(
+        wave.map(async (batch) => {
+          const conditions = await getConditionsByGameIds({
+            chainId,
+            gameIds: batch,
+          });
+          const byGameId = new Map<string, typeof conditions>();
+          for (const c of conditions) {
+            const gid = c.game.gameId;
+            const list = byGameId.get(gid);
+            if (list) {
+              list.push(c);
+            } else {
+              byGameId.set(gid, [c]);
+            }
+          }
+          const batchResult: Record<string, GameOddsData> = {};
+          const fetchedAt = Date.now();
+          for (const gid of batch) {
+            const conds = byGameId.get(gid) ?? [];
+            batchResult[gid] = {
+              topOdds: extractMainLineOdds(conds),
+              overUnderOdds: extractOverUnderOdds(conds),
+              marketCount: countGameMarkets(conds),
+              fetchedAt,
+            };
+          }
+          return batchResult;
+        }),
+      );
+      for (const m of partialMaps) {
+        Object.assign(result, m);
+      }
+    }
+    return result;
+  },
+  ["fetchTopOddsRecord"],
+  { revalidate: ODDS_CACHE_REVALIDATE_SECONDS },
+);
+
 export async function fetchTopOddsByGameId(
   gameIds: string[],
   chainId: SportsChainId,
 ): Promise<Map<string, GameOddsData>> {
-  const result = new Map<string, GameOddsData>();
   if (!gameIds.length) {
-    return result;
+    return new Map<string, GameOddsData>();
   }
-  const batches = chunk(gameIds, CONDITIONS_BATCH_SIZE);
-  for (let i = 0; i < batches.length; i += CONDITIONS_FETCH_CONCURRENCY) {
-    const wave = batches.slice(i, i + CONDITIONS_FETCH_CONCURRENCY);
-    const partialMaps = await Promise.all(
-      wave.map(async (batch) => {
-        const conditions = await getConditionsByGameIds({
-          chainId,
-          gameIds: batch,
-        });
-        const byGameId = new Map<string, typeof conditions>();
-        for (const c of conditions) {
-          const gid = c.game.gameId;
-          const list = byGameId.get(gid);
-          if (list) {
-            list.push(c);
-          } else {
-            byGameId.set(gid, [c]);
-          }
-        }
-        const batchResult = new Map<string, GameOddsData>();
-        const fetchedAt = Date.now();
-        for (const gid of batch) {
-          const conds = byGameId.get(gid) ?? [];
-          batchResult.set(gid, {
-            topOdds: extractMainLineOdds(conds),
-            overUnderOdds: extractOverUnderOdds(conds),
-            marketCount: countGameMarkets(conds),
-            fetchedAt,
-          });
-        }
-        return batchResult;
-      }),
-    );
-    for (const m of partialMaps) {
-      for (const [gid, data] of m) {
-        result.set(gid, data);
-      }
-    }
+  // Stable cache key: dedupe + sort so different orderings of the same set hit
+  // the same cache entry (sport pages group games by league after fetch).
+  const sortedIds = [...new Set(gameIds)].sort();
+  const record = await fetchTopOddsRecord(sortedIds, chainId);
+  const result = new Map<string, GameOddsData>();
+  for (const [gid, data] of Object.entries(record)) {
+    result.set(gid, data);
   }
   return result;
 }

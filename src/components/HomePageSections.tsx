@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { unstable_cache } from "next/cache";
 import {
   GameOrderBy,
   GameState,
@@ -24,48 +25,88 @@ const UPCOMING_LIMIT = 12;
 const UPCOMING_FETCH_BUFFER = 3;
 const SPORT_LINKS_MAX = 10;
 
+/**
+ * Home is dynamic (cookies → chainId), so the route-level `revalidate = 45`
+ * we had before commit 8ab071e was silently dropped. Cache per-chainId at the
+ * data layer instead so returning users don't pay the upstream latency.
+ * Short TTL for live so the hero stays near real-time; longer for popular/
+ * upcoming/sports nav which barely move minute-to-minute.
+ */
+const LIVE_CACHE_SECONDS = 15;
+const PREMATCH_CACHE_SECONDS = 45;
+
 function parseStartMs(startsAt: string): number {
   const n = +startsAt;
   return n < 32_503_680_000 ? n * 1000 : n;
 }
 
-async function fetchHeroLiveGames(chainId: SportsChainId): Promise<GameData[]> {
-  const res = await getGamesByFilters({
-    chainId,
-    state: GameState.Live,
-    orderBy: GameOrderBy.StartsAt,
-    orderDir: OrderDirection.Asc,
-    page: 1,
-    perPage: HERO_FETCH_PER_PAGE,
-  });
-  return res.games.slice(0, HERO_LIVE_LIMIT);
-}
+const fetchHeroLiveGames = unstable_cache(
+  async (chainId: SportsChainId): Promise<GameData[]> => {
+    const res = await getGamesByFilters({
+      chainId,
+      state: GameState.Live,
+      orderBy: GameOrderBy.StartsAt,
+      orderDir: OrderDirection.Asc,
+      page: 1,
+      perPage: HERO_FETCH_PER_PAGE,
+    });
+    return res.games.slice(0, HERO_LIVE_LIMIT);
+  },
+  ["fetchHeroLiveGames"],
+  { revalidate: LIVE_CACHE_SECONDS },
+);
 
-async function fetchPopularGames(chainId: SportsChainId): Promise<GameData[]> {
-  const res = await getGamesByFilters({
-    chainId,
-    state: GameState.Prematch,
-    orderBy: GameOrderBy.Turnover,
-    orderDir: OrderDirection.Desc,
-    page: 1,
-    perPage: Math.max(POPULAR_LIMIT, API_MIN_PER_PAGE),
-  });
-  return res.games.slice(0, POPULAR_LIMIT);
-}
+const fetchPopularGames = unstable_cache(
+  async (chainId: SportsChainId): Promise<GameData[]> => {
+    const res = await getGamesByFilters({
+      chainId,
+      state: GameState.Prematch,
+      orderBy: GameOrderBy.Turnover,
+      orderDir: OrderDirection.Desc,
+      page: 1,
+      perPage: Math.max(POPULAR_LIMIT, API_MIN_PER_PAGE),
+    });
+    return res.games.slice(0, POPULAR_LIMIT);
+  },
+  ["fetchPopularGames"],
+  { revalidate: PREMATCH_CACHE_SECONDS },
+);
 
-async function fetchUpcomingGames(chainId: SportsChainId): Promise<GameData[]> {
-  const res = await getGamesByFilters({
-    chainId,
-    state: GameState.Prematch,
-    orderBy: GameOrderBy.StartsAt,
-    orderDir: OrderDirection.Asc,
-    page: 1,
-    perPage: UPCOMING_LIMIT * UPCOMING_FETCH_BUFFER,
-  });
-  const now = Date.now();
-  const upcoming = res.games.filter((g) => parseStartMs(g.startsAt) >= now);
-  return upcoming.slice(0, UPCOMING_LIMIT);
-}
+const fetchUpcomingGames = unstable_cache(
+  async (chainId: SportsChainId): Promise<GameData[]> => {
+    const res = await getGamesByFilters({
+      chainId,
+      state: GameState.Prematch,
+      orderBy: GameOrderBy.StartsAt,
+      orderDir: OrderDirection.Asc,
+      page: 1,
+      perPage: UPCOMING_LIMIT * UPCOMING_FETCH_BUFFER,
+    });
+    const now = Date.now();
+    const upcoming = res.games.filter((g) => parseStartMs(g.startsAt) >= now);
+    return upcoming.slice(0, UPCOMING_LIMIT);
+  },
+  ["fetchUpcomingGames"],
+  { revalidate: PREMATCH_CACHE_SECONDS },
+);
+
+const fetchSportsNavLinks = unstable_cache(
+  async (chainId: SportsChainId) => {
+    const sports = await getSports({
+      chainId,
+      gameState: GameState.Prematch,
+      numberOfGames: 10,
+      orderBy: GameOrderBy.Turnover,
+      orderDir: OrderDirection.Desc,
+    });
+    return sports.slice(0, SPORT_LINKS_MAX).map((s) => ({
+      slug: s.slug,
+      name: s.name,
+    }));
+  },
+  ["fetchSportsNavLinks"],
+  { revalidate: PREMATCH_CACHE_SECONDS },
+);
 
 /** Live hero: streamed behind Suspense so the shell can render immediately. */
 export async function HomeHeroSection() {
@@ -132,17 +173,7 @@ export async function HomeSportsNavSection() {
   let sportsError: string | null = null;
 
   try {
-    const sports = await getSports({
-      chainId,
-      gameState: GameState.Prematch,
-      numberOfGames: 10,
-      orderBy: GameOrderBy.Turnover,
-      orderDir: OrderDirection.Desc,
-    });
-    sportLinks = sports.slice(0, SPORT_LINKS_MAX).map((s) => ({
-      slug: s.slug,
-      name: s.name,
-    }));
+    sportLinks = await fetchSportsNavLinks(chainId);
   } catch (e) {
     sportsError = formatServerFetchError(e);
   }

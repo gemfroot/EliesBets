@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import {
   GameOrderBy,
   GameState,
@@ -10,6 +11,15 @@ import {
 import type { SportsChainId } from "@/lib/sportsChainConstants";
 
 export const GAMES_PER_PAGE = 100;
+
+/**
+ * List pages read `getSportsChainId()` from cookies → routes are dynamic, so
+ * route-level `revalidate = 45` (which we had before commit 8ab071e) is a no-op.
+ * Cache at the data layer instead: each chainId gets its own 45s-bucketed render
+ * so returning users in the same chain hit the in-memory cache, not the slow
+ * upstream. Live odds still update client-side via the SDK's WebSocket feed.
+ */
+const LIST_PAGE_REVALIDATE_SECONDS = 45;
 
 /** Games per league from the sports tree API; must be high enough for full country listings. */
 const COUNTRY_TREE_GAMES_PER_LEAGUE = 1000;
@@ -68,16 +78,17 @@ function dedupeGames(games: GameData[]): GameData[] {
   });
 }
 
-export async function fetchGamesForSport(
-  sportSlug: string,
-  chainId: SportsChainId,
-): Promise<GameData[]> {
-  const collected = await Promise.all([
-    fetchGamesForPaginatedState(sportSlug, GameState.Prematch, chainId),
-    fetchGamesForPaginatedState(sportSlug, GameState.Live, chainId),
-  ]).then((parts) => parts.flat());
-  return dedupeGames(collected);
-}
+export const fetchGamesForSport = unstable_cache(
+  async (sportSlug: string, chainId: SportsChainId): Promise<GameData[]> => {
+    const collected = await Promise.all([
+      fetchGamesForPaginatedState(sportSlug, GameState.Prematch, chainId),
+      fetchGamesForPaginatedState(sportSlug, GameState.Live, chainId),
+    ]).then((parts) => parts.flat());
+    return dedupeGames(collected);
+  },
+  ["fetchGamesForSport"],
+  { revalidate: LIST_PAGE_REVALIDATE_SECONDS },
+);
 
 function collectGamesForCountryFromSportsTree(
   sportSlug: string,
@@ -123,36 +134,44 @@ async function fetchGamesForSportCountryState(
  * Games for a single country under a sport (server-filtered via toolkit `getSports`),
  * without loading every game for the sport.
  */
-export async function fetchGamesForSportCountry(
-  sportSlug: string,
-  countrySlug: string,
-  chainId: SportsChainId,
-): Promise<GameData[]> {
-  const collected = await Promise.all([
-    fetchGamesForSportCountryState(
-      sportSlug,
-      countrySlug,
-      GameState.Prematch,
-      chainId,
-    ),
-    fetchGamesForSportCountryState(
-      sportSlug,
-      countrySlug,
-      GameState.Live,
-      chainId,
-    ),
-  ]).then((parts) => parts.flat());
-  return dedupeGames(collected);
-}
+export const fetchGamesForSportCountry = unstable_cache(
+  async (
+    sportSlug: string,
+    countrySlug: string,
+    chainId: SportsChainId,
+  ): Promise<GameData[]> => {
+    const collected = await Promise.all([
+      fetchGamesForSportCountryState(
+        sportSlug,
+        countrySlug,
+        GameState.Prematch,
+        chainId,
+      ),
+      fetchGamesForSportCountryState(
+        sportSlug,
+        countrySlug,
+        GameState.Live,
+        chainId,
+      ),
+    ]).then((parts) => parts.flat());
+    return dedupeGames(collected);
+  },
+  ["fetchGamesForSportCountry"],
+  { revalidate: LIST_PAGE_REVALIDATE_SECONDS },
+);
 
-export async function fetchGamesForLeague(
-  sportSlug: string,
-  leagueSlug: string,
-  chainId: SportsChainId,
-): Promise<GameData[]> {
-  const collected = await Promise.all([
-    fetchGamesForPaginatedState(sportSlug, GameState.Prematch, chainId, leagueSlug),
-    fetchGamesForPaginatedState(sportSlug, GameState.Live, chainId, leagueSlug),
-  ]).then((parts) => parts.flat());
-  return dedupeGames(collected);
-}
+export const fetchGamesForLeague = unstable_cache(
+  async (
+    sportSlug: string,
+    leagueSlug: string,
+    chainId: SportsChainId,
+  ): Promise<GameData[]> => {
+    const collected = await Promise.all([
+      fetchGamesForPaginatedState(sportSlug, GameState.Prematch, chainId, leagueSlug),
+      fetchGamesForPaginatedState(sportSlug, GameState.Live, chainId, leagueSlug),
+    ]).then((parts) => parts.flat());
+    return dedupeGames(collected);
+  },
+  ["fetchGamesForLeague"],
+  { revalidate: LIST_PAGE_REVALIDATE_SECONDS },
+);
