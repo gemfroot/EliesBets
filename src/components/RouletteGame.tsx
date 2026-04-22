@@ -390,7 +390,7 @@ export function RouletteGame() {
         </header>
 
         <div className="mb-6">
-          <CasinoBankBanner chainId={chainId} betToken={selectedToken} />
+          <CasinoBankBanner chainId={chainId} betToken={selectedToken} game="roulette" />
         </div>
 
         {isConnected && !isSupportedChain ? (
