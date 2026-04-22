@@ -172,6 +172,17 @@ export function ClaimAllBetsButton({
 
   const claimableLoaded = useMemo(() => bets.filter(betIsClaimable), [bets]);
 
+  // Signature count estimate: `buildRedeemChunks` groups by LP/core/freebet/paymaster
+  // and chunks each group at CLAIM_BATCH_SIZE — each chunk is one wallet prompt.
+  // Only meaningful once every page is loaded; otherwise the count under-estimates.
+  const estimatedSignatures = useMemo(
+    () =>
+      claimableLoaded.length > 0
+        ? buildRedeemChunks(claimableLoaded).length
+        : 0,
+    [claimableLoaded],
+  );
+
   const invalidateBalances = useCallback(() => {
     if (address) {
       void queryClient.invalidateQueries({
@@ -326,7 +337,7 @@ export function ClaimAllBetsButton({
     busyPhase === "pages"
       ? "Loading bets…"
       : busyPhase === "claim" && claimBatch && claimBatch.total > 0
-        ? `Claiming ${claimBatch.done}/${claimBatch.total}…`
+        ? `Signing batch ${claimBatch.done + 1} of ${claimBatch.total}…`
         : loading
           ? "Claiming…"
           : null;
@@ -355,6 +366,28 @@ export function ClaimAllBetsButton({
       ? "Until every settled page is loaded, the button does not show a bet count (only loaded pages are counted and the number can jump). Click to load all, then claim in batches (up to 6 per tx). If your wallet caps fees, batches split automatically."
       : "Claims redeemable wins in on-chain batches (up to 6 per tx). If your wallet caps fees, batches split automatically.";
 
+  /**
+   * Single-line summary shown above the button on every viewport: what counts
+   * are firm, how many wallet prompts to expect, and how the split works.
+   * Kept terse because the same card shows a claimable-count pill too.
+   */
+  const batchInfoLine: string | null = (() => {
+    if (loadingLabel) return null;
+    if (claimableLoaded.length === 0) {
+      // Button is only rendered when summary or incoming pages could hold wins.
+      if (fetchNextPage && hasNextPage) {
+        return "Click to load every settled bet, then you’ll see exact counts.";
+      }
+      return null;
+    }
+    const sigWord = estimatedSignatures === 1 ? "signature" : "signatures";
+    const prefix =
+      countIsComplete
+        ? `${claimableLoaded.length} win${claimableLoaded.length === 1 ? "" : "s"} ready · ~${estimatedSignatures} ${sigWord}`
+        : `~${estimatedSignatures} ${sigWord} for loaded bets so far`;
+    return `${prefix} — one wallet prompt per batch of up to ${CLAIM_BATCH_SIZE}.`;
+  })();
+
   return (
     <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:items-end">
       {!azuroChain.onBetChain ? (
@@ -376,9 +409,26 @@ export function ClaimAllBetsButton({
       >
         {loadingLabel ?? claimCountLabel}
       </button>
-      <p className="hidden max-w-md text-left text-[11px] leading-snug text-zinc-500 md:block">
-        {helpText}
-      </p>
+      {batchInfoLine ? (
+        <p className="max-w-md text-left text-[11px] leading-snug text-zinc-400 md:text-right">
+          {batchInfoLine}
+        </p>
+      ) : null}
+      {loading && claimBatch && claimBatch.total > 1 ? (
+        <p
+          className="max-w-md text-left text-[11px] leading-snug text-zinc-400 md:text-right"
+          role="status"
+          aria-live="polite"
+        >
+          {`${claimBatch.done} of ${claimBatch.total} batches confirmed. Keep the tab open — each batch waits for 2 Polygon confirmations before the next prompt.`}
+        </p>
+      ) : null}
+      <details className="max-w-md text-[11px] leading-snug text-zinc-500 md:text-right">
+        <summary className="cursor-pointer select-none text-zinc-400 hover:text-zinc-200">
+          How does batch claim work?
+        </summary>
+        <p className="mt-1">{helpText}</p>
+      </details>
       {mismatchOpen && summaryShowsClaim ? (
         <div
           className="flex max-w-md flex-col gap-2 rounded-lg border border-amber-800/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-100"
