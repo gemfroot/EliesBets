@@ -26,6 +26,7 @@ import dynamic from "next/dynamic";
 import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { useToast } from "@/components/Toast";
 import {
+  encodeSlipDecimalOdds,
   formatDriftDecimalPair,
   formatOddsValue,
   formatStoredOddsString,
@@ -82,6 +83,8 @@ type BetslipActionsValue = {
   }) => void;
   clearSelections: () => void;
   removeSelection: (id: string) => void;
+  /** Update stored odds for selections to accept live price changes. */
+  acceptOdds: (updates: Record<string, string>) => void;
 };
 
 type BetslipSelectionsValue = {
@@ -291,9 +294,24 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
     setMetaById({});
   }, [clear]);
 
+  const acceptOdds = useCallback(
+    (updates: Record<string, string>) => {
+      setMetaById((prev) => {
+        const next = { ...prev };
+        for (const [id, odds] of Object.entries(updates)) {
+          if (next[id]) {
+            next[id] = { ...next[id]!, odds };
+          }
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
   const actionsValue = useMemo(
-    () => ({ addSelection, removeSelection, clearSelections }),
-    [addSelection, removeSelection, clearSelections],
+    () => ({ addSelection, removeSelection, clearSelections, acceptOdds }),
+    [addSelection, removeSelection, clearSelections, acceptOdds],
   );
 
   const selectionsValue = useMemo(() => ({ selections }), [selections]);
@@ -437,7 +455,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   } = useDetailedBetslip();
   const { data: betFeeData } = useBetFee();
   const { showToast } = useToast();
-  const { clearSelections } = useBetslipActions();
+  const { clearSelections, acceptOdds } = useBetslipActions();
   const { address, isConnected } = useConnection();
   const { data: tokenBalanceRaw } = useReadContract({
     address: betToken.address,
@@ -465,8 +483,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   }, [applyStake, betToken.decimals, tokenBalanceRaw]);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [oddsConfirmOpen, setOddsConfirmOpen] = useState(false);
-  const oddsDialogRef = useRef<HTMLDivElement>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [receiptSnapshot, setReceiptSnapshot] = useState<{
     selections: BetslipSelection[];
@@ -688,28 +704,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     return () => window.clearTimeout(id);
   }, [pausedConditionBlocking]);
 
-  useEffect(() => {
-    if (!oddsConfirmOpen) return;
-    const t = window.setTimeout(() => {
-      oddsDialogRef.current
-        ?.querySelector<HTMLElement>("[data-odds-confirm-primary]")
-        ?.focus();
-    }, 0);
-    return () => window.clearTimeout(t);
-  }, [oddsConfirmOpen]);
-
-  useEffect(() => {
-    if (!oddsConfirmOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setOddsConfirmOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [oddsConfirmOpen]);
-
   const { submit, approveTx, betTx, isApproveRequired } =
     useBet({
       betAmount: stakeValid ? stakeAmount : "0",
@@ -760,7 +754,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     betTx.isPending ||
     betTx.isProcessing;
 
-  const canSubmit =
+  const canSubmitRaw =
     stakeValid &&
     oddsRecord !== null &&
     totalOddsForBet > 0 &&
@@ -771,6 +765,19 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     !isOddsFetching &&
     !isBetCalculationFetching &&
     isBetAllowed;
+
+  // Stabilise the enabled state: once disabled, hold for 200ms before
+  // re-enabling to prevent single-frame flicker on live condition transitions.
+  const [canSubmitStable, setCanSubmitStable] = useState(canSubmitRaw);
+  useEffect(() => {
+    if (canSubmitRaw) {
+      const id = window.setTimeout(() => setCanSubmitStable(true), 200);
+      return () => window.clearTimeout(id);
+    }
+    setCanSubmitStable(false);
+  }, [canSubmitRaw]);
+
+  const canSubmit = canSubmitStable;
 
   const placeBetLabel = isApproveRequired
     ? "Approve token"
@@ -993,80 +1000,43 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       oddsDrift.hasDrift &&
       !isStatesFetching &&
       !isOddsFetching &&
-      !isBetCalculationFetching ? (
-        <p
+      !isBetCalculationFetching &&
+      isBetAllowed ? (
+        <div
           className="rounded-md border border-amber-800/80 bg-amber-950/35 px-3 py-2 text-xs text-amber-100"
           role="status"
           aria-live="polite"
           aria-relevant="additions text"
         >
-          <span className="font-medium text-amber-50">Odds updated.</span> Prices
-          no longer match when you added these picks (including small line moves). Tap
-          Place bet to confirm or cancel in the dialog.{" "}
+          <span className="font-medium text-amber-50">Odds updated.</span>{" "}
+          Prices no longer match when you added these picks. Accept the new
+          odds to continue.
           <span className="block pt-1 font-mono text-[11px] leading-snug text-amber-200/90 whitespace-pre-line">
             {oddsDrift.summary}
           </span>
-        </p>
-      ) : null}
-      {oddsConfirmOpen ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-4 sm:items-center"
-          role="presentation"
-          onClick={() => setOddsConfirmOpen(false)}
-        >
-          <div
-            ref={oddsDialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="odds-confirm-title"
-            className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            type="button"
+            className="mt-2 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-amber-500"
+            onClick={() => {
+              const updates: Record<string, string> = {};
+              for (const sel of activeSelections) {
+                const liveOdds = sdkOdds?.[`${sel.conditionId}-${sel.outcomeId}`];
+                if (typeof liveOdds === "number" && liveOdds > 0) {
+                  updates[sel.id] = encodeSlipDecimalOdds(liveOdds);
+                }
+              }
+              acceptOdds(updates);
+            }}
           >
-            <h2
-              id="odds-confirm-title"
-              className="text-base font-semibold text-zinc-50"
-            >
-              Confirm updated prices
-            </h2>
-            <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-              Prices changed since you added these picks. You can place at the
-              current prices shown in the betslip, or cancel to adjust your stake.
-            </p>
-            <pre className="mt-3 max-h-40 overflow-auto rounded-md border border-zinc-800 bg-zinc-950/80 p-3 font-mono text-[11px] leading-snug text-amber-100/95 whitespace-pre-wrap">
-              {oddsDrift.summary}
-            </pre>
-            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                className="rounded-lg border border-zinc-600 px-4 py-2.5 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
-                onClick={() => setOddsConfirmOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                data-odds-confirm-primary
-                className="rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-amber-500"
-                onClick={() => {
-                  setOddsConfirmOpen(false);
-                  void submit();
-                }}
-              >
-                Place at new prices
-              </button>
-            </div>
-          </div>
+            Accept new odds
+          </button>
         </div>
       ) : null}
       <button
         type="button"
-        disabled={!canSubmit}
+        disabled={!canSubmit || oddsDrift.hasDrift}
         onClick={() => {
-          if (!canSubmit) return;
-          if (oddsDrift.hasDrift) {
-            setOddsConfirmOpen(true);
-            return;
-          }
+          if (!canSubmit || oddsDrift.hasDrift) return;
           void submit();
         }}
         className="min-h-11 rounded-md bg-amber-600 px-3 py-2.5 text-sm font-semibold text-zinc-950 transition-[background-color,transform,opacity] duration-200 ease-out hover:scale-[1.02] hover:bg-amber-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100 md:min-h-0 md:py-2"
