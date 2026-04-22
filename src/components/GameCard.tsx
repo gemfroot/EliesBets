@@ -136,15 +136,20 @@ export function GameCard({
       ? Math.max(0, totalMarketsAfterRefresh - marketsShownCount)
       : extraMarketsCount;
 
-  const showListOddsSkeleton =
-    shouldRefetchStaleList && listOddsRefreshing && refreshedTop == null;
+  /**
+   * Background refresh only — never hide the odds behind a skeleton or disable the
+   * button, the betslip already validates on add and the SDK surfaces drift.
+   * The first attempt used to gate clicks, which made cards appear unclickable on
+   * any list page left open for > LIST_ODDS_STALE_MS.
+   */
+  const showListOddsSkeleton = false;
   const listOddsRefreshFailed =
     isStale &&
     staleRefreshRequested &&
     !listOddsRefreshing &&
     refreshedTop == null;
-  const needsStaleListInteraction =
-    isStale && refreshedTop == null && !showListOddsSkeleton;
+  const needsStaleListInteraction = false;
+  const showStaleHint = isStale && refreshedTop == null && !listOddsRefreshing;
 
   const outcomeCtx = {
     sportSlug: game.sport.slug,
@@ -171,9 +176,9 @@ export function GameCard({
   const lineDisabled = (line: TopOddsLine) =>
     line.conditionState !== ConditionState.Active || needsStaleListInteraction;
 
-  const staleHint = needsStaleListInteraction ? (
+  const staleHint = showStaleHint ? (
     <p className="text-[10px] leading-snug text-amber-500/85">
-      List prices may be stale — hover or tap this card to refresh.
+      List prices may be stale — refreshing on hover.
     </p>
   ) : listOddsRefreshFailed ? (
     <p className="text-[10px] leading-snug text-red-400/90">
