@@ -520,60 +520,84 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     [activeSelections],
   );
 
-  const oddsRecord = useMemo(() => {
+  // Effective odds: prefer live SDK values, fall back to the price captured at
+  // add-to-slip time. Azuro's `condition-batch` upstream is 7–10s per call, and
+  // `useOdds` starts with an empty map → betslip would show "loading" for that
+  // whole window. The user already clicked a confirmed price on the list card;
+  // trust it, and let the drift banner catch real price moves once the SDK
+  // eventually returns.
+  const effectiveOddsRecord = useMemo(() => {
     const o: Record<string, number> = {};
     for (const s of activeSelections) {
       const key = `${s.conditionId}-${s.outcomeId}`;
-      const v = sdkOdds[key];
-      if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) {
+      const live = sdkOdds[key];
+      if (typeof live === "number" && Number.isFinite(live) && live > 0) {
+        o[key] = live;
+        continue;
+      }
+      const stored = parseStoredDecimalOdds(s.odds);
+      if (stored != null && stored > 0) {
+        o[key] = stored;
+      } else {
         return null;
       }
-      o[key] = v;
     }
     return o;
   }, [activeSelections, sdkOdds]);
 
-  const totalOddsForBet = useMemo(() => {
-    if (!activeSelections.length) {
+  const effectiveTotalOdds = useMemo(() => {
+    if (!activeSelections.length || !effectiveOddsRecord) {
       return 0;
     }
+    // Single-mode on a multi-pick slip places per-leg: use raw leg odds.
     if (mode === "single" && multiPick) {
       const s = activeSelections[0]!;
-      const v = sdkOdds[`${s.conditionId}-${s.outcomeId}`];
-      return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
+      return effectiveOddsRecord[`${s.conditionId}-${s.outcomeId}`] ?? 0;
     }
-    return typeof sdkTotalOdds === "number" &&
+    // Combo (incl. 1-pick default): the SDK's `useOdds.totalOdds` always applies
+    // the `ODDS_COMBO_FEE_MODIFIER` (0.99). Mirror that in the fallback so the
+    // submit-time minOdds and potential-win display stay consistent with what
+    // the SDK would have computed.
+    if (
+      typeof sdkTotalOdds === "number" &&
       Number.isFinite(sdkTotalOdds) &&
-      sdkTotalOdds > 0
-      ? sdkTotalOdds
-      : 0;
-  }, [activeSelections, mode, multiPick, sdkOdds, sdkTotalOdds]);
+      sdkTotalOdds > 1
+    ) {
+      return sdkTotalOdds;
+    }
+    let prod = 1;
+    for (const s of activeSelections) {
+      const v = effectiveOddsRecord[`${s.conditionId}-${s.outcomeId}`];
+      if (!v) return 0;
+      prod *= v;
+    }
+    return prod * 0.99;
+  }, [activeSelections, effectiveOddsRecord, mode, multiPick, sdkTotalOdds]);
 
-  /** Combined odds for display when in combo mode (matches SDK total). */
-  const totalOddsDisplay =
-    mode === "combo" && multiPick ? sdkTotalOdds : totalOddsForBet;
+  /** Combined odds for display — stays consistent with what we'll submit. */
+  const totalOddsDisplay = effectiveTotalOdds;
 
   const stakeAmount = betAmount.trim();
   const stakeNum = Number.parseFloat(stakeAmount);
   const stakeValid = Number.isFinite(stakeNum) && stakeNum > 0;
 
-  const singleLegOdds =
-    multiPick && mode === "single" && activeSelections[0]
-      ? sdkOdds[
+  const singleLegEffective =
+    multiPick && mode === "single" && activeSelections[0] && effectiveOddsRecord
+      ? effectiveOddsRecord[
           `${activeSelections[0].conditionId}-${activeSelections[0].outcomeId}`
         ]
-      : NaN;
+      : undefined;
   const potentialWinSingleLeg =
     stakeValid &&
-    typeof singleLegOdds === "number" &&
-    Number.isFinite(singleLegOdds) &&
-    singleLegOdds > 0
-      ? stakeNum * singleLegOdds
+    typeof singleLegEffective === "number" &&
+    Number.isFinite(singleLegEffective) &&
+    singleLegEffective > 0
+      ? stakeNum * singleLegEffective
       : null;
 
   const potentialWinCombo =
-    mode === "combo" && stakeValid && sdkTotalOdds > 0
-      ? stakeNum * sdkTotalOdds
+    mode === "combo" && stakeValid && effectiveTotalOdds > 0
+      ? stakeNum * effectiveTotalOdds
       : null;
 
   const potentialWinDisplay =
@@ -594,7 +618,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const stablePotentialWin = potentialWinDisplay ?? stablePotentialWinRef.current;
   const stableFee = betFeeData?.formattedRelayerFeeAmount ?? stableFeeRef.current;
 
-  const receiptTotalOdds = totalOddsForBet;
+  const receiptTotalOdds = effectiveTotalOdds;
 
   const oddsDrift = useMemo(
     () =>
@@ -736,8 +760,8 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       affiliate: zeroAddress,
       freebet: selectedFreebet,
       selections: sdkSelections,
-      odds: oddsRecord ?? {},
-      totalOdds: totalOddsForBet,
+      odds: effectiveOddsRecord ?? {},
+      totalOdds: effectiveTotalOdds,
       onSuccess: (receipt) => {
         setErrorMessage(null);
         const placedSelections = activeSelections.map((s) => ({ ...s }));
@@ -779,17 +803,28 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     betTx.isPending ||
     betTx.isProcessing;
 
+  // SDK's `useOdds` runs its own `condition-batch` fetch on mount (7–10s on
+  // `onchainfeed.org`). During that window `sdkOdds={}` → `totalOdds=0.99` →
+  // `disableReason=TotalOddsTooLow`, which is spurious. When the user has a
+  // fresh list-card price in `effectiveOddsRecord`, treat that quirk as a
+  // no-op so the submit button doesn't needlessly wait. Real blockers
+  // (paused condition, over-max stake, drifted price) are still honored via
+  // `isStatesFetching`, `maxBet`, and the drift banner respectively. Drop the
+  // `!isBetCalculationFetching` wait too: during that window the SDK's
+  // `isAmountLowerThanMaxBet` returns true (maxBet undefined), and the
+  // relayer enforces limits on submit regardless.
+  const isOddsHydrationQuirk =
+    disableReason === BetslipDisableReason.TotalOddsTooLow && isOddsFetching;
+
   const canSubmitRaw =
     stakeValid &&
-    oddsRecord !== null &&
-    totalOddsForBet > 0 &&
+    effectiveOddsRecord !== null &&
+    effectiveTotalOdds > 1 &&
     isConnected &&
     Boolean(address) &&
     !isBusy &&
     !isStatesFetching &&
-    !isOddsFetching &&
-    !isBetCalculationFetching &&
-    isBetAllowed;
+    (isBetAllowed || isOddsHydrationQuirk);
 
   // Stabilise the enabled state: once disabled, hold for 200ms before
   // re-enabling to prevent single-frame flicker on live condition transitions.
@@ -993,7 +1028,10 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       {!isConnected ? (
         <p className="text-xs text-zinc-500">Connect a wallet to place a bet.</p>
       ) : null}
-      {isConnected && sdkDisableMessage && !isBetAllowed ? (
+      {isConnected &&
+      sdkDisableMessage &&
+      !isBetAllowed &&
+      !isOddsHydrationQuirk ? (
         <div
           className="rounded-md border border-amber-800/80 bg-amber-950/40 px-3 py-2 text-xs text-amber-200"
           role="status"
