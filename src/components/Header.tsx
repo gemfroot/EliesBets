@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useChain as useAzuroChain } from "@azuro-org/sdk";
 import { useBalance, useConnection, useDisconnect, useSwitchChain } from "wagmi";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -64,7 +63,6 @@ export function Header() {
   const { format: oddsFormat, setFormat: setOddsFormat } = useOddsFormat();
   const [modalOpen, setModalOpen] = useState(false);
   const { address, isConnected, status } = useConnection();
-  const { setAppChainId } = useAzuroChain();
   const { disconnect } = useDisconnect();
   const chainId = useWalletChainId();
   const { switchChainAsync, isPending: switchPending, error: switchError } =
@@ -208,15 +206,19 @@ export function Header() {
                     setChainMenuOpen(false);
                     setSwitchErrorMsg(null);
                     if (active) return;
+                    // Navigate the URL first so the displayed chain updates
+                    // immediately via ChainParamBinder, even if the wallet
+                    // switch is denied or hangs. Skip the redundant
+                    // setAppChainId — URL is the single source of truth now.
+                    const nextPath = rewriteChainInPath(id);
+                    if (nextPath) {
+                      router.push(nextPath);
+                    }
                     try {
                       await switchChainAsync({ chainId: id });
-                      setAppChainId(id);
-                      const nextPath = rewriteChainInPath(id);
-                      if (nextPath) {
-                        router.push(nextPath);
-                      }
                     } catch {
-                      /* wagmi surfaces switchError */
+                      /* wagmi surfaces switchError; user can retry from the
+                         Betslip's "Switch wallet" button at bet time. */
                     }
                   })();
                 }}
