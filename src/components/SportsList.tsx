@@ -6,6 +6,7 @@ import { useSports } from "@azuro-org/sdk";
 import type { SportData } from "@azuro-org/toolkit";
 import { RetryCallout } from "@/components/RetryCallout";
 import { SportsListSkeleton } from "@/components/Skeleton";
+import { useChainSlug } from "@/lib/useChainSlug";
 
 function countGames(sport: SportData): number {
   return sport.countries.reduce(
@@ -34,6 +35,7 @@ function Chevron({ open }: { open: boolean }) {
 }
 
 export function SportsList() {
+  const chain = useChainSlug();
   const { data: sports, isLoading, isError, refetch } = useSports({
     isLive: false,
     filter: { maxGamesPerLeague: 10 },
@@ -144,7 +146,7 @@ export function SportsList() {
                 <Chevron open={sportOpen} />
               </button>
               <Link
-                href={`/sports/${sport.slug}`}
+                href={`/${chain}/sports/${sport.slug}`}
                 className="flex min-w-0 flex-1 items-center justify-between gap-2 py-2 pl-0.5 pr-2 text-left text-sm text-zinc-300 transition hover:text-zinc-50"
               >
                 <span className="min-w-0 truncate">{sport.name}</span>
@@ -176,7 +178,7 @@ export function SportsList() {
                           <Chevron open={countryOpen} />
                         </button>
                         <Link
-                          href={`/sports/${sport.slug}/${country.slug}`}
+                          href={`/${chain}/sports/${sport.slug}/${country.slug}`}
                           className="flex min-w-0 flex-1 items-center justify-between gap-2 py-1.5 pl-0.5 pr-2 text-left text-xs text-zinc-400 transition hover:text-zinc-100"
                         >
                           <span className="min-w-0 truncate">{country.name}</span>
@@ -190,7 +192,7 @@ export function SportsList() {
                           {country.leagues.map((league) => (
                             <li key={league.slug}>
                               <Link
-                                href={`/sports/${sport.slug}/${country.slug}/${league.slug}`}
+                                href={`/${chain}/sports/${sport.slug}/${country.slug}/${league.slug}`}
                                 className="block truncate rounded py-1 text-[11px] text-zinc-500 transition hover:bg-zinc-900 hover:text-zinc-300"
                               >
                                 {league.name}

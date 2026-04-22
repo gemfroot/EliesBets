@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { notFound } from "next/navigation";
 import {
   GameOrderBy,
   GameState,
@@ -8,11 +9,12 @@ import {
 } from "@azuro-org/toolkit";
 import { LiveGamesList } from "@/components/LiveGamesList";
 import { formatServerFetchError } from "@/lib/serverFetchError";
-import { getSportsChainId } from "@/lib/sportsChain";
-import type { SportsChainId } from "@/lib/sportsChainConstants";
+import {
+  chainIdFromSlug,
+  isChainSlug,
+  type SportsChainId,
+} from "@/lib/sportsChainConstants";
 import type { Metadata } from "next";
-
-export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Live games",
@@ -20,9 +22,9 @@ export const metadata: Metadata = {
     "In-play sports fixtures with updating odds. Follow live markets and bet with your wallet on EliesBets.",
 };
 
+export const revalidate = 15;
+
 const GAMES_PER_PAGE = 100;
-/** Short TTL — the list drives live games, and client-side SDK WS pushes keep prices current. */
-const LIVE_CACHE_SECONDS = 15;
 
 const fetchAllLiveGames = unstable_cache(
   async (chainId: SportsChainId): Promise<GameData[]> => {
@@ -47,11 +49,19 @@ const fetchAllLiveGames = unstable_cache(
     return [...first.games, ...rest.flatMap((r) => r.games)];
   },
   ["fetchAllLiveGames"],
-  { revalidate: LIVE_CACHE_SECONDS },
+  { revalidate: 15 },
 );
 
-export default async function LivePage() {
-  const chainId = await getSportsChainId();
+type Props = {
+  params: Promise<{ chain: string }>;
+};
+
+export default async function LivePage({ params }: Props) {
+  const { chain } = await params;
+  if (!isChainSlug(chain)) {
+    notFound();
+  }
+  const chainId = chainIdFromSlug(chain);
   let games: GameData[] = [];
   let loadError: string | null = null;
   try {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useChain as useAzuroChain } from "@azuro-org/sdk";
 import { useBalance, useConnection, useDisconnect, useSwitchChain } from "wagmi";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { formatUnits } from "viem";
 import { MyBetsLink } from "@/components/MyBetsLink";
@@ -14,6 +15,11 @@ import {
   chainName,
 } from "@/lib/chains";
 import { useWalletChainId } from "@/lib/useWalletChainId";
+import {
+  CHAIN_SLUG_BY_ID,
+  CHAIN_SLUGS,
+  type SportsChainId,
+} from "@/lib/sportsChainConstants";
 
 const ConnectModal = dynamic(
   () =>
@@ -63,9 +69,24 @@ export function Header() {
   const chainId = useWalletChainId();
   const { switchChainAsync, isPending: switchPending, error: switchError } =
     useSwitchChain();
+  const pathname = usePathname();
+  const router = useRouter();
   const [chainMenuOpen, setChainMenuOpen] = useState(false);
   const chainMenuRef = useRef<HTMLDivElement | null>(null);
   const [switchErrorMsg, setSwitchErrorMsg] = useState<string | null>(null);
+
+  const rewriteChainInPath = (target: SportsChainId): string | null => {
+    const nextSlug = CHAIN_SLUG_BY_ID[target];
+    if (!nextSlug) return null;
+    const segments = pathname.split("/").filter(Boolean);
+    const first = segments[0];
+    if (first && (CHAIN_SLUGS as readonly string[]).includes(first)) {
+      segments[0] = nextSlug;
+      return `/${segments.join("/")}`;
+    }
+    // Non-chain route (e.g. /bets): don't move the user, just update chain state.
+    return null;
+  };
 
   useEffect(() => {
     if (!chainMenuOpen) return;
@@ -174,7 +195,10 @@ export function Header() {
                     try {
                       await switchChainAsync({ chainId: id });
                       setAppChainId(id);
-                      /* router.refresh: SportsChainSync debounces after wagmi chainId updates */
+                      const nextPath = rewriteChainInPath(id);
+                      if (nextPath) {
+                        router.push(nextPath);
+                      }
                     } catch {
                       /* wagmi surfaces switchError */
                     }
@@ -192,6 +216,13 @@ export function Header() {
     </div>
   );
 
+  const firstSegment = pathname.split("/").filter(Boolean)[0];
+  const currentChainSlug =
+    firstSegment && (CHAIN_SLUGS as readonly string[]).includes(firstSegment)
+      ? firstSegment
+      : null;
+  const homeHref = currentChainSlug ? `/${currentChainSlug}` : "/";
+
   return (
     <>
       <span id="header-chain-pill-help" className="sr-only">
@@ -199,7 +230,7 @@ export function Header() {
       </span>
       <header className="relative z-50 flex h-16 shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4">
         <Link
-          href="/"
+          href={homeHref}
           className="shrink-0 text-lg font-semibold tracking-tight text-zinc-50 transition hover:text-zinc-200"
         >
           EliesBets

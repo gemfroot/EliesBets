@@ -15,6 +15,7 @@ import { RetryCallout } from "@/components/RetryCallout";
 import { gameParticipantLine } from "@/lib/gameTitle";
 import { formatServerFetchError } from "@/lib/serverFetchError";
 import { getSportsChainId, type SportsChainId } from "@/lib/sportsChain";
+import { CHAIN_SLUG_BY_ID } from "@/lib/sportsChainConstants";
 import { isSoccerSport } from "@/lib/outcomeLabels";
 import type { Metadata } from "next";
 
@@ -191,23 +192,27 @@ export default async function GameDetailPage({ params }: Props) {
   const sections = groupMarketsForUi(markets, game.sport.slug);
 
   const names = gameParticipantLine(game);
+  const chainSlug = CHAIN_SLUG_BY_ID[chainId];
 
   return (
     <div className="page-shell">
       <p className="type-muted">
-        <Link href={`/sports/${game.sport.slug}`} className="hover:text-zinc-300">
+        <Link
+          href={`/${chainSlug}/sports/${game.sport.slug}`}
+          className="hover:text-zinc-300"
+        >
           {game.sport.name}
         </Link>
         <span className="text-zinc-600"> · </span>
         <Link
-          href={`/sports/${game.sport.slug}/${game.country.slug}`}
+          href={`/${chainSlug}/sports/${game.sport.slug}/${game.country.slug}`}
           className="hover:text-zinc-300"
         >
           {game.country.name}
         </Link>
         <span className="text-zinc-600"> · </span>
         <Link
-          href={`/sports/${game.sport.slug}/${game.country.slug}/${game.league.slug}`}
+          href={`/${chainSlug}/sports/${game.sport.slug}/${game.country.slug}/${game.league.slug}`}
           className="hover:text-zinc-300"
         >
           {game.league.name}

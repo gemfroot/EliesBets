@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useFavorites } from "@/components/FavoritesProvider";
+import { useChainSlug } from "@/lib/useChainSlug";
 
 const LINK_CLASS =
   "truncate rounded-md px-2 py-1.5 text-sm text-zinc-300 hover:bg-zinc-900 hover:text-zinc-50";
@@ -16,6 +17,7 @@ export function FavoritesNav({
   variant = "sidebar",
   onFavoriteNavigate,
 }: FavoritesNavProps) {
+  const chain = useChainSlug();
   const { games, leagues } = useFavorites();
   const isEmpty = games.length === 0 && leagues.length === 0;
 
@@ -45,7 +47,7 @@ export function FavoritesNav({
       {leagueLinks.map((l) => (
         <Link
           key={l.key}
-          href={`/sports/${l.sportSlug}/${l.countrySlug}/${l.leagueSlug}`}
+          href={`/${chain}/sports/${l.sportSlug}/${l.countrySlug}/${l.leagueSlug}`}
           className={LINK_CLASS}
           onClick={onFavoriteNavigate}
         >

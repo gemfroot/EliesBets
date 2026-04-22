@@ -1,17 +1,26 @@
 import type { GameData } from "@azuro-org/toolkit";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { GameCard } from "@/components/GameCard";
 import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
 import { fetchGamesForLeague } from "@/lib/sportGames";
 import { formatServerFetchError } from "@/lib/serverFetchError";
-import { getSportsChainId } from "@/lib/sportsChain";
+import {
+  chainIdFromSlug,
+  isChainSlug,
+} from "@/lib/sportsChainConstants";
 
-// Cookie-driven chain id → dynamic route; `revalidate` would not apply as ISR.
+export const revalidate = 45;
 
 type Props = {
-  params: Promise<{ slug: string; country: string; league: string }>;
+  params: Promise<{
+    chain: string;
+    slug: string;
+    country: string;
+    league: string;
+  }>;
 };
 
 function titleFromSlug(slug: string): string {
@@ -22,9 +31,12 @@ function titleFromSlug(slug: string): string {
 }
 
 export default async function SportCountryLeaguePage({ params }: Props) {
-  const { slug, country: countrySlug, league: leagueSlug } = await params;
+  const { chain, slug, country: countrySlug, league: leagueSlug } = await params;
+  if (!isChainSlug(chain)) {
+    notFound();
+  }
+  const chainId = chainIdFromSlug(chain);
   const sportTitle = titleFromSlug(slug);
-  const chainId = await getSportsChainId();
 
   let games: GameData[] = [];
   let loadError: string | null = null;
@@ -50,12 +62,12 @@ export default async function SportCountryLeaguePage({ params }: Props) {
   return (
     <div className="page-shell">
       <p className="type-muted">
-        <Link href={`/sports/${slug}`} className="hover:text-zinc-300">
+        <Link href={`/${chain}/sports/${slug}`} className="hover:text-zinc-300">
           {sportTitle}
         </Link>
         <span className="text-zinc-600"> · </span>
         <Link
-          href={`/sports/${slug}/${countrySlug}`}
+          href={`/${chain}/sports/${slug}/${countrySlug}`}
           className="hover:text-zinc-300"
         >
           {countryName}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSports } from "@azuro-org/sdk";
+import { useChainSlug } from "@/lib/useChainSlug";
 
 function LiveCountBadge() {
   const { data: sports, isLoading, isError } = useSports({
@@ -53,9 +54,10 @@ function LiveCountBadge() {
 }
 
 export function LiveCountLink() {
+  const chain = useChainSlug();
   return (
     <Link
-      href="/live"
+      href={`/${chain}/live`}
       className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm text-zinc-300 transition hover:bg-zinc-900 hover:text-zinc-50"
     >
       <span className="min-w-0 truncate font-medium">Live</span>

@@ -1,17 +1,21 @@
 import type { GameData } from "@azuro-org/toolkit";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import { LeagueFavoriteButton } from "@/components/FavoriteButton";
 import { GameCard } from "@/components/GameCard";
 import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
-import { fetchGamesForSport } from "@/lib/sportGames";
+import { fetchGamesForSportCountry } from "@/lib/sportGames";
 import { formatServerFetchError } from "@/lib/serverFetchError";
-import { getSportsChainId } from "@/lib/sportsChain";
-import type { Metadata } from "next";
+import {
+  chainIdFromSlug,
+  isChainSlug,
+} from "@/lib/sportsChainConstants";
 
-// `getSportsChainId()` reads cookies → this route is dynamic; do not rely on ISR here.
+export const revalidate = 45;
 
 type Props = {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ chain: string; slug: string; country: string }>;
 };
 
 function titleFromSlug(slug: string): string {
@@ -19,15 +23,6 @@ function titleFromSlug(slug: string): string {
     .split("-")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
-}
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
-  const title = titleFromSlug(slug);
-  return {
-    title: `${title} betting`,
-    description: `Browse ${title} fixtures, leagues, and live or prematch odds on EliesBets.`,
-  };
 }
 
 type LeagueGroup = { leagueKey: string; leagueName: string; games: GameData[] };
@@ -52,21 +47,27 @@ function groupGamesByLeague(games: GameData[]): LeagueGroup[] {
   return groups;
 }
 
-export default async function SportPage({ params }: Props) {
-  const { slug } = await params;
-  const title = titleFromSlug(slug);
-  const chainId = await getSportsChainId();
+export default async function SportCountryPage({ params }: Props) {
+  const { chain, slug, country: countrySlug } = await params;
+  if (!isChainSlug(chain)) {
+    notFound();
+  }
+  const chainId = chainIdFromSlug(chain);
+  const sportTitle = titleFromSlug(slug);
 
   let games: GameData[] = [];
   let loadError: string | null = null;
   try {
-    games = await fetchGamesForSport(slug, chainId);
+    games = await fetchGamesForSportCountry(slug, countrySlug, chainId);
   } catch (e) {
     if (process.env.NODE_ENV === "development") {
-      console.error("[SportPage] fetchGamesForSport", e);
+      console.error("[SportCountryPage] fetchGamesForSportCountry", e);
     }
     loadError = formatServerFetchError(e);
   }
+
+  const countryName =
+    games[0]?.country.name ?? titleFromSlug(countrySlug);
 
   const oddsByGameId = loadError
     ? new Map<string, GameOddsData>()
@@ -76,8 +77,17 @@ export default async function SportPage({ params }: Props) {
 
   return (
     <div className="page-shell">
-      <h1 className="type-display">{title}</h1>
-      <p className="type-muted mt-1">Sport: {slug}</p>
+      <p className="type-muted">
+        <Link href={`/${chain}/sports/${slug}`} className="hover:text-zinc-300">
+          {sportTitle}
+        </Link>
+        <span className="text-zinc-600"> · </span>
+        <span className="text-zinc-400">{countryName}</span>
+      </p>
+      <h1 className="type-display mt-2">{countryName}</h1>
+      <p className="type-muted mt-1">
+        {sportTitle} · {countrySlug}
+      </p>
 
       {loadError ? (
         <RetryCallout
@@ -89,8 +99,8 @@ export default async function SportPage({ params }: Props) {
         <div className="mt-8 rounded-lg border border-zinc-800 bg-zinc-900/30 px-4 py-6">
           <p className="text-sm font-medium text-zinc-200">No games</p>
           <p className="mt-1 text-sm text-zinc-500">
-            No fixtures for this sport right now. Try another sport or check back when new
-            events are added.
+            No fixtures for this country yet. Pick a different region or browse other
+            leagues.
           </p>
         </div>
       ) : (
@@ -102,16 +112,19 @@ export default async function SportPage({ params }: Props) {
                   id={`league-${league.leagueKey}`}
                   className="type-overline text-zinc-400"
                 >
-                  {league.leagueName}
+                  <Link
+                    href={`/${chain}/sports/${slug}/${countrySlug}/${league.leagueKey}`}
+                    className="hover:text-zinc-200"
+                  >
+                    {league.leagueName}
+                  </Link>
                 </h2>
-                {league.games[0] ? (
-                  <LeagueFavoriteButton
-                    sportSlug={slug}
-                    countrySlug={league.games[0].country.slug}
-                    leagueSlug={league.leagueKey}
-                    title={league.leagueName}
-                  />
-                ) : null}
+                <LeagueFavoriteButton
+                  sportSlug={slug}
+                  countrySlug={countrySlug}
+                  leagueSlug={league.leagueKey}
+                  title={league.leagueName}
+                />
               </div>
               <ul className="mt-4 flex flex-col gap-2">
                 {league.games.map((game) => (

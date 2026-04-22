@@ -7,6 +7,7 @@ import { useBetslipMobileDrawer } from "@/components/Betslip";
 import { FavoritesNav } from "@/components/FavoritesNav";
 import { MyBetsLink } from "@/components/MyBetsLink";
 import { SportNavIcon } from "@/lib/sportNavIcon";
+import { useChainSlug } from "@/lib/useChainSlug";
 
 function NavGlyph({
   children,
@@ -183,6 +184,7 @@ function MobileBottomNav({
   favoritesOpen: boolean;
   onToggleFavorites: () => void;
 }) {
+  const chain = useChainSlug();
   const { data: sports, isLoading, isError } = useSports({
     isLive: false,
     filter: { maxGamesPerLeague: 10 },
@@ -197,14 +199,14 @@ function MobileBottomNav({
     >
       <div className="flex h-14 w-full min-w-0 items-stretch">
         <Link
-          href="/"
+          href={`/${chain}`}
           className="flex min-h-[44px] min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 px-2 text-[10px] font-medium text-zinc-400 transition hover:text-zinc-100"
         >
           <HomeIcon className="h-[1.125rem] w-[1.125rem]" />
           Home
         </Link>
         <Link
-          href="/live"
+          href={`/${chain}/live`}
           className="flex min-h-[44px] min-w-[44px] shrink-0 flex-col items-center justify-center gap-0.5 px-2 text-[10px] font-medium text-zinc-400 transition hover:text-zinc-100"
         >
           <LiveIcon className="h-[1.125rem] w-[1.125rem] text-red-400/90" />
@@ -249,7 +251,7 @@ function MobileBottomNav({
               {sports.map((sport) => (
                 <li key={sport.id}>
                   <Link
-                    href={`/sports/${sport.slug}`}
+                    href={`/${chain}/sports/${sport.slug}`}
                     className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg transition hover:bg-zinc-900"
                     title={sport.name}
                     aria-label={sport.name}

@@ -12,8 +12,11 @@ import { GameCard } from "@/components/GameCard";
 import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { LiveGameCard } from "@/components/LiveGameCard";
 import { RetryCallout } from "@/components/RetryCallout";
-import { getSportsChainId } from "@/lib/sportsChain";
-import type { SportsChainId } from "@/lib/sportsChainConstants";
+import {
+  chainIdFromSlug,
+  type ChainSlug,
+  type SportsChainId,
+} from "@/lib/sportsChainConstants";
 import { SportNavIcon } from "@/lib/sportNavIcon";
 import { formatServerFetchError } from "@/lib/serverFetchError";
 
@@ -109,8 +112,8 @@ const fetchSportsNavLinks = unstable_cache(
 );
 
 /** Live hero: streamed behind Suspense so the shell can render immediately. */
-export async function HomeHeroSection() {
-  const chainId = await getSportsChainId();
+export async function HomeHeroSection({ chain }: { chain: ChainSlug }) {
+  const chainId = chainIdFromSlug(chain);
   let heroGames: GameData[] = [];
   let heroError: string | null = null;
 
@@ -132,7 +135,7 @@ export async function HomeHeroSection() {
           </p>
         </div>
         <Link
-          href="/live"
+          href={`/${chain}/live`}
           className="shrink-0 text-sm font-medium text-emerald-400/90 hover:text-emerald-300 hover:underline"
         >
           All live games
@@ -167,8 +170,8 @@ export async function HomeHeroSection() {
 }
 
 /** Sports quick links: separate Suspense boundary from hero and game lists. */
-export async function HomeSportsNavSection() {
-  const chainId = await getSportsChainId();
+export async function HomeSportsNavSection({ chain }: { chain: ChainSlug }) {
+  const chainId = chainIdFromSlug(chain);
   let sportLinks: { slug: string; name: string }[] = [];
   let sportsError: string | null = null;
 
@@ -196,7 +199,7 @@ export async function HomeSportsNavSection() {
         {sportLinks.map((s) => (
           <li key={s.slug}>
             <Link
-              href={`/sports/${s.slug}`}
+              href={`/${chain}/sports/${s.slug}`}
               className="flex min-h-[44px] min-w-[4.5rem] flex-col items-center justify-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900/40 px-3 py-2 text-center transition hover:border-zinc-600 hover:bg-zinc-900"
             >
               <SportNavIcon
@@ -215,8 +218,8 @@ export async function HomeSportsNavSection() {
 }
 
 /** Popular + upcoming lists share one conditions fetch for odds. */
-export async function HomePopularUpcomingSections() {
-  const chainId = await getSportsChainId();
+export async function HomePopularUpcomingSections({ chain }: { chain: ChainSlug }) {
+  const chainId = chainIdFromSlug(chain);
   let popularGames: GameData[] = [];
   let upcomingGames: GameData[] = [];
   let popularError: string | null = null;

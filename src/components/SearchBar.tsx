@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { formatServerFetchError } from "@/lib/serverFetchError";
+import { useChainSlug } from "@/lib/useChainSlug";
 
 const MIN_QUERY = 3;
 
@@ -51,7 +52,11 @@ function leagueKey(g: GamePayload): string {
   return `${g.sport.slug}|${g.country.slug}|${g.league.slug}`;
 }
 
-function buildItems(games: GamePayload[], q: string): SearchResultItem[] {
+function buildItems(
+  games: GamePayload[],
+  q: string,
+  chain: string,
+): SearchResultItem[] {
   const items: SearchResultItem[] = [];
   const seenLeague = new Set<string>();
   const seenTeam = new Set<string>();
@@ -90,7 +95,7 @@ function buildItems(games: GamePayload[], q: string): SearchResultItem[] {
     items.push({
       id: `league-${key}`,
       kind: "league",
-      href: `/sports/${game.sport.slug}/${game.country.slug}/${game.league.slug}`,
+      href: `/${chain}/sports/${game.sport.slug}/${game.country.slug}/${game.league.slug}`,
       primary: game.league.name,
       secondary: `${game.sport.name} · ${game.country.name}`,
     });
@@ -125,6 +130,7 @@ const KIND_LABEL: Record<SearchResultItem["kind"], string> = {
 
 export function SearchBar() {
   const router = useRouter();
+  const chain = useChainSlug();
   const listId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRequestId = useRef(0);
@@ -140,8 +146,8 @@ export function SearchBar() {
   const trimmed = query.trim();
   const items = useMemo(() => {
     const activeGames = trimmed.length >= MIN_QUERY ? games : [];
-    return buildItems(activeGames, trimmed);
-  }, [games, trimmed]);
+    return buildItems(activeGames, trimmed, chain);
+  }, [games, trimmed, chain]);
   const showLoading = trimmed.length >= MIN_QUERY && loading;
   const showError = trimmed.length >= MIN_QUERY ? fetchError : null;
 
