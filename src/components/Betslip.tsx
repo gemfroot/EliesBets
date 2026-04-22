@@ -463,13 +463,21 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const { showToast } = useToast();
   const { clearSelections, acceptOdds } = useBetslipActions();
   const { address, isConnected } = useConnection();
-  const { data: tokenBalanceRaw } = useReadContract({
+  const {
+    data: tokenBalanceRaw,
+    refetch: refetchTokenBalance,
+    isFetching: isFetchingTokenBalance,
+  } = useReadContract({
     address: betToken.address,
     abi: erc20Abi,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     query: {
       enabled: Boolean(address && isConnected && betToken.address),
+      // Keep the balance fresh while the slip is open so the insufficient-
+      // balance gate stays accurate between bets without waiting on the SDK.
+      refetchInterval: 15_000,
+      staleTime: 0,
     },
   });
 
@@ -617,10 +625,10 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const stakeNum = Number.parseFloat(stakeAmount);
   const stakeValid = Number.isFinite(stakeNum) && stakeNum > 0;
 
-  // Pre-submit balance guard: without this, users with 0 token balance hit the
-  // Azuro relayer's generic "Condition is not active" / "BadData" branch
-  // (relayer validates condition state before funds) and never see the real
-  // problem. Free bets don't debit the wallet, so skip when one is selected.
+  // Pre-submit balance guard: without this, users with too little token
+  // balance hit the Azuro relayer's generic "Condition is not active" /
+  // "BadData" branch (relayer validates condition state before funds) and
+  // never see the real problem. Free bets don't debit the wallet; skip.
   const stakeWei = (() => {
     if (!stakeValid || selectedFreebet) return null;
     try {
@@ -629,12 +637,14 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       return null;
     }
   })();
+  const relayerFeeWei = betFeeData?.relayerFeeAmount ?? 0n;
+  const requiredWei = stakeWei != null ? stakeWei + relayerFeeWei : null;
   const hasInsufficientBalance =
     isConnected &&
     !selectedFreebet &&
-    stakeWei != null &&
+    requiredWei != null &&
     tokenBalanceRaw != null &&
-    stakeWei > tokenBalanceRaw;
+    requiredWei > tokenBalanceRaw;
   const formattedBalance =
     tokenBalanceRaw != null
       ? formatUnits(tokenBalanceRaw, betToken.decimals)
@@ -823,6 +833,11 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       totalOdds: effectiveTotalOdds,
       onSuccess: (receipt) => {
         setErrorMessage(null);
+        // Force an immediate balance re-read so the next bet's
+        // insufficient-balance gate compares against post-bet funds.
+        // The 15s refetchInterval would catch up eventually; this closes
+        // the window where the user opens another slip mid-interval.
+        void refetchTokenBalance();
         const placedSelections = activeSelections.map((s) => ({ ...s }));
         const win =
           mode === "combo"
