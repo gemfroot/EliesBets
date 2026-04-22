@@ -417,7 +417,7 @@ function messageForBetslipDisableReason(
   }
   switch (reason) {
     case BetslipDisableReason.ConditionState:
-      return "This pick paused — lines flicker on live games. Remove and re-add from the game page to retry.";
+      return "This market is paused or closed for betting on the contract right now. Remove the pick and add it again from the game page — on live matches the line can flicker while the feed updates. When only the price changes, you will see “Odds updated” instead.";
     case BetslipDisableReason.BetAmountGreaterThanMaxBet:
       return "Stake is above the maximum allowed for this bet.";
     case BetslipDisableReason.BetAmountLowerThanMinBet:

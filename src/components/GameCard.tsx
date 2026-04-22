@@ -217,7 +217,7 @@ export function GameCard({
 
   const staleHint = showStaleHint ? (
     <p className="text-[10px] leading-snug text-amber-500/85">
-      Odds refresh on hover.
+      List prices may be stale — refreshing on hover.
     </p>
   ) : listOddsRefreshFailed ? (
     <p className="text-[10px] leading-snug text-red-400/90">
