@@ -1987,11 +1987,6 @@ function useWeightedWheelLikeGame(
   gameConfigured: boolean,
   historyStorageKey: WeightedWheelLikeHistoryKey,
   betTokenOverride?: BetToken,
-  // A single deployed WeightedGame hosts both Wheel (gameId=1) and Plinko
-  // (gameId=2) configurations. When set, limit returned configs to the
-  // caller's gameId so the Wheel UI never lists a plinko drop (and vice
-  // versa). Leaving it undefined preserves the prior unfiltered behavior.
-  filterGameId?: number,
 ) {
   const chainId = useWalletChainId();
   const token = useMemo(() => betTokenOverride ?? getDefaultBetToken(chainId), [betTokenOverride, chainId]);
@@ -2101,7 +2096,6 @@ function useWeightedWheelLikeGame(
             bigint,
             number,
           ];
-          if (filterGameId !== undefined && tuple[3] !== filterGameId) continue;
           const raw = {
             weightRanges: [...tuple[0]],
             multipliers: [...tuple[1]],
@@ -2371,7 +2365,7 @@ export function useWheel(betToken?: BetToken) {
     gameConfigs: wheelConfigs,
     gameConfigsLoading: wheelConfigsLoading,
     ...rest
-  } = useWeightedWheelLikeGame(wheel, wheelConfigured, wheelBetHistoryStorageKey, betToken, 1);
+  } = useWeightedWheelLikeGame(wheel, wheelConfigured, wheelBetHistoryStorageKey, betToken);
   return {
     wheelAddress,
     wheelConfigured: wheelConfiguredOut,
@@ -2391,7 +2385,7 @@ export function usePlinko(betToken?: BetToken) {
     gameConfigs: plinkoConfigs,
     gameConfigsLoading: plinkoConfigsLoading,
     ...rest
-  } = useWeightedWheelLikeGame(plinko, plinkoConfigured, plinkoBetHistoryStorageKey, betToken, 2);
+  } = useWeightedWheelLikeGame(plinko, plinkoConfigured, plinkoBetHistoryStorageKey, betToken);
   return {
     plinkoAddress,
     plinkoConfigured: plinkoConfiguredOut,
