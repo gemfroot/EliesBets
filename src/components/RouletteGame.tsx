@@ -19,6 +19,7 @@ import { useRoulette, type RouletteBetData } from "@/lib/casino/hooks";
 import { CASINO_CHAIN_IDS, getBetTokens, type BetToken } from "@/lib/casino/addresses";
 import { chainName, explorerTxUrl } from "@/lib/chains";
 import { formatWalletTxError } from "@/lib/userFacingTxError";
+import { CasinoBankBanner } from "@/components/CasinoBankBanner";
 
 const BET_HISTORY_DISPLAY_CAP = 12;
 
@@ -387,6 +388,10 @@ export function RouletteGame() {
             Chainlink VRF.
           </p>
         </header>
+
+        <div className="mb-6">
+          <CasinoBankBanner chainId={chainId} betToken={selectedToken} />
+        </div>
 
         {isConnected && !isSupportedChain ? (
           <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-amber-800/60 bg-amber-950/40 px-4 py-3">

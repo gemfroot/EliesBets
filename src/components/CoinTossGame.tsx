@@ -19,6 +19,7 @@ import {
   formatUsdFromDecimalString,
 } from "@/lib/price";
 import { formatWalletTxError } from "@/lib/userFacingTxError";
+import { CasinoBankBanner } from "@/components/CasinoBankBanner";
 
 type GamePhase = CoinFlipPhase;
 
@@ -303,6 +304,10 @@ export function CoinTossGame() {
             Chainlink VRF.
           </p>
         </header>
+
+        <div className="mb-6">
+          <CasinoBankBanner chainId={chainId} betToken={selectedToken} />
+        </div>
 
         {/* Network indicator */}
         {isConnected && !isSupportedChain ? (
