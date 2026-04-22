@@ -630,6 +630,12 @@ function wheelRollFromDecodedLog(
  * Generic VRF cost fetcher. getChainlinkVRFCost uses tx.gasprice internally,
  * which is 0 in a normal eth_call, so we pass the current gasPrice explicitly.
  * Works for any game ABI that has getChainlinkVRFCost(address,uint16).
+ *
+ * We used to hardcode 1 gwei, which is ~167× Base's real gas price (~0.006 gwei)
+ * and ballooned msg.value by ~0.00135 ETH per bet — enough to trigger
+ * "insufficient funds" on wallets that had plenty for the actual bet. Now the
+ * estimation mirrors live gas with a 1.5× cushion, floored at 0.01 gwei so a
+ * sudden spike between estimate and submit can't underfund the VRF callback.
  */
 async function fetchVrfCost(
   client: PublicClient,
@@ -640,7 +646,10 @@ async function fetchVrfCost(
   tokenAddress: Address,
   betCount: number = 1,
 ): Promise<bigint> {
-  const safeGasPrice = BigInt(1_000_000_000);
+  const live = await client.getGasPrice().catch(() => BigInt(0));
+  const cushioned = live > BigInt(0) ? (live * BigInt(150)) / BigInt(100) : BigInt(1_000_000_000);
+  const floor = BigInt(10_000_000);
+  const safeGasPrice = cushioned > floor ? cushioned : floor;
   const data = encodeFunctionData({
     abi,
     functionName: "getChainlinkVRFCost",
