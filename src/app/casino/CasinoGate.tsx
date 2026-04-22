@@ -4,13 +4,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
- * When `NEXT_PUBLIC_CASINO_ENABLED` is not `"true"`, shows a blocking overlay so
- * sports-first launch does not invite real casino play. Build with the env set
- * to enable full casino UX.
+ * Casino is enabled by default. Opt out by setting
+ * `NEXT_PUBLIC_CASINO_ENABLED="false"` — e.g. during an incident or while
+ * funding the Chainlink VRF subscription.
  */
 export function CasinoGate({ children }: { children: ReactNode }) {
-  const enabled = process.env.NEXT_PUBLIC_CASINO_ENABLED === "true";
-  if (enabled) {
+  const disabled = process.env.NEXT_PUBLIC_CASINO_ENABLED === "false";
+  if (!disabled) {
     return <>{children}</>;
   }
 

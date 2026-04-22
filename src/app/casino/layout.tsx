@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { CasinoGate } from "./CasinoGate";
 
-const casinoEnabled = process.env.NEXT_PUBLIC_CASINO_ENABLED === "true";
+const casinoEnabled = process.env.NEXT_PUBLIC_CASINO_ENABLED !== "false";
 
 export const metadata: Metadata = {
   title: "Casino",

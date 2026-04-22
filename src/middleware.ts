@@ -100,8 +100,8 @@ function buildStandardResponse(): NextResponse {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const casinoEnabled = process.env.NEXT_PUBLIC_CASINO_ENABLED === "true";
-  if (!casinoEnabled && pathname.startsWith("/casino")) {
+  const casinoDisabled = process.env.NEXT_PUBLIC_CASINO_ENABLED === "false";
+  if (casinoDisabled && pathname.startsWith("/casino")) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
