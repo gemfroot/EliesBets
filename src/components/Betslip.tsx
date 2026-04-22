@@ -40,6 +40,7 @@ import {
   parseStoredDecimalOdds,
 } from "@/lib/oddsFormat";
 import { formatWalletTxError } from "@/lib/userFacingTxError";
+import { useAzuroActionChain } from "@/lib/useAzuroActionChain";
 
 const BetReceipt = dynamic(
   () =>
@@ -442,6 +443,7 @@ function messageForBetslipDisableReason(
 function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }) {
   const { format: oddsFormat } = useOddsFormat();
   const { betToken } = useChain();
+  const chainGuard = useAzuroActionChain();
   const {
     betAmount,
     changeBetAmount,
@@ -1187,17 +1189,35 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           </button>
         </div>
       ) : null}
-      <button
-        type="button"
-        disabled={!canSubmit || oddsDrift.hasDrift}
-        onClick={() => {
-          if (!canSubmit || oddsDrift.hasDrift) return;
-          void submit();
-        }}
-        className="min-h-11 rounded-md bg-amber-600 px-3 py-2.5 text-sm font-semibold text-zinc-950 transition-[background-color,transform,opacity] duration-200 ease-out hover:scale-[1.02] hover:bg-amber-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100 md:min-h-0 md:py-2"
-      >
-        {isBusy ? "Working…" : placeBetLabel}
-      </button>
+      {isConnected && !chainGuard.onBetChain ? (
+        <button
+          type="button"
+          disabled={chainGuard.switchPending}
+          onClick={() => {
+            void chainGuard.switchToAppChain().catch(() => {
+              /* wagmi surfaces the error on next render via switchError in Header; here we just stay blocked */
+            });
+          }}
+          className="min-h-11 rounded-md bg-amber-600 px-3 py-2.5 text-sm font-semibold text-zinc-950 transition-[background-color,transform,opacity] duration-200 ease-out hover:scale-[1.02] hover:bg-amber-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:min-h-0 md:py-2"
+          title={`Your wallet is on ${chainGuard.walletChainName}; bets on this page settle on ${chainGuard.appChainName}.`}
+        >
+          {chainGuard.switchPending
+            ? `Switching to ${chainGuard.appChainName}…`
+            : `Switch wallet to ${chainGuard.appChainName}`}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={!canSubmit || oddsDrift.hasDrift}
+          onClick={() => {
+            if (!canSubmit || oddsDrift.hasDrift) return;
+            void submit();
+          }}
+          className="min-h-11 rounded-md bg-amber-600 px-3 py-2.5 text-sm font-semibold text-zinc-950 transition-[background-color,transform,opacity] duration-200 ease-out hover:scale-[1.02] hover:bg-amber-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100 md:min-h-0 md:py-2"
+        >
+          {isBusy ? "Working…" : placeBetLabel}
+        </button>
+      )}
       {receiptSnapshot ? (
         <BetReceipt
           open={receiptOpen}
