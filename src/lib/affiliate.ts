@@ -1,7 +1,7 @@
 import { isAddress, zeroAddress, type Address } from "viem";
 
 /**
- * Sports affiliate wallet — registered with Azuro to receive GGR (gross gaming
+ * Sports affiliate wallet — the address that receives GGR (gross gaming
  * revenue) share on every bet placed via this frontend. Read once from env
  * so it's identical server-side (sitemap, RSC render) and client-side.
  *
