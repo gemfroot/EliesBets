@@ -118,6 +118,13 @@ export function Header() {
     chainId !== undefined &&
     !(SUPPORTED_CHAIN_IDS as readonly number[]).includes(chainId);
 
+  // Resolved up here so the chainPill JSX (below) can reference it.
+  const firstSegment = pathname.split("/").filter(Boolean)[0];
+  const currentChainSlug =
+    firstSegment && (CHAIN_SLUGS as readonly string[]).includes(firstSegment)
+      ? firstSegment
+      : null;
+
   const chainPill = (
     <div ref={chainMenuRef} className="relative">
       <button
@@ -146,7 +153,16 @@ export function Header() {
           }`}
         />
         <span>
-          {isUnsupported ? "Unsupported" : chainId !== undefined ? chainName(chainId) : "—"}
+          {isUnsupported
+            ? "Unsupported"
+            : chainId !== undefined
+              ? chainName(chainId)
+              : // Not connected yet — fall back to the chain the user is
+                // actually browsing (from the URL) so the pill doesn't read
+                // "—" while the page is clearly on Polygon/Gnosis/Base.
+                currentChainSlug
+                ? currentChainSlug.charAt(0).toUpperCase() + currentChainSlug.slice(1)
+                : "—"}
         </span>
         {switchPending ? (
           <svg
@@ -216,11 +232,6 @@ export function Header() {
     </div>
   );
 
-  const firstSegment = pathname.split("/").filter(Boolean)[0];
-  const currentChainSlug =
-    firstSegment && (CHAIN_SLUGS as readonly string[]).includes(firstSegment)
-      ? firstSegment
-      : null;
   const homeHref = currentChainSlug ? `/${currentChainSlug}` : "/";
 
   return (

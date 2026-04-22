@@ -39,7 +39,12 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const showCashoutUi =
+  // Only show the cashout section when the bet is eligible in the usual sense
+  // AND Azuro has actually issued a cashout quote (precalc > 0 with available
+  // flag, or a cached value from a prior refetch). Otherwise every pending
+  // bet showed a disabled Cash out button even though Azuro has not offered
+  // cashout on a single one of our markets for weeks — pure UI noise.
+  const eligibleByStatus =
     isPendingBet(bet) &&
     bet.freebetId === null &&
     bet.status === GraphBetStatus.Accepted;
@@ -53,7 +58,7 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
       totalOdds: bet.totalOdds,
       freebetId: bet.freebetId,
     },
-    query: { enabled: showCashoutUi },
+    query: { enabled: eligibleByStatus },
   });
 
   const invalidateBalances = useCallback(() => {
@@ -208,7 +213,16 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
     void calculationQuery.refetch();
   }, [calculationQuery]);
 
-  if (!showCashoutUi) {
+  if (!eligibleByStatus) {
+    return null;
+  }
+
+  // Azuro globally had 0/6465 conditions cashout-enabled when we last measured,
+  // so a permanently-disabled button + "—" value on every pending bet was pure
+  // noise. Hide the section unless we have (or had) a real quote.
+  const haveEverHadQuote =
+    stableCashoutAmount != null && Number.isFinite(stableCashoutAmount);
+  if (!precalc.isLoading && !haveEverHadQuote) {
     return null;
   }
 
