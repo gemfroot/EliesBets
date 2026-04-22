@@ -23,7 +23,7 @@ function redeemBatchKey(bet: Bet): string {
   return `${bet.lpAddress.toLowerCase()}_${bet.coreAddress.toLowerCase()}_${fb}_${pm}`;
 }
 
-function shouldRetryBatchWithSmallerSplit(error: unknown): boolean {
+function collectErrorText(error: unknown): string {
   const parts: string[] = [];
   let e: unknown = error;
   for (let d = 0; d < 8 && e != null && typeof e === "object"; d++) {
@@ -33,15 +33,22 @@ function shouldRetryBatchWithSmallerSplit(error: unknown): boolean {
     if (typeof o.details === "string") parts.push(o.details);
     e = o.cause;
   }
-  const t = parts.join(" ").toLowerCase();
-  if (
+  return parts.join(" ").toLowerCase();
+}
+
+function isUserRejection(error: unknown): boolean {
+  const t = collectErrorText(error);
+  return (
     t.includes("user rejected") ||
     t.includes("user denied") ||
     t.includes("action_rejected") ||
     /\b4001\b/.test(t)
-  ) {
-    return false;
-  }
+  );
+}
+
+function shouldRetryBatchWithSmallerSplit(error: unknown): boolean {
+  if (isUserRejection(error)) return false;
+  const t = collectErrorText(error);
   return (
     t.includes("exceeds the configured cap") ||
     (t.includes("tx fee") && t.includes("configured cap")) ||
@@ -50,6 +57,14 @@ function shouldRetryBatchWithSmallerSplit(error: unknown): boolean {
     t.includes("exceeds block gas limit") ||
     t.includes("max fee per gas less than block base fee")
   );
+}
+
+/** Let the wallet settle between rapid sequential prompts — MetaMask in particular sometimes
+ *  drops or mis-orders back-to-back requests, which shows up as "request already pending" or
+ *  a modal that never opens. */
+const INTER_CHUNK_DELAY_MS = 350;
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 /**
@@ -237,6 +252,10 @@ export function ClaimAllBetsButton({
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i]!;
         try {
+          // Small settle delay between successful chunks so the wallet's
+          // request queue empties before the next sendTransaction. Skips on
+          // the first iteration to avoid a pointless upfront delay.
+          if (i > 0) await sleep(INTER_CHUNK_DELAY_MS);
           await redeemSliceWithSplitFallback(submit, chunk);
           succeededBets += chunk.length;
           setClaimBatch({ done: i + 1, total: totalBatches });
@@ -247,10 +266,23 @@ export function ClaimAllBetsButton({
             e,
             chunk.length > 0 ? chunk : mergedBets,
           );
-          showToast(
-            `${formatWalletTxError(e)} — succeeded ${succeededBets} bet${succeededBets === 1 ? "" : "s"}; about ${remaining} not submitted yet. Retry or claim smaller sets from My bets.`,
-            "error",
-          );
+          if (isUserRejection(e)) {
+            // Not actually an error — the user intentionally stopped. Keep any
+            // successes and surface a neutral status instead of a red banner.
+            if (succeededBets > 0) {
+              showToast(
+                `Stopped. ${succeededBets} bet${succeededBets === 1 ? "" : "s"} claimed; ${remaining} still redeemable from My bets.`,
+                "info",
+              );
+            } else {
+              showToast("Claim cancelled in wallet.", "info");
+            }
+          } else {
+            showToast(
+              `${formatWalletTxError(e)} — succeeded ${succeededBets} bet${succeededBets === 1 ? "" : "s"}; about ${remaining} not submitted yet. Retry or claim smaller sets from My bets.`,
+              "error",
+            );
+          }
           claimAborted = true;
           break;
         }
