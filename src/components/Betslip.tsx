@@ -26,7 +26,8 @@ import {
   type ReactNode,
 } from "react";
 import { useConnection, useReadContract } from "wagmi";
-import { erc20Abi, formatUnits, zeroAddress } from "viem";
+import { erc20Abi, formatUnits } from "viem";
+import { AZURO_AFFILIATE } from "@/lib/affiliate";
 import dynamic from "next/dynamic";
 import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { useToast } from "@/components/Toast";
@@ -792,7 +793,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     useBet({
       betAmount: stakeValid ? stakeAmount : "0",
       slippage: SLIPPAGE_PERCENT,
-      affiliate: zeroAddress,
+      affiliate: AZURO_AFFILIATE,
       freebet: selectedFreebet,
       selections: sdkSelections,
       odds: effectiveOddsRecord ?? {},

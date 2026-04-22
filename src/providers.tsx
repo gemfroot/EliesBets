@@ -14,6 +14,7 @@ import { PendingBetsProvider } from "@/components/PendingBetsProvider";
 import type { SportsChainId } from "@/lib/sportsChainConstants";
 import { DEFAULT_SPORTS_CHAIN_ID } from "@/lib/sportsChainConstants";
 import { SportsChainSync } from "@/components/SportsChainSync";
+import { AZURO_AFFILIATE } from "@/lib/affiliate";
 import { wagmiConfig } from "./wagmi";
 
 export function Providers({
@@ -44,7 +45,7 @@ export function Providers({
         <OddsFormatProvider>
         <AzuroSDKProvider initialChainId={azuroChainId}>
           <SportsChainSync />
-          <AzuroBetslipProvider>
+          <AzuroBetslipProvider affiliate={AZURO_AFFILIATE}>
             <FavoritesProvider>
               <ToastProvider>
                 <PendingBetsProvider>
