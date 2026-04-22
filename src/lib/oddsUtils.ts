@@ -41,6 +41,19 @@ function marketFamilyKey(marketKey: string): string {
  * Picks Full Time Result (1X2) when present, otherwise the first "Match Winner" market (moneyline).
  * Falls back to the first non–Over/Under market when possible so totals are not shown as the main line.
  */
+/**
+ * Within a market, Azuro may list multiple conditions (e.g. one per margin).
+ * Prefer an `Active` one so list cards don't surface `Stopped`/`Paused` odds
+ * that the betslip will reject with "market is paused". Fall back to the first
+ * condition so we still render something when the whole market is off (the
+ * card/betslip will show the pause state).
+ */
+function pickPreferredCondition<T extends { state: ConditionState }>(
+  conds: readonly T[],
+): T | undefined {
+  return conds.find((c) => c.state === ConditionState.Active) ?? conds[0];
+}
+
 export function extractMainLineOdds(
   conditions: ConditionDetailedData[],
 ): TopOddsLine[] | null {
@@ -49,17 +62,31 @@ export function extractMainLineOdds(
   }
   try {
     const markets = groupConditionsByMarket(conditions);
-    const fullTime = markets.find((m) => m.marketKey === "1-1-1");
+    const hasActive = (m: (typeof markets)[number]) =>
+      m.conditions.some((c) => c.state === ConditionState.Active);
+    // Prefer markets that have at least one Active condition so we don't
+    // pick an all-`Stopped` FullTime over an available "Match Winner".
+    const fullTime =
+      markets.find((m) => m.marketKey === "1-1-1" && hasActive(m)) ??
+      markets.find((m) => m.marketKey === "1-1-1");
     /** Moneyline / two-way winner: family `19` in Azuro keys (e.g. `19-...`), not localized names. */
-    const matchWinnerByKey = markets.find((m) => marketFamilyKey(m.marketKey) === "19");
+    const matchWinnerByKey =
+      markets.find(
+        (m) => marketFamilyKey(m.marketKey) === "19" && hasActive(m),
+      ) ?? markets.find((m) => marketFamilyKey(m.marketKey) === "19");
     const matchWinner =
       matchWinnerByKey ??
+      markets.find((m) => /match winner/i.test(m.name) && hasActive(m)) ??
       markets.find((m) => /match winner/i.test(m.name));
     const firstNonOu =
-      markets.find((m) => marketFamilyKey(m.marketKey) !== "4") ?? null;
+      markets.find(
+        (m) => marketFamilyKey(m.marketKey) !== "4" && hasActive(m),
+      ) ??
+      markets.find((m) => marketFamilyKey(m.marketKey) !== "4") ??
+      null;
     const main =
-      fullTime ?? matchWinner ?? firstNonOu ?? markets[0];
-    const firstCondition = main?.conditions[0];
+      fullTime ?? matchWinner ?? firstNonOu ?? markets.find(hasActive) ?? markets[0];
+    const firstCondition = pickPreferredCondition(main?.conditions ?? []);
     if (!firstCondition?.outcomes?.length) {
       return null;
     }
@@ -95,7 +122,7 @@ export function extractOverUnderOdds(
   try {
     const markets = groupConditionsByMarket(conditions);
     const ou = markets.find((m) => marketFamilyKey(m.marketKey) === "4");
-    const firstCondition = ou?.conditions[0];
+    const firstCondition = pickPreferredCondition(ou?.conditions ?? []);
     if (!firstCondition?.outcomes?.length) {
       return null;
     }
