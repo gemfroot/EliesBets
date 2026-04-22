@@ -579,6 +579,21 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const potentialWinDisplay =
     mode === "combo" ? potentialWinCombo : potentialWinSingleLeg;
 
+  // Hold last-known-good values so the UI doesn't flash "—" during SDK refetches.
+  const stableMinBetRef = useRef(minBet);
+  const stableMaxBetRef = useRef(maxBet);
+  const stablePotentialWinRef = useRef(potentialWinDisplay);
+  const stableFeeRef = useRef(betFeeData?.formattedRelayerFeeAmount);
+  if ((minBet ?? 0) > 0) stableMinBetRef.current = minBet;
+  if ((maxBet ?? 0) > 0) stableMaxBetRef.current = maxBet;
+  if (potentialWinDisplay != null) stablePotentialWinRef.current = potentialWinDisplay;
+  if (betFeeData?.formattedRelayerFeeAmount) stableFeeRef.current = betFeeData.formattedRelayerFeeAmount;
+
+  const stableMinBet = minBet ?? stableMinBetRef.current;
+  const stableMaxBet = maxBet ?? stableMaxBetRef.current;
+  const stablePotentialWin = potentialWinDisplay ?? stablePotentialWinRef.current;
+  const stableFee = betFeeData?.formattedRelayerFeeAmount ?? stableFeeRef.current;
+
   const receiptTotalOdds = totalOddsForBet;
 
   const oddsDrift = useMemo(
@@ -906,14 +921,13 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       </div>
       {isConnected &&
       activeSelections.length > 0 &&
-      !isBetCalculationFetching &&
-      ((minBet ?? 0) > 0 || (maxBet ?? 0) > 0) ? (
+      ((stableMinBet ?? 0) > 0 || (stableMaxBet ?? 0) > 0) ? (
         <p className="text-xs text-zinc-500">
           Allowed stake:{" "}
           <span className="font-mono tabular-nums text-zinc-400">
             {[
-              (minBet ?? 0) > 0 ? `min ${minBet}` : null,
-              (maxBet ?? 0) > 0 ? `max ${maxBet}` : null,
+              (stableMinBet ?? 0) > 0 ? `min ${stableMinBet}` : null,
+              (stableMaxBet ?? 0) > 0 ? `max ${stableMaxBet}` : null,
             ]
               .filter(Boolean)
               .join(" · ")}
@@ -923,11 +937,11 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       ) : null}
       {isConnected &&
       !selectedFreebet &&
-      betFeeData?.formattedRelayerFeeAmount ? (
+      stableFee ? (
         <p className="text-xs text-zinc-500">
           Est. relayer fee:{" "}
           <span className="font-mono tabular-nums text-zinc-400">
-            {betFeeData.formattedRelayerFeeAmount} {betToken.symbol}
+            {stableFee} {betToken.symbol}
           </span>
         </p>
       ) : null}
@@ -946,8 +960,8 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       <p className="text-xs text-zinc-500">
         Potential win:{" "}
         <span className="font-mono font-semibold tabular-nums text-zinc-300">
-          {potentialWinDisplay != null
-            ? `${potentialWinDisplay.toFixed(2)} ${betToken.symbol}`
+          {stablePotentialWin != null
+            ? `${stablePotentialWin.toFixed(2)} ${betToken.symbol}`
             : "—"}
         </span>
         {mode === "combo" && multiPick ? (
