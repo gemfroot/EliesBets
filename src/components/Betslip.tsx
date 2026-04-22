@@ -26,7 +26,7 @@ import {
   type ReactNode,
 } from "react";
 import { useConnection, useReadContract } from "wagmi";
-import { erc20Abi, formatUnits } from "viem";
+import { erc20Abi, formatUnits, parseUnits } from "viem";
 import { AZURO_AFFILIATE } from "@/lib/affiliate";
 import dynamic from "next/dynamic";
 import { useOddsFormat } from "@/components/OddsFormatProvider";
@@ -617,6 +617,29 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const stakeNum = Number.parseFloat(stakeAmount);
   const stakeValid = Number.isFinite(stakeNum) && stakeNum > 0;
 
+  // Pre-submit balance guard: without this, users with 0 token balance hit the
+  // Azuro relayer's generic "Condition is not active" / "BadData" branch
+  // (relayer validates condition state before funds) and never see the real
+  // problem. Free bets don't debit the wallet, so skip when one is selected.
+  const stakeWei = (() => {
+    if (!stakeValid || selectedFreebet) return null;
+    try {
+      return parseUnits(stakeAmount, betToken.decimals);
+    } catch {
+      return null;
+    }
+  })();
+  const hasInsufficientBalance =
+    isConnected &&
+    !selectedFreebet &&
+    stakeWei != null &&
+    tokenBalanceRaw != null &&
+    stakeWei > tokenBalanceRaw;
+  const formattedBalance =
+    tokenBalanceRaw != null
+      ? formatUnits(tokenBalanceRaw, betToken.decimals)
+      : null;
+
   const singleLegEffective =
     multiPick && mode === "single" && activeSelections[0] && effectiveOddsRecord
       ? effectiveOddsRecord[
@@ -859,6 +882,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     isConnected &&
     Boolean(address) &&
     !isBusy &&
+    !hasInsufficientBalance &&
     (isBetAllowed || isOddsHydrationQuirk);
 
   // Stabilise the enabled state: once disabled, hold for 200ms before
@@ -1068,6 +1092,19 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       ) : null}
       {!isConnected ? (
         <p className="text-xs text-zinc-500">Connect a wallet to place a bet.</p>
+      ) : null}
+      {hasInsufficientBalance ? (
+        <p
+          className="rounded-md border border-amber-800/80 bg-amber-950/40 px-3 py-2 text-xs text-amber-200"
+          role="status"
+          aria-live="polite"
+        >
+          Not enough {betToken.symbol} for this stake. Your balance is{" "}
+          <span className="font-semibold tabular-nums">
+            {formattedBalance ?? "0"}
+          </span>{" "}
+          {betToken.symbol}. Lower the stake or top up your wallet.
+        </p>
       ) : null}
       {isConnected &&
       sdkDisableMessage &&

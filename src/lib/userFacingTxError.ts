@@ -74,7 +74,12 @@ function collectErrorText(err: unknown, depth = 0): string {
   }
 
   const joined = parts.join(" ").trim();
-  return joined.length > 12_000 ? joined.slice(0, 12_000) : joined;
+  // Collapse consecutive duplicate tokens — BetOrderError exposes the same
+  // errorCode through several fields (`error.errorCode`, `error.data.error`,
+  // the plain-object walker) and the join produces "BadData BadData BadData"
+  // which looks like a stutter to users without adding info.
+  const deduped = joined.replace(/\b(\S+)(?:\s+\1\b)+/g, "$1");
+  return deduped.length > 12_000 ? deduped.slice(0, 12_000) : deduped;
 }
 
 /**
@@ -146,6 +151,25 @@ export function formatWalletTxError(error: unknown): string {
 
   if (t.includes("insufficient funds") || t.includes("insufficient balance")) {
     return "Not enough native coin to cover gas (and stake if applicable). Add funds or reduce the amount, then try again.";
+  }
+
+  if (
+    t.includes("insufficient allowance") ||
+    t.includes("erc20: transfer amount exceeds allowance") ||
+    t.includes("transferhelper::transferfrom")
+  ) {
+    return "Token approval is missing or was revoked. Tap Approve token, confirm in your wallet, then Place Bet again.";
+  }
+
+  if (
+    t.includes("condition is not active") ||
+    t.includes("condition not active") ||
+    t.includes("conditionisnotactive") ||
+    t.includes("conditionnotactive") ||
+    t.includes("condition is paused") ||
+    t.includes("condition is stopped")
+  ) {
+    return "The market paused right as the bet reached the relayer — live lines flicker. Wait a few seconds and tap Place Bet again; no need to remove the pick.";
   }
 
   if (
