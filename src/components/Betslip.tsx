@@ -403,7 +403,7 @@ function messageForBetslipDisableReason(
     case BetslipDisableReason.ComboWithSameGame:
       return "Combo cannot include more than one outcome from the same game.";
     case BetslipDisableReason.SelectedOutcomesTemporarySuspended:
-      return "One or more selections are temporarily unavailable.";
+      return "One or more selections are temporarily unavailable, or the contract has not returned a max stake yet.";
     case BetslipDisableReason.TotalOddsTooLow:
       return "Total odds are too low for this bet.";
     case BetslipDisableReason.FreeBetExpired:
@@ -425,6 +425,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     totalOdds: sdkTotalOdds,
     disableReason,
     isBetAllowed,
+    isStatesFetching,
     isOddsFetching,
     isBetCalculationFetching,
     minBet,
@@ -595,6 +596,14 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   }, [disableReason, isOddsFetching, isBetCalculationFetching]);
 
   const sdkDisableMessage = useMemo(() => {
+    // While condition states are loading, the SDK often reports ConditionState — avoid
+    // alarming "paused" copy on live games (Azuro useConditionsState lags the list card).
+    if (
+      disableReason === BetslipDisableReason.ConditionState &&
+      isStatesFetching
+    ) {
+      return "Checking market availability…";
+    }
     if (
       disableReason === BetslipDisableReason.ConditionState &&
       (isOddsFetching || isBetCalculationFetching) &&
@@ -602,8 +611,25 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     ) {
       return "Checking market availability…";
     }
+    // SDK maps !isMaxBetBiggerThanZero to SelectedOutcomesTemporarySuspended (misnamed).
+    if (
+      disableReason ===
+        BetslipDisableReason.SelectedOutcomesTemporarySuspended &&
+      (isBetCalculationFetching || (maxBet ?? 0) <= 0)
+    ) {
+      return isBetCalculationFetching
+        ? "Loading bet limits for this slip…"
+        : "The contract returned no max stake for this slip yet. Wait a moment, lower your stake, or re-add the pick from the live game page.";
+    }
     return messageForBetslipDisableReason(disableReason);
-  }, [disableReason, isOddsFetching, isBetCalculationFetching, pauseGraceElapsed]);
+  }, [
+    disableReason,
+    isStatesFetching,
+    isOddsFetching,
+    isBetCalculationFetching,
+    pauseGraceElapsed,
+    maxBet,
+  ]);
 
   const betslipDebug = process.env.NEXT_PUBLIC_BETSLIP_DEBUG === "1";
   const betslipDebugLoggedKey = useRef("");
@@ -627,6 +653,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     betslipDebugLoggedKey.current = key;
     console.info("[betslip-debug]", {
       disableReason,
+      isStatesFetching,
       isOddsFetching,
       isBetCalculationFetching,
       legs: activeSelections.map((s) => ({
@@ -643,6 +670,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     activeSelections,
     isOddsFetching,
     isBetCalculationFetching,
+    isStatesFetching,
   ]);
 
   const pausedConditionBlocking =
@@ -739,6 +767,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     isConnected &&
     Boolean(address) &&
     !isBusy &&
+    !isStatesFetching &&
     !isOddsFetching &&
     !isBetCalculationFetching &&
     isBetAllowed;
@@ -962,6 +991,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       {isConnected &&
       activeSelections.length > 0 &&
       oddsDrift.hasDrift &&
+      !isStatesFetching &&
       !isOddsFetching &&
       !isBetCalculationFetching ? (
         <p
