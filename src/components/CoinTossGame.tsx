@@ -181,7 +181,15 @@ export function CoinTossGame() {
       return;
     }
 
-    const landedHeads = lastRoll.rolled[0] === true;
+    // BetSwirl's CoinToss `_roll` returns `rolled = randomWord % 2` where the
+    // source comment says "0 if heads & 1 if tails", and the emitted event's
+    // `rolled[0]` is `rolled == 1`. So `rolled[0] === true` means the contract
+    // landed on TAILS, not heads. The input side (hooks.ts passes `!betHeads`
+    // as face) already matches the contract convention (face=false ↔ heads);
+    // the display side just needs to invert. Previously every contract loss
+    // looked like a visual win, which explains the "I won but got no payout"
+    // pattern on our deployment.
+    const landedHeads = lastRoll.rolled[0] === false;
     setOutcome(landedHeads ? "heads" : "tails");
     setPayoutWei(lastRoll.payout);
     setWaitingVrf(false);
@@ -673,7 +681,7 @@ export function CoinTossGame() {
                       className="max-h-[16rem] space-y-2 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-950/40 p-2 pr-3"
                     >
                       {betHistory.slice(0, BET_HISTORY_DISPLAY_CAP).map((row) => {
-                        const landedHeads = row.rolled[0] === true;
+                        const landedHeads = row.rolled[0] === false;
                         const won = row.payout > BigInt(0);
                         const netWei = won ? row.payout - row.totalBetAmount : -row.totalBetAmount;
                         const netPrefix = netWei >= BigInt(0) ? "+" : "−";
