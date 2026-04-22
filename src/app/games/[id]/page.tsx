@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import {
   getConditionsByGameIds,
@@ -13,7 +14,7 @@ import { GameDetailStatus } from "@/components/GameDetailStatus";
 import { RetryCallout } from "@/components/RetryCallout";
 import { gameParticipantLine } from "@/lib/gameTitle";
 import { formatServerFetchError } from "@/lib/serverFetchError";
-import { getSportsChainId } from "@/lib/sportsChain";
+import { getSportsChainId, type SportsChainId } from "@/lib/sportsChain";
 import { isSoccerSport } from "@/lib/outcomeLabels";
 import type { Metadata } from "next";
 
@@ -23,12 +24,20 @@ type Props = {
   params: Promise<{ id: string }>;
 };
 
+// `generateMetadata` and the page body both need the game record. Toolkit calls
+// use POST so Next's fetch cache can't dedupe them — React's per-request cache can.
+const getGameByIdForRequest = cache(
+  async (chainId: SportsChainId, id: string): Promise<GameData | undefined> => {
+    const games = await getGamesByIds({ chainId, gameIds: [id] });
+    return games[0];
+  },
+);
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const chainId = await getSportsChainId();
   try {
-    const games = await getGamesByIds({ chainId, gameIds: [id] });
-    const game = games[0];
+    const game = await getGameByIdForRequest(chainId, id);
     if (!game) {
       return { title: "Game" };
     }
@@ -132,16 +141,23 @@ export default async function GameDetailPage({ params }: Props) {
   const { id } = await params;
   const chainId = await getSportsChainId();
 
+  // Both calls only depend on the route id; fire in parallel instead of stacking
+  // two slow upstream hops. `allSettled` so a conditions failure still lets us
+  // render the game with a markets-error callout.
+  const [gameResult, conditionsResult] = await Promise.allSettled([
+    getGameByIdForRequest(chainId, id),
+    getConditionsByGameIds({ chainId, gameIds: id }),
+  ]);
+
   let game: GameData | undefined;
   let gameFetchError: string | null = null;
-  try {
-    const games = await getGamesByIds({ chainId, gameIds: [id] });
-    game = games[0];
-  } catch (e) {
+  if (gameResult.status === "fulfilled") {
+    game = gameResult.value;
+  } else {
     if (process.env.NODE_ENV === "development") {
-      console.error("[GameDetailPage] getGamesByIds", e);
+      console.error("[GameDetailPage] getGamesByIds", gameResult.reason);
     }
-    gameFetchError = formatServerFetchError(e);
+    gameFetchError = formatServerFetchError(gameResult.reason);
   }
 
   if (gameFetchError) {
@@ -162,13 +178,13 @@ export default async function GameDetailPage({ params }: Props) {
 
   let conditions: Awaited<ReturnType<typeof getConditionsByGameIds>> = [];
   let marketsError: string | null = null;
-  try {
-    conditions = await getConditionsByGameIds({ chainId, gameIds: id });
-  } catch (e) {
+  if (conditionsResult.status === "fulfilled") {
+    conditions = conditionsResult.value;
+  } else {
     if (process.env.NODE_ENV === "development") {
-      console.error("[GameDetailPage] getConditionsByGameIds", e);
+      console.error("[GameDetailPage] getConditionsByGameIds", conditionsResult.reason);
     }
-    marketsError = formatServerFetchError(e);
+    marketsError = formatServerFetchError(conditionsResult.reason);
   }
 
   const markets = groupConditionsByMarket(conditions);
