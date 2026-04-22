@@ -28,23 +28,31 @@ async function fetchGamesForPaginatedState(
   chainId: SportsChainId,
   leagueSlug?: string,
 ): Promise<GameData[]> {
-  const collected: GameData[] = [];
-  let page = 1;
-  let totalPages = 1;
-  while (page <= totalPages) {
-    const res = await getGamesByFilters({
-      chainId,
-      state,
-      sportSlug,
-      ...(leagueSlug ? { leagueSlug } : {}),
-      orderBy: GameOrderBy.StartsAt,
-      orderDir: OrderDirection.Asc,
-      page,
-      perPage: GAMES_PER_PAGE,
-    });
+  const baseParams = {
+    chainId,
+    state,
+    sportSlug,
+    ...(leagueSlug ? { leagueSlug } : {}),
+    orderBy: GameOrderBy.StartsAt,
+    orderDir: OrderDirection.Asc,
+    perPage: GAMES_PER_PAGE,
+  } as const;
+  const first = await getGamesByFilters({ ...baseParams, page: 1 });
+  if (first.totalPages <= 1) {
+    return first.games;
+  }
+  // Sequential pagination made popular sports (baseball, football) block SSR for
+  // 10–30s on a slow upstream. Fetch remaining pages in parallel.
+  const remainingPages = Array.from(
+    { length: first.totalPages - 1 },
+    (_, i) => i + 2,
+  );
+  const rest = await Promise.all(
+    remainingPages.map((page) => getGamesByFilters({ ...baseParams, page })),
+  );
+  const collected: GameData[] = [...first.games];
+  for (const res of rest) {
     collected.push(...res.games);
-    totalPages = res.totalPages;
-    page += 1;
   }
   return collected;
 }
