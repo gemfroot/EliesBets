@@ -297,9 +297,16 @@ export function Header() {
               type="button"
               onClick={() => setModalOpen(true)}
               disabled={status === "connecting"}
-              className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-white disabled:opacity-60"
+              className="rounded-lg bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 transition hover:bg-white disabled:opacity-60 sm:px-4"
             >
-              {status === "connecting" ? "Connecting…" : "Connect wallet"}
+              {status === "connecting" ? (
+                "Connecting…"
+              ) : (
+                <>
+                  <span className="hidden sm:inline">Connect wallet</span>
+                  <span className="sm:hidden">Connect</span>
+                </>
+              )}
             </button>
           )}
         </div>

@@ -43,15 +43,27 @@ function marketFamilyKey(marketKey: string): string {
  */
 /**
  * Within a market, Azuro may list multiple conditions (e.g. one per margin).
- * Prefer an `Active` one so list cards don't surface `Stopped`/`Paused` odds
- * that the betslip will reject with "market is paused". Fall back to the first
- * condition so we still render something when the whole market is off (the
- * card/betslip will show the pause state).
+ * Prefer an `Active` one whose outcomes all have real odds (>1) so list cards
+ * don't surface `Stopped`/`Paused` conditions (rejected by the betslip as
+ * "market is paused") or heavy-favorite pairs where the feed has emitted a
+ * `1.00` placeholder on one side (formatter renders that as "—"). Fall back
+ * progressively so we still render something if no ideal condition exists.
  */
-function pickPreferredCondition<T extends { state: ConditionState }>(
-  conds: readonly T[],
-): T | undefined {
-  return conds.find((c) => c.state === ConditionState.Active) ?? conds[0];
+function pickPreferredCondition<
+  T extends {
+    state: ConditionState;
+    outcomes: readonly { odds: number }[];
+  },
+>(conds: readonly T[]): T | undefined {
+  const hasPricedOutcomes = (c: T) =>
+    c.outcomes.length > 0 &&
+    c.outcomes.every((o) => Number.isFinite(o.odds) && o.odds > 1);
+  return (
+    conds.find((c) => c.state === ConditionState.Active && hasPricedOutcomes(c)) ??
+    conds.find((c) => c.state === ConditionState.Active) ??
+    conds.find(hasPricedOutcomes) ??
+    conds[0]
+  );
 }
 
 export function extractMainLineOdds(
