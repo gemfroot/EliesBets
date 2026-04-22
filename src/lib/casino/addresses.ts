@@ -167,18 +167,13 @@ const COIN_TOSS_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_BASE) ?? OUR_COIN_TOSS_BASE,
 };
 
-// BetSwirl redeployed the full game stack at the *same* addresses on Base as on
-// Polygon (CREATE2-style deterministic deploy). So the `BETSWIRL_*_POLYGON`
-// constants double as the canonical Base fallbacks for Dice / Roulette / Keno —
-// we haven't shipped our own forks of those games on Base yet. These games are
-// backed by BetSwirl's Bank (not ours); see `getCasinoBankForGame` below.
 const DICE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_POLYGON) ?? BETSWIRL_DICE_POLYGON,
   [polygonAmoy.id]: BETSWIRL_DICE_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_AVALANCHE),
   [avalancheFuji.id]: undefined,
-  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_BASE) ?? BETSWIRL_DICE_POLYGON,
+  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_BASE),
 };
 
 const ROULETTE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
@@ -188,7 +183,7 @@ const ROULETTE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_AVALANCHE),
   [avalancheFuji.id]: undefined,
-  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_BASE) ?? BETSWIRL_ROULETTE_POLYGON,
+  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_BASE),
 };
 
 const KENO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
@@ -197,7 +192,7 @@ const KENO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_AVALANCHE),
   [avalancheFuji.id]: undefined,
-  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_BASE) ?? BETSWIRL_KENO_POLYGON,
+  [base.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_BASE),
 };
 
 const WHEEL_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
@@ -221,31 +216,6 @@ const PLINKO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
 export function getCasinoBankAddress(chainId: number): Address {
   const resolved = BANK_BY_CHAIN[chainId as CasinoChainId];
   return resolved ?? zeroAddress;
-}
-
-export type CasinoGame =
-  | "coinToss"
-  | "dice"
-  | "roulette"
-  | "keno"
-  | "wheel"
-  | "plinko";
-
-/**
- * Bank address to pre-flight a given game against. On Base we run our own
- * CoinToss + WeightedGame (Wheel/Plinko) backed by our bank, but Dice /
- * Roulette / Keno are BetSwirl's mainnet contracts reused via identical
- * deterministic addresses — those games settle against BetSwirl's bank.
- * Asking our bank about BetSwirl games (or vice versa) returns meaningless
- * `getBetRequirements` results and produces false "bank empty" warnings.
- */
-export function getCasinoBankForGame(chainId: number, game: CasinoGame): Address {
-  if (chainId === base.id) {
-    if (game === "dice" || game === "roulette" || game === "keno") {
-      return BETSWIRL_BANK_MAINNET;
-    }
-  }
-  return getCasinoBankAddress(chainId);
 }
 
 export function getCasinoCoinTossAddress(chainId: number): Address {

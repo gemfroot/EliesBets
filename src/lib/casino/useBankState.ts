@@ -6,9 +6,7 @@ import { zeroAddress, type Address } from "viem";
 import { bankAbi } from "@/lib/casino/abis/Bank";
 import {
   getCasinoBankAddress,
-  getCasinoBankForGame,
   type BetToken,
-  type CasinoGame,
 } from "@/lib/casino/addresses";
 
 /**
@@ -34,17 +32,13 @@ export function useCasinoBankState(
   chainId: number,
   betToken: BetToken,
   multiplierBps: bigint = 19_800n,
-  game?: CasinoGame,
 ): {
   isOperational: boolean;
   statusLabel: string | null;
   maxBetAmount: bigint | undefined;
   maxBetCount: bigint | undefined;
 } {
-  const bank = useMemo(
-    () => (game ? getCasinoBankForGame(chainId, game) : getCasinoBankAddress(chainId)),
-    [chainId, game],
-  );
+  const bank = useMemo(() => getCasinoBankAddress(chainId), [chainId]);
   const bankConfigured = bank !== zeroAddress;
 
   const { data, isLoading, isError } = useReadContract({

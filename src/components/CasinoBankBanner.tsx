@@ -1,6 +1,6 @@
 "use client";
 
-import type { BetToken, CasinoGame } from "@/lib/casino/addresses";
+import type { BetToken } from "@/lib/casino/addresses";
 import { useCasinoBankState } from "@/lib/casino/useBankState";
 
 /**
@@ -17,19 +17,15 @@ export function CasinoBankBanner({
   betToken,
   /** Basis-points multiplier to probe the bank at (default 1.98× = 19800). */
   multiplierBps = 19_800n,
-  /** Game key — routes the preflight to the bank that actually backs this game (ours vs BetSwirl's on Base). */
-  game,
 }: {
   chainId: number;
   betToken: BetToken;
   multiplierBps?: bigint;
-  game?: CasinoGame;
 }) {
   const { isOperational, statusLabel } = useCasinoBankState(
     chainId,
     betToken,
     multiplierBps,
-    game,
   );
   if (isOperational || !statusLabel) {
     return null;

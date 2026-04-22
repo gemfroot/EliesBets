@@ -270,7 +270,7 @@ export function DiceGame() {
         </header>
 
         <div className="mb-6">
-          <CasinoBankBanner chainId={chainId} betToken={selectedToken} game="dice" />
+          <CasinoBankBanner chainId={chainId} betToken={selectedToken} />
         </div>
 
         {isConnected && !isSupportedChain ? (

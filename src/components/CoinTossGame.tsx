@@ -350,7 +350,7 @@ export function CoinTossGame() {
         </header>
 
         <div className="mb-6">
-          <CasinoBankBanner chainId={chainId} betToken={selectedToken} game="coinToss" />
+          <CasinoBankBanner chainId={chainId} betToken={selectedToken} />
         </div>
 
         {/* Network indicator */}

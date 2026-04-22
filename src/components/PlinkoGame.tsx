@@ -364,7 +364,7 @@ export function PlinkoGame() {
         </header>
 
         <div className="mb-6">
-          <CasinoBankBanner chainId={chainId} betToken={selectedToken} game="plinko" />
+          <CasinoBankBanner chainId={chainId} betToken={selectedToken} />
         </div>
 
         {isConnected && !isSupportedChain ? (

@@ -428,7 +428,7 @@ export function KenoGame() {
         </header>
 
         <div className="mb-6">
-          <CasinoBankBanner chainId={chainId} betToken={selectedToken} game="keno" />
+          <CasinoBankBanner chainId={chainId} betToken={selectedToken} />
         </div>
 
         {isConnected && !isSupportedChain ? (

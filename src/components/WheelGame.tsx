@@ -352,7 +352,7 @@ export function WheelGame() {
         </header>
 
         <div className="mb-6">
-          <CasinoBankBanner chainId={chainId} betToken={selectedToken} game="wheel" />
+          <CasinoBankBanner chainId={chainId} betToken={selectedToken} />
         </div>
 
         {isConnected && !isSupportedChain ? (
