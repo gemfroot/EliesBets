@@ -586,7 +586,7 @@ function messageForBetslipDisableReason(
   }
   switch (reason) {
     case BetslipDisableReason.ConditionState:
-      return "A pick is paused — bet will unlock automatically when the market reopens.";
+      return "This market is paused — it will auto-unlock when it reopens.";
     case BetslipDisableReason.BetAmountGreaterThanMaxBet:
       return "Stake is above the maximum allowed for this bet.";
     case BetslipDisableReason.BetAmountLowerThanMinBet:
@@ -1586,21 +1586,29 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
         </div>
       ) : null}
       {isConnected && !chainGuard.onBetChain ? (
-        <button
-          type="button"
-          disabled={chainGuard.switchPending}
-          onClick={() => {
-            void chainGuard.switchToAppChain().catch(() => {
-              /* wagmi surfaces the error on next render via switchError in Header; here we just stay blocked */
-            });
-          }}
-          className="min-h-11 rounded-md bg-amber-600 px-3 py-2.5 text-sm font-semibold text-zinc-950 transition-[background-color,transform,opacity] duration-200 ease-out hover:scale-[1.02] hover:bg-amber-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:min-h-0 md:py-2"
-          title={`Your wallet is on ${chainGuard.walletChainName}; bets on this page settle on ${chainGuard.appChainName}.`}
-        >
-          {chainGuard.switchPending
-            ? `Switching to ${chainGuard.appChainName}…`
-            : `Switch wallet to ${chainGuard.appChainName}`}
-        </button>
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs text-amber-300/90">
+            This match settles on{" "}
+            <span className="font-semibold">{chainGuard.appChainName}</span>.
+            Your wallet is on{" "}
+            <span className="font-semibold">{chainGuard.walletChainName}</span>{" "}
+            — switch to place the bet.
+          </p>
+          <button
+            type="button"
+            disabled={chainGuard.switchPending}
+            onClick={() => {
+              void chainGuard.switchToAppChain().catch(() => {
+                /* wagmi surfaces the error on next render via switchError in Header; here we just stay blocked */
+              });
+            }}
+            className="min-h-11 rounded-md bg-amber-600 px-3 py-2.5 text-sm font-semibold text-zinc-950 transition-[background-color,transform,opacity] duration-200 ease-out hover:scale-[1.02] hover:bg-amber-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:min-h-0 md:py-2"
+          >
+            {chainGuard.switchPending
+              ? `Switching to ${chainGuard.appChainName}…`
+              : `Switch wallet to ${chainGuard.appChainName}`}
+          </button>
+        </div>
       ) : (
         <button
           type="button"
