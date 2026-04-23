@@ -1101,11 +1101,12 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
 
   const canSubmit = canSubmitStable;
 
-  const placeBetLabel = isApproveRequired
-    ? "Approve token"
-    : mode === "single" && multiPick
-      ? `Place bet (leg ${effectiveLegIndex + 1}/${selections.length})`
-      : "Place Bet";
+  const placeBetLabel =
+    isApproveRequired && !hasInsufficientBalance
+      ? "Approve token"
+      : mode === "single" && multiPick
+        ? `Place bet (leg ${effectiveLegIndex + 1}/${selections.length})`
+        : "Place Bet";
 
   return (
     <div className="mt-4 flex flex-col gap-3 border-t border-zinc-800 pt-4">
@@ -1329,7 +1330,7 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           </span>
         ) : null}
       </p>
-      {isApproveRequired ? (
+      {isApproveRequired && !hasInsufficientBalance ? (
         <p className="text-xs text-amber-500/90">
           Approve {betToken.symbol} for the relayer, then tap Place Bet again to
           confirm.
