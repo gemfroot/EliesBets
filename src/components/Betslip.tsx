@@ -41,6 +41,7 @@ import {
 } from "@/lib/oddsFormat";
 import { formatWalletTxError } from "@/lib/userFacingTxError";
 import { useAzuroActionChain } from "@/lib/useAzuroActionChain";
+import { formatUsdFromDecimalString, useTokenUsdPrice } from "@/lib/price";
 
 const BetReceipt = dynamic(
   () =>
@@ -427,7 +428,53 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
 
 const SLIPPAGE_PERCENT = 5;
 
-const QUICK_STAKE_PRESETS = ["5", "10", "25", "50"] as const;
+/** Token-native quick-stake presets, keyed by token symbol. Falls back to
+ * `TOKEN_PRESETS_FALLBACK` when the bet token isn't in the map. Kept in the
+ * token's own units (ETH: 0.001–0.05, stablecoins: 5–50, etc.) so presets
+ * are sensible regardless of USD price. */
+const TOKEN_PRESETS_BY_SYMBOL: Record<string, readonly string[]> = {
+  ETH: ["0.001", "0.005", "0.01", "0.05"],
+  WETH: ["0.001", "0.005", "0.01", "0.05"],
+  AVAX: ["0.1", "0.5", "1", "5"],
+  WAVAX: ["0.1", "0.5", "1", "5"],
+  POL: ["1", "5", "10", "50"],
+  WPOL: ["1", "5", "10", "50"],
+  MATIC: ["1", "5", "10", "50"],
+  WMATIC: ["1", "5", "10", "50"],
+  xDAI: ["1", "5", "10", "50"],
+  WXDAI: ["1", "5", "10", "50"],
+  USDC: ["5", "10", "25", "50"],
+  "USDC.E": ["5", "10", "25", "50"],
+  USDT: ["5", "10", "25", "50"],
+  USDt: ["5", "10", "25", "50"],
+  "USDT.E": ["5", "10", "25", "50"],
+  DAI: ["5", "10", "25", "50"],
+  LINK: ["0.5", "1", "5", "10"],
+};
+const TOKEN_PRESETS_FALLBACK = ["5", "10", "25", "50"] as const;
+
+/** USD-denominated presets used when the user toggles the stake input to $. */
+const USD_STAKE_PRESETS = ["5", "10", "25", "50"] as const;
+
+function stakePresetsFor(symbol: string): readonly string[] {
+  return TOKEN_PRESETS_BY_SYMBOL[symbol] ?? TOKEN_PRESETS_FALLBACK;
+}
+
+/** Convert a USD string like "10" or "$10.50" to a token-decimal string. */
+function usdToTokenString(
+  usdStr: string,
+  usdPerUnit: number,
+  decimals: number,
+): string {
+  const clean = usdStr.replace(/^\$/, "").trim();
+  if (!clean) return "";
+  const n = Number(clean);
+  if (!Number.isFinite(n) || n < 0 || usdPerUnit <= 0) return "";
+  const tokens = n / usdPerUnit;
+  // Cap decimals at the token's max to avoid parseUnits rounding errors later.
+  const max = Math.min(Math.max(decimals, 2), 8);
+  return tokens.toFixed(max).replace(/\.?0+$/, "");
+}
 
 type BetslipMode = "single" | "combo";
 
@@ -578,6 +625,64 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     }
     applyStake(formatUnits(tokenBalanceRaw, betToken.decimals));
   }, [applyStake, betToken.decimals, tokenBalanceRaw]);
+
+  const usdPerUnit = useTokenUsdPrice(chainGuard.appChainId, {
+    address: betToken.address,
+    symbol: betToken.symbol,
+    decimals: betToken.decimals,
+    // Sports betslip tokens are always the chain's wrapped-native / stablecoin
+    // ERC-20, never the raw EOA-holdable native token. isNative=false is
+    // correct; `isWrappedNative` logic in price.ts handles WETH et al.
+    isNative: false,
+  });
+  const canShowUsd = usdPerUnit !== undefined && !selectedFreebet;
+  const [inputCurrency, setInputCurrency] = useState<"token" | "usd">("token");
+  // If we lose the price (e.g. after a chain switch) while in USD mode, fall
+  // back to token mode so the input doesn't silently misrepresent the stake.
+  useEffect(() => {
+    if (inputCurrency === "usd" && !canShowUsd) setInputCurrency("token");
+  }, [inputCurrency, canShowUsd]);
+
+  const tokenPresets = useMemo(
+    () => stakePresetsFor(betToken.symbol),
+    [betToken.symbol],
+  );
+
+  const usdOfCurrentStake = useMemo(
+    () => formatUsdFromDecimalString(betAmount || "0", usdPerUnit),
+    [betAmount, usdPerUnit],
+  );
+
+  const stakeInputValue = useMemo(() => {
+    if (inputCurrency === "token") return betAmount;
+    if (!usdPerUnit || !betAmount) return "";
+    const n = Number(betAmount);
+    if (!Number.isFinite(n)) return "";
+    const usd = n * usdPerUnit;
+    return usd > 0 && usd < 0.01 ? "" : usd.toFixed(usd < 1 ? 4 : 2);
+  }, [inputCurrency, betAmount, usdPerUnit]);
+
+  const handleStakeInput = useCallback(
+    (raw: string) => {
+      if (inputCurrency === "token" || !usdPerUnit) {
+        applyStake(raw);
+        return;
+      }
+      applyStake(usdToTokenString(raw, usdPerUnit, betToken.decimals));
+    },
+    [inputCurrency, usdPerUnit, applyStake, betToken.decimals],
+  );
+
+  const handlePresetClick = useCallback(
+    (preset: string) => {
+      if (inputCurrency === "token" || !usdPerUnit) {
+        applyStake(preset);
+        return;
+      }
+      applyStake(usdToTokenString(preset, usdPerUnit, betToken.decimals));
+    },
+    [inputCurrency, usdPerUnit, applyStake, betToken.decimals],
+  );
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -1084,21 +1189,54 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           ) : null}
         </div>
       ) : null}
-      <label className="text-xs font-medium text-zinc-400" htmlFor="betslip-stake">
-        Stake ({betToken.symbol})
-      </label>
+      <div className="flex items-center justify-between gap-2">
+        <label
+          className="text-xs font-medium text-zinc-400"
+          htmlFor="betslip-stake"
+        >
+          Stake ({inputCurrency === "usd" ? "USD" : betToken.symbol})
+        </label>
+        {canShowUsd ? (
+          <div className="flex rounded-md border border-zinc-700 p-0.5 text-[11px] font-medium">
+            <button
+              type="button"
+              onClick={() => setInputCurrency("token")}
+              className={`rounded-sm px-2 py-0.5 transition ${
+                inputCurrency === "token"
+                  ? "bg-zinc-700 text-zinc-100"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              {betToken.symbol}
+            </button>
+            <button
+              type="button"
+              onClick={() => setInputCurrency("usd")}
+              className={`rounded-sm px-2 py-0.5 transition ${
+                inputCurrency === "usd"
+                  ? "bg-zinc-700 text-zinc-100"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              $
+            </button>
+          </div>
+        ) : null}
+      </div>
       <div className="flex flex-wrap gap-2">
-        {QUICK_STAKE_PRESETS.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            disabled={Boolean(selectedFreebet)}
-            onClick={() => applyStake(preset)}
-            className="min-h-9 min-w-[2.75rem] touch-manipulation rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-medium tabular-nums text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-800 active:bg-zinc-800/90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {preset}
-          </button>
-        ))}
+        {(inputCurrency === "usd" ? USD_STAKE_PRESETS : tokenPresets).map(
+          (preset) => (
+            <button
+              key={preset}
+              type="button"
+              disabled={Boolean(selectedFreebet)}
+              onClick={() => handlePresetClick(preset)}
+              className="min-h-9 min-w-[2.75rem] touch-manipulation rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-medium tabular-nums text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-800 active:bg-zinc-800/90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {inputCurrency === "usd" ? `$${preset}` : preset}
+            </button>
+          ),
+        )}
         <button
           type="button"
           onClick={fillMaxStake}
@@ -1120,13 +1258,22 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           inputMode="decimal"
           min={0}
           step="any"
-          placeholder="0"
-          value={betAmount}
+          placeholder={inputCurrency === "usd" ? "$0" : "0"}
+          value={stakeInputValue}
           readOnly={Boolean(selectedFreebet)}
-          onChange={(e) => applyStake(e.target.value)}
+          onChange={(e) => handleStakeInput(e.target.value)}
           className="min-h-11 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-base tabular-nums text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 read-only:cursor-not-allowed read-only:bg-zinc-900/80 read-only:text-zinc-400 md:min-h-0 md:text-sm"
         />
       </div>
+      {canShowUsd && betAmount && Number(betAmount) > 0 ? (
+        <p className="text-[11px] tabular-nums text-zinc-500">
+          {inputCurrency === "usd"
+            ? `≈ ${betAmount} ${betToken.symbol}`
+            : usdOfCurrentStake
+              ? `≈ ${usdOfCurrentStake}`
+              : null}
+        </p>
+      ) : null}
       {isConnected &&
       activeSelections.length > 0 &&
       ((stableMinBet ?? 0) > 0 || (stableMaxBet ?? 0) > 0) ? (

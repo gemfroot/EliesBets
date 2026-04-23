@@ -44,14 +44,26 @@ function isStablecoin(symbol: string): boolean {
 }
 
 /**
+ * Sports betslip tokens are usually wrapped natives (WETH on Base, WMATIC on
+ * Polygon, etc.). These track the native 1:1 so price them with the same
+ * Chainlink feed instead of returning "no price" just because `isNative` is
+ * false on the Azuro-side token shape.
+ */
+function isWrappedNative(symbol: string): boolean {
+  const s = symbol.toUpperCase();
+  return s === "WETH" || s === "WMATIC" || s === "WPOL" || s === "WAVAX";
+}
+
+/**
  * Returns the USD price of one whole unit of `token` on `chainId`, or
  * undefined if no feed is configured / the feed is stale. Stablecoins are
  * assumed to be pegged at $1.
  */
 export function useTokenUsdPrice(chainId: number, token: BetToken): number | undefined {
   const stable = isStablecoin(token.symbol);
+  const treatAsNative = token.isNative || isWrappedNative(token.symbol);
   const feed = NATIVE_USD_FEED[chainId];
-  const needsFeed = !stable && token.isNative && Boolean(feed);
+  const needsFeed = !stable && treatAsNative && Boolean(feed);
 
   const { data } = useReadContract({
     address: feed,
@@ -66,9 +78,11 @@ export function useTokenUsdPrice(chainId: number, token: BetToken): number | und
 
   return useMemo(() => {
     if (stable) return 1;
-    // Gnosis native xDAI is pegged ~$1.
-    if (!token.isNative && chainId === gnosis.id) return 1;
-    if (!token.isNative) return undefined;
+    // Gnosis native xDAI (and wrapped WXDAI) is pegged ~$1.
+    if (chainId === gnosis.id && (token.isNative || token.symbol.toUpperCase() === "WXDAI")) {
+      return 1;
+    }
+    if (!treatAsNative) return undefined;
     if (!data) return undefined;
     const [, answer, , updatedAt] = data as readonly [bigint, bigint, bigint, bigint, bigint];
     if (answer <= BigInt(0)) return undefined;
@@ -76,7 +90,7 @@ export function useTokenUsdPrice(chainId: number, token: BetToken): number | und
     if (nowSec - updatedAt > BigInt(STALE_SECONDS)) return undefined;
     const n = Number(formatUnits(answer, FEED_DECIMALS));
     return Number.isFinite(n) ? n : undefined;
-  }, [stable, token.isNative, chainId, data]);
+  }, [stable, treatAsNative, token.isNative, token.symbol, chainId, data]);
 }
 
 /**
