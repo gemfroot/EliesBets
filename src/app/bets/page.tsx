@@ -4,6 +4,7 @@ import { useBets, useBetsSummary, BetType, useChain, type Bet } from "@azuro-org
 import { useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { zeroAddress } from "viem";
+import { base, gnosis, polygon } from "viem/chains";
 import { BetCard } from "@/components/BetCard";
 import { BetsSummaryStrip } from "@/components/BetsSummaryStrip";
 import { ClaimAllBetsButton } from "@/components/ClaimAllBetsButton";
@@ -14,6 +15,8 @@ import {
 import { RetryCallout } from "@/components/RetryCallout";
 import { BetsListSkeleton } from "@/components/Skeleton";
 import { sumClaimableExpectedPayout } from "@/lib/azuroClaimEligibility";
+import { chainName } from "@/lib/chains";
+import type { SportsChainId } from "@/lib/sportsChainConstants";
 
 type FilterTab = "all" | "pending" | "won" | "lost";
 
@@ -72,7 +75,7 @@ const EMPTY_COPY: Record<
 
 export default function BetsPage() {
   const { address, isConnected } = useConnection();
-  const { appChain } = useChain();
+  const { appChain, setAppChainId } = useChain();
   const [tab, setTab] = useState<FilterTab>("all");
 
   const bettor = address ?? zeroAddress;
@@ -90,6 +93,62 @@ export default function BetsPage() {
   }, [bettor, tab]);
 
   const queryEnabled = Boolean(isConnected && address);
+
+  // Side-query each supported sports chain so the user can see at a glance
+  // where their bets live. The active `appChain` drives the main list below
+  // (BetCard + useRedeemBet use the SDK context chain, so the render chain
+  // must match what we claim against). These summaries are just counts we
+  // surface as a header strip; clicking switches the whole page to that
+  // chain's bets.
+  const polygonSummary = useBetsSummary({
+    account: address ?? "",
+    chainId: polygon.id,
+    query: { enabled: queryEnabled },
+  });
+  const baseSummary = useBetsSummary({
+    account: address ?? "",
+    chainId: base.id,
+    query: { enabled: queryEnabled },
+  });
+  const gnosisSummary = useBetsSummary({
+    account: address ?? "",
+    chainId: gnosis.id,
+    query: { enabled: queryEnabled },
+  });
+  const summaryByChain: Record<SportsChainId, typeof polygonSummary> = {
+    [polygon.id]: polygonSummary,
+    [base.id]: baseSummary,
+    [gnosis.id]: gnosisSummary,
+  };
+  type ChainTotals = { total: number; pending: number };
+  const totalsForChain = (
+    sum: typeof polygonSummary,
+  ): ChainTotals => {
+    // useBetsSummary returns { data: { toPayout, inBets, winBets, ... } }
+    // where inBets is the count of open/pending bets across the shape.
+    // Fall back to zero when the query is disabled or still loading.
+    const d = (sum.data ?? {}) as Record<string, unknown>;
+    const n = (k: string) => {
+      const v = d[k];
+      return typeof v === "number" ? v : 0;
+    };
+    const pending = n("inBets");
+    const winBets = n("winBets");
+    const loseBets = n("loseBets");
+    const canceled = n("canceledBets");
+    const redeemed = n("redeemedBets");
+    const cashedOut = n("cashedOutBets");
+    return {
+      pending,
+      total:
+        pending + winBets + loseBets + canceled + redeemed + cashedOut,
+    };
+  };
+  const totalsByChain: Record<SportsChainId, ChainTotals> = {
+    [polygon.id]: totalsForChain(polygonSummary),
+    [base.id]: totalsForChain(baseSummary),
+    [gnosis.id]: totalsForChain(gnosisSummary),
+  };
 
   const { refetch: refetchBetsSummary } = useBetsSummary({
     account: address ?? "",
@@ -136,7 +195,11 @@ export default function BetsPage() {
         <div>
           <h1 className="type-display text-xl">My bets</h1>
           <p className="type-muted mt-1">
-            Bets placed with your connected wallet on the app chain.
+            Viewing bets on{" "}
+            <span className="font-medium text-zinc-200">
+              {chainName(appChain.id)}
+            </span>
+            . Switch chains below to see bets on other networks.
           </p>
         </div>
         {queryEnabled && !isError ? (
@@ -157,11 +220,58 @@ export default function BetsPage() {
       </div>
 
       {queryEnabled && !isError ? (
-        <BetsSummaryStrip
-          claimableSlipTotal={claimableSlipTotal}
-          isPrefetchingSettledPages={isPrefetchingAllSettled}
-          settledPrefetchHitCap={settledPrefetchHitCap}
-        />
+        <>
+          <div
+            className="mt-5 flex flex-wrap gap-2"
+            role="tablist"
+            aria-label="Bet chain"
+          >
+            {(Object.keys(totalsByChain) as unknown as SportsChainId[]).map(
+              (idRaw) => {
+                const id = Number(idRaw) as SportsChainId;
+                const totals = totalsByChain[id];
+                const active = appChain.id === id;
+                const loading = summaryByChain[id].isFetching && !summaryByChain[id].data;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => {
+                      if (!active) setAppChainId(id);
+                    }}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition ${
+                      active
+                        ? "border-emerald-700/60 bg-emerald-950/40 text-emerald-100"
+                        : "border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100"
+                    }`}
+                  >
+                    <span className="font-medium">{chainName(id)}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums ${
+                        active
+                          ? "bg-emerald-900/60 text-emerald-100"
+                          : "bg-zinc-800 text-zinc-400"
+                      }`}
+                    >
+                      {loading
+                        ? "…"
+                        : totals.pending > 0
+                          ? `${totals.total} · ${totals.pending} open`
+                          : totals.total}
+                    </span>
+                  </button>
+                );
+              },
+            )}
+          </div>
+          <BetsSummaryStrip
+            claimableSlipTotal={claimableSlipTotal}
+            isPrefetchingSettledPages={isPrefetchingAllSettled}
+            settledPrefetchHitCap={settledPrefetchHitCap}
+          />
+        </>
       ) : null}
 
       <div
