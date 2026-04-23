@@ -199,9 +199,83 @@ export function selectionId(
   return `${gameId}::${outcomeName}`;
 }
 
+/**
+ * Azuro's `useBaseBetslip` persists the minimal bet tuple (gameId, conditionId,
+ * outcomeId) across refreshes, but our display metadata — match title, outcome
+ * label, locked odds — lives only in React state. On reload the item comes
+ * back from SDK storage while `metaById` starts empty, so the slip flashes
+ * "—" placeholders for everything.
+ *
+ * Mirror the metadata to localStorage so the slip survives reloads with real
+ * info. Key is versioned so future shape changes don't break existing users.
+ */
+const BETSLIP_META_STORAGE_KEY = "elies:betslip:meta:v1";
+
+function readPersistedBetslipMeta(): Record<string, BetslipSelection> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(BETSLIP_META_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const out: Record<string, BetslipSelection> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!v || typeof v !== "object") continue;
+      const r = v as Partial<BetslipSelection>;
+      if (
+        typeof r.id === "string" &&
+        typeof r.gameId === "string" &&
+        typeof r.gameTitle === "string" &&
+        typeof r.outcomeName === "string" &&
+        typeof r.odds === "string" &&
+        typeof r.conditionId === "string" &&
+        typeof r.outcomeId === "string"
+      ) {
+        out[k] = {
+          id: r.id,
+          gameId: r.gameId,
+          gameTitle: r.gameTitle,
+          outcomeName: r.outcomeName,
+          odds: r.odds,
+          conditionId: r.conditionId,
+          outcomeId: r.outcomeId,
+          listConditionStateAtAdd: r.listConditionStateAtAdd,
+        };
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writePersistedBetslipMeta(meta: Record<string, BetslipSelection>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      BETSLIP_META_STORAGE_KEY,
+      JSON.stringify(meta),
+    );
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
 export function BetslipProvider({ children }: { children: ReactNode }) {
   const { items, addItem, removeItem, clear } = useBaseBetslip();
+  // Start empty on the server to keep SSR deterministic, then hydrate from
+  // localStorage on mount. A bet placed right after load still works because
+  // addSelection writes both React state and storage.
   const [metaById, setMetaById] = useState<Record<string, BetslipSelection>>({});
+  useEffect(() => {
+    const stored = readPersistedBetslipMeta();
+    if (Object.keys(stored).length > 0) {
+      setMetaById((prev) =>
+        Object.keys(prev).length === 0 ? stored : { ...stored, ...prev },
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot hydration
+  }, []);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const openDrawer = useCallback(() => setMobileDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setMobileDrawerOpen(false), []);
@@ -226,6 +300,13 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
     }
     return next;
   }, [metaById, validSelectionIds]);
+
+  // Persist on every change so the slip survives refresh with real info
+  // instead of "—" placeholders. The pruned map mirrors exactly what the
+  // slip will render, so storage stays in lockstep with the UI.
+  useEffect(() => {
+    writePersistedBetslipMeta(metaByIdSynced);
+  }, [metaByIdSynced]);
 
   const selections = useMemo((): BetslipSelection[] => {
     return items.map((item) => {
