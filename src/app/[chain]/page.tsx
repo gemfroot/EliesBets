@@ -12,6 +12,7 @@ import {
   HomeSportsNavSection,
 } from "@/components/HomePageSections";
 import { isChainSlug } from "@/lib/sportsChainConstants";
+import { OddsRefreshControls } from "@/components/OddsRefreshControls";
 
 /**
  * Home lists are per-chain prematch/popular data — safe to ISR at 45s.
@@ -72,6 +73,7 @@ export default async function Home({ params }: Props) {
   }
   return (
     <div className="page-shell">
+      <OddsRefreshControls />
       <Suspense fallback={<HomeHeroFallback />}>
         <HomeHeroSection chain={chain} />
       </Suspense>

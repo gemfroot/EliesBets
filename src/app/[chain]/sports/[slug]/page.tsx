@@ -7,6 +7,7 @@ import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
 import { GameCardListSkeleton } from "@/components/Skeleton";
 import { fetchGamesForSport } from "@/lib/sportGames";
+import { OddsRefreshControls } from "@/components/OddsRefreshControls";
 import { formatServerFetchError } from "@/lib/serverFetchError";
 import {
   CHAIN_SLUGS,
@@ -104,8 +105,13 @@ export default async function SportPage({ params }: Props) {
 
   return (
     <div className="page-shell">
-      <h1 className="type-display">{title}</h1>
-      <p className="type-muted mt-1">Sport: {slug}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="type-display">{title}</h1>
+          <p className="type-muted mt-1">Sport: {slug}</p>
+        </div>
+        <OddsRefreshControls className="mt-1" />
+      </div>
       <Suspense
         fallback={
           <div className="mt-8">

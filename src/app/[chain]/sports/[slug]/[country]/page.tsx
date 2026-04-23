@@ -8,6 +8,7 @@ import { fetchTopOddsByGameId, type GameOddsData } from "@/lib/oddsUtils";
 import { RetryCallout } from "@/components/RetryCallout";
 import { GameCardListSkeleton } from "@/components/Skeleton";
 import { fetchGamesForSportCountry } from "@/lib/sportGames";
+import { OddsRefreshControls } from "@/components/OddsRefreshControls";
 import { formatServerFetchError } from "@/lib/serverFetchError";
 import {
   chainIdFromSlug,
@@ -67,10 +68,15 @@ export default async function SportCountryPage({ params }: Props) {
         <span className="text-zinc-600"> · </span>
         <span className="text-zinc-400">{fallbackCountryName}</span>
       </p>
-      <h1 className="type-display mt-2">{fallbackCountryName}</h1>
-      <p className="type-muted mt-1">
-        {sportTitle} · {countrySlug}
-      </p>
+      <div className="mt-2 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="type-display">{fallbackCountryName}</h1>
+          <p className="type-muted mt-1">
+            {sportTitle} · {countrySlug}
+          </p>
+        </div>
+        <OddsRefreshControls className="mt-1" />
+      </div>
       <Suspense
         fallback={
           <div className="mt-8">
