@@ -378,6 +378,26 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
       listConditionStateAtAdd?: ConditionState;
     }) => {
       const id = selectionId(item.gameId, item.outcomeName, item.outcomeId);
+      // Standard sportsbook ergonomic: clicking an already-selected outcome
+      // toggles it off. Saves the user a trip to the slip's × button for the
+      // common "I mis-clicked / I changed my mind" case.
+      const existing = items.find(
+        (it) =>
+          it.gameId === item.gameId && it.outcomeId === item.outcomeId,
+      );
+      if (existing) {
+        removeItem({
+          conditionId: existing.conditionId,
+          outcomeId: existing.outcomeId,
+        });
+        setMetaById((prev) => {
+          if (!(id in prev)) return prev;
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        return;
+      }
       const row: BetslipSelection = {
         id,
         gameId: item.gameId,
@@ -396,7 +416,7 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
         isExpressForbidden: item.isExpressForbidden ?? false,
       });
     },
-    [addItem],
+    [addItem, items, removeItem],
   );
 
   const removeSelection = useCallback(
