@@ -26,7 +26,14 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { useBalance, useConnection, useReadContract, useWriteContract } from "wagmi";
+import {
+  useBalance,
+  useConnection,
+  useReadContract,
+  useWaitForTransactionReceipt,
+  useWriteContract,
+} from "wagmi";
+import { explorerTxUrl } from "@/lib/chains";
 import { erc20Abi, formatUnits, parseUnits } from "viem";
 import { AZURO_AFFILIATE } from "@/lib/affiliate";
 import dynamic from "next/dynamic";
@@ -903,14 +910,37 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
     wrapShortfallWei != null &&
     wrapShortfallWei > BigInt(0) &&
     (nativeBalance?.value ?? BigInt(0)) >= wrapShortfallWei;
-  const [wrapping, setWrapping] = useState(false);
+  // Wrap flow has four distinct UI states, each needing a different status
+  // so the user always knows what's actually happening:
+  //   idle                → "Wrap X ETH → WETH" (call to action)
+  //   waitingWallet       → "Confirm in wallet…" (between click and MM sign)
+  //   broadcast + pending → "Wrapping… · view tx" (tx submitted, mining)
+  //   confirmed           → banner hides, balances refetched automatically
+  const [wrapTxHash, setWrapTxHash] = useState<`0x${string}` | undefined>();
+  const [wrapWaitingWallet, setWrapWaitingWallet] = useState(false);
   const { writeContractAsync: writeWrapAsync } = useWriteContract();
+  const { isLoading: wrapReceiptLoading, isSuccess: wrapReceiptSuccess } =
+    useWaitForTransactionReceipt({
+      hash: wrapTxHash,
+      query: { enabled: Boolean(wrapTxHash) },
+    });
+  const wrapping = wrapWaitingWallet || Boolean(wrapTxHash && wrapReceiptLoading);
+  useEffect(() => {
+    if (!wrapReceiptSuccess) return;
+    // Give the node a beat so the refetch returns the post-deposit balance.
+    const id = window.setTimeout(() => {
+      void refetchTokenBalance();
+      void refetchNativeBalance();
+      setWrapTxHash(undefined);
+    }, 600);
+    return () => window.clearTimeout(id);
+  }, [wrapReceiptSuccess, refetchTokenBalance, refetchNativeBalance]);
   const handleWrap = useCallback(async () => {
     if (!canWrap || wrapShortfallWei == null) return;
-    setWrapping(true);
     setErrorMessage(null);
+    setWrapWaitingWallet(true);
     try {
-      await writeWrapAsync({
+      const hash = await writeWrapAsync({
         address: betToken.address,
         abi: [
           {
@@ -924,23 +954,13 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
         functionName: "deposit",
         value: wrapShortfallWei,
       });
-      // Give the node a beat to reflect the new WETH balance before refetching.
-      await new Promise((r) => setTimeout(r, 600));
-      await refetchTokenBalance();
-      await refetchNativeBalance();
+      setWrapTxHash(hash);
     } catch (e) {
       setErrorMessage(formatWalletTxError(e));
     } finally {
-      setWrapping(false);
+      setWrapWaitingWallet(false);
     }
-  }, [
-    canWrap,
-    wrapShortfallWei,
-    betToken.address,
-    writeWrapAsync,
-    refetchTokenBalance,
-    refetchNativeBalance,
-  ]);
+  }, [canWrap, wrapShortfallWei, betToken.address, writeWrapAsync]);
 
   const singleLegEffective =
     multiPick && mode === "single" && activeSelections[0] && effectiveOddsRecord
@@ -1460,16 +1480,42 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
               : "Lower the stake or top up your wallet."}
           </p>
           {canWrap && wrapShortfallWei != null ? (
-            <button
-              type="button"
-              disabled={wrapping}
-              onClick={() => void handleWrap()}
-              className="self-start rounded-md border border-amber-600 bg-amber-900/40 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-800/60 disabled:cursor-wait disabled:opacity-60"
-            >
-              {wrapping
-                ? `Wrapping ${nativeSymbol}…`
-                : `Wrap ${formatUnits(wrapShortfallWei, betToken.decimals)} ${nativeSymbol} → ${betToken.symbol}`}
-            </button>
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                disabled={wrapping}
+                onClick={() => void handleWrap()}
+                className="self-start rounded-md border border-amber-600 bg-amber-900/40 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-800/60 disabled:cursor-wait disabled:opacity-60"
+              >
+                {wrapWaitingWallet
+                  ? `Confirm in wallet…`
+                  : wrapTxHash && wrapReceiptLoading
+                    ? `Wrapping ${nativeSymbol}…`
+                    : `Wrap ${formatUnits(wrapShortfallWei, betToken.decimals)} ${nativeSymbol} → ${betToken.symbol}`}
+              </button>
+              {wrapTxHash ? (() => {
+                const url = explorerTxUrl(chainGuard.appChainId, wrapTxHash);
+                return (
+                  <p className="text-[11px] text-amber-200/80">
+                    {wrapReceiptLoading
+                      ? "Waiting for on-chain confirmation… "
+                      : wrapReceiptSuccess
+                        ? "Wrap confirmed — refreshing balance… "
+                        : "Tx submitted. "}
+                    {url ? (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline hover:text-amber-100"
+                      >
+                        View tx
+                      </a>
+                    ) : null}
+                  </p>
+                );
+              })() : null}
+            </div>
           ) : null}
         </div>
       ) : null}
