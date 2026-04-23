@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useActiveConditions, useConditionsState } from "@azuro-org/sdk";
 import { ConditionState, GameState, type GameData } from "@azuro-org/toolkit";
 import { FavoriteGameButton } from "@/components/FavoriteButton";
@@ -19,6 +19,71 @@ import { useCountdown, parseStartsAtMs, formatStartTime } from "@/lib/useCountdo
 import { SportNavIcon } from "@/lib/sportNavIcon";
 import { getOutcomeDisplayLabel } from "@/lib/outcomeLabels";
 import { encodeSlipDecimalOdds } from "@/lib/oddsFormat";
+
+const STOPPED_STABILIZE_MS = 800;
+
+/**
+ * Returns the set of conditionIds that have been in a non-Active state for at
+ * least {@link STOPPED_STABILIZE_MS}. Callers use this to visually disable
+ * paused outcomes without flashing grey on sub-second live-feed flickers.
+ */
+function useStableStoppedConditions(
+  states: Record<string, ConditionState>,
+): ReadonlySet<string> {
+  const [stable, setStable] = useState<ReadonlySet<string>>(() => new Set());
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    // Returning to Active → cancel pending timer, remove from stable set.
+    const toRemove: string[] = [];
+    for (const id of Array.from(timersRef.current.keys())) {
+      if (states[id] === ConditionState.Active) {
+        clearTimeout(timersRef.current.get(id)!);
+        timersRef.current.delete(id);
+      }
+    }
+    setStable((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const id of next) {
+        if (states[id] === ConditionState.Active) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      for (const id of toRemove) {
+        if (next.delete(id)) changed = true;
+      }
+      return changed ? next : prev;
+    });
+
+    // Non-Active → start a timer if not already running; on fire, promote
+    // the id to the stable set. Active ids were already cleared above.
+    for (const [id, s] of Object.entries(states)) {
+      if (s === ConditionState.Active) continue;
+      if (timersRef.current.has(id)) continue;
+      const t = setTimeout(() => {
+        setStable((prev) => {
+          if (prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.add(id);
+          return next;
+        });
+        timersRef.current.delete(id);
+      }, STOPPED_STABILIZE_MS);
+      timersRef.current.set(id, t);
+    }
+  }, [states]);
+
+  useEffect(() => {
+    return () => {
+      for (const t of timersRef.current.values()) clearTimeout(t);
+      timersRef.current.clear();
+    };
+  }, []);
+
+  return stable;
+}
 
 function PrematchCountdown({
   startsAt,
@@ -199,17 +264,25 @@ export function GameCard({
   };
 
   /**
-   * Only block on terminal states. Live feeds flicker `Active ↔ Stopped` during
-   * paused play and an older check of `!== Active` made the whole card unclickable
-   * whenever the feed dropped out of `Active` for a tick. The betslip validates
-   * state on add (`useConditionsState`) and surfaces pause/price-change copy there.
+   * Terminal states (Canceled/Removed/Resolved) disable immediately.
+   *
+   * For `Stopped`: live feeds flicker Active ↔ Stopped during in-running
+   * (which is why we used to leave Stopped clickable) but users reported it
+   * as "weird to click a dead price". Compromise: track how long each
+   * condition has been Stopped and only disable + grey after
+   * STOPPED_STABILIZE_MS — sub-second blips don't flash the button grey,
+   * a real pause does.
    */
+  const stableStoppedIds = useStableStoppedConditions(liveConditionStates);
   const lineDisabled = (line: TopOddsLine) => {
-    switch (effectiveStateFor(line)) {
+    const s = effectiveStateFor(line);
+    switch (s) {
       case ConditionState.Canceled:
       case ConditionState.Removed:
       case ConditionState.Resolved:
         return true;
+      case ConditionState.Stopped:
+        return stableStoppedIds.has(line.conditionId) || needsStaleListInteraction;
       default:
         return needsStaleListInteraction;
     }
