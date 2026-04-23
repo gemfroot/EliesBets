@@ -25,7 +25,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { useConnection, useReadContract } from "wagmi";
+import { useBalance, useConnection, useReadContract, useWriteContract } from "wagmi";
 import { erc20Abi, formatUnits, parseUnits } from "viem";
 import { AZURO_AFFILIATE } from "@/lib/affiliate";
 import dynamic from "next/dynamic";
@@ -838,6 +838,77 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
       ? formatUnits(tokenBalanceRaw, betToken.decimals)
       : null;
 
+  // ---- One-click wrap (ETH→WETH / xDAI→WXDAI / etc.) ----
+  // Sports bets settle in a wrapped native on most chains, but wallets usually
+  // hold the raw native token. If the user is short on the wrapped ERC-20 but
+  // has enough native to cover the shortfall, offer to call deposit() on the
+  // wrapped-native contract before they try to bet.
+  const isWrappableSymbol = /^W(ETH|MATIC|POL|AVAX|XDAI)$/i.test(
+    betToken.symbol,
+  );
+  const nativeSymbol = isWrappableSymbol
+    ? betToken.symbol.replace(/^W/i, "")
+    : "";
+  // `chainGuard.appChainId` is Azuro's broad chain union — narrow to the
+  // wagmi-config subset via a numeric cast so the hook types type-check.
+  const { data: nativeBalance, refetch: refetchNativeBalance } = useBalance({
+    address,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    chainId: chainGuard.appChainId as any,
+    query: {
+      enabled: Boolean(isWrappableSymbol && address && isConnected),
+      refetchInterval: 15_000,
+      staleTime: 0,
+    },
+  });
+  const wrapShortfallWei =
+    hasInsufficientBalance && requiredWei != null && tokenBalanceRaw != null
+      ? requiredWei - tokenBalanceRaw
+      : null;
+  const canWrap =
+    isWrappableSymbol &&
+    wrapShortfallWei != null &&
+    wrapShortfallWei > BigInt(0) &&
+    (nativeBalance?.value ?? BigInt(0)) >= wrapShortfallWei;
+  const [wrapping, setWrapping] = useState(false);
+  const { writeContractAsync: writeWrapAsync } = useWriteContract();
+  const handleWrap = useCallback(async () => {
+    if (!canWrap || wrapShortfallWei == null) return;
+    setWrapping(true);
+    setErrorMessage(null);
+    try {
+      await writeWrapAsync({
+        address: betToken.address,
+        abi: [
+          {
+            type: "function",
+            name: "deposit",
+            stateMutability: "payable",
+            inputs: [],
+            outputs: [],
+          },
+        ] as const,
+        functionName: "deposit",
+        value: wrapShortfallWei,
+      });
+      // Give the node a beat to reflect the new WETH balance before refetching.
+      await new Promise((r) => setTimeout(r, 600));
+      await refetchTokenBalance();
+      await refetchNativeBalance();
+    } catch (e) {
+      setErrorMessage(formatWalletTxError(e));
+    } finally {
+      setWrapping(false);
+    }
+  }, [
+    canWrap,
+    wrapShortfallWei,
+    betToken.address,
+    writeWrapAsync,
+    refetchTokenBalance,
+    refetchNativeBalance,
+  ]);
+
   const singleLegEffective =
     multiPick && mode === "single" && activeSelections[0] && effectiveOddsRecord
       ? effectiveOddsRecord[
@@ -1340,17 +1411,34 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
         <p className="text-xs text-zinc-500">Connect a wallet to place a bet.</p>
       ) : null}
       {hasInsufficientBalance ? (
-        <p
-          className="rounded-md border border-amber-800/80 bg-amber-950/40 px-3 py-2 text-xs text-amber-200"
+        <div
+          className="flex flex-col gap-2 rounded-md border border-amber-800/80 bg-amber-950/40 px-3 py-2 text-xs text-amber-200"
           role="status"
           aria-live="polite"
         >
-          Not enough {betToken.symbol} for this stake. Your balance is{" "}
-          <span className="font-semibold tabular-nums">
-            {formattedBalance ?? "0"}
-          </span>{" "}
-          {betToken.symbol}. Lower the stake or top up your wallet.
-        </p>
+          <p>
+            Not enough {betToken.symbol} for this stake. Your balance is{" "}
+            <span className="font-semibold tabular-nums">
+              {formattedBalance ?? "0"}
+            </span>{" "}
+            {betToken.symbol}.{" "}
+            {canWrap
+              ? `You have enough ${nativeSymbol} to wrap the shortfall.`
+              : "Lower the stake or top up your wallet."}
+          </p>
+          {canWrap && wrapShortfallWei != null ? (
+            <button
+              type="button"
+              disabled={wrapping}
+              onClick={() => void handleWrap()}
+              className="self-start rounded-md border border-amber-600 bg-amber-900/40 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-800/60 disabled:cursor-wait disabled:opacity-60"
+            >
+              {wrapping
+                ? `Wrapping ${nativeSymbol}…`
+                : `Wrap ${formatUnits(wrapShortfallWei, betToken.decimals)} ${nativeSymbol} → ${betToken.symbol}`}
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {isConnected &&
       sdkDisableMessage &&
