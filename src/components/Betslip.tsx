@@ -6,6 +6,7 @@ import {
   useBet,
   useBetFee,
   useChain,
+  useConditionsState,
   useDetailedBetslip,
 } from "@azuro-org/sdk";
 import {
@@ -309,6 +310,38 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
     writePersistedBetslipMeta(metaByIdSynced);
   }, [metaByIdSynced]);
 
+  // Auto-evict picks whose live condition is terminal (Canceled / Removed /
+  // Resolved). Stopped is intentionally NOT included — it's a transient pause
+  // that flips back to Active on a live-match flicker, and the SDK's
+  // BetslipDisableReason.ConditionState gate self-clears when it does, so
+  // there's no reason to drop the user's pick just to make them re-add it
+  // seconds later. Terminal states really can't settle, though, so keeping
+  // them on the slip is pure friction.
+  const slipConditionIds = useMemo(
+    () => Array.from(new Set(items.map((it) => it.conditionId))),
+    [items],
+  );
+  const { data: slipLiveStates } = useConditionsState({
+    conditionIds: slipConditionIds,
+    initialStates: {},
+  });
+  useEffect(() => {
+    for (const item of items) {
+      const state = slipLiveStates[item.conditionId];
+      if (
+        state === ConditionState.Canceled ||
+        state === ConditionState.Removed ||
+        state === ConditionState.Resolved
+      ) {
+        removeItem({
+          conditionId: item.conditionId,
+          outcomeId: item.outcomeId,
+        });
+      }
+    }
+    // `removeItem` identity is stable from `useBaseBetslip`.
+  }, [items, slipLiveStates, removeItem]);
+
   const selections = useMemo((): BetslipSelection[] => {
     return items.map((item) => {
       const id = selectionId(item.gameId, "", item.outcomeId);
@@ -546,7 +579,7 @@ function messageForBetslipDisableReason(
   }
   switch (reason) {
     case BetslipDisableReason.ConditionState:
-      return "This pick paused — lines flicker on live games. Remove and re-add from the game page to retry.";
+      return "A pick is paused — bet will unlock automatically when the market reopens.";
     case BetslipDisableReason.BetAmountGreaterThanMaxBet:
       return "Stake is above the maximum allowed for this bet.";
     case BetslipDisableReason.BetAmountLowerThanMinBet:
