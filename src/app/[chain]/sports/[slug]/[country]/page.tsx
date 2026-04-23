@@ -16,7 +16,7 @@ import {
   type ChainSlug,
 } from "@/lib/sportsChainConstants";
 
-export const revalidate = 45;
+export const revalidate = 20;
 
 type Props = {
   params: Promise<{ chain: string; slug: string; country: string }>;

@@ -23,9 +23,10 @@ import type { Metadata } from "next";
  * common sports are served from cached HTML on the first visit; uncommon
  * sports still work via on-demand ISR (`dynamicParams = true` is default).
  *
- * 45s TTL matches the data-layer `unstable_cache` in `sportGames.ts`.
+ * TTL (20s) matches the data-layer `unstable_cache` in `sportGames.ts` and
+ * the client-side OddsRefreshControls tick.
  */
-export const revalidate = 45;
+export const revalidate = 20;
 
 /** Hardcoded so the build doesn't depend on Azuro's upstream being healthy. */
 const PREGENERATED_SPORT_SLUGS = [

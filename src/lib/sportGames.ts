@@ -13,13 +13,13 @@ import type { SportsChainId } from "@/lib/sportsChainConstants";
 export const GAMES_PER_PAGE = 100;
 
 /**
- * List pages read `getSportsChainId()` from cookies → routes are dynamic, so
- * route-level `revalidate = 45` (which we had before commit 8ab071e) is a no-op.
- * Cache at the data layer instead: each chainId gets its own 45s-bucketed render
- * so returning users in the same chain hit the in-memory cache, not the slow
- * upstream. Live odds still update client-side via the SDK's WebSocket feed.
+ * TTL for the data-layer cache on list pages (per chainId bucket). Must match
+ * the interval used by `OddsRefreshControls` on the client — the client tick
+ * pulls this ISR snapshot, so the client never sees fresher data than the
+ * TTL. Lowered from 45s to 20s so MMA/tennis/etc. refresh more often while
+ * the user is sitting on a page.
  */
-const LIST_PAGE_REVALIDATE_SECONDS = 45;
+const LIST_PAGE_REVALIDATE_SECONDS = 20;
 
 /** Games per league from the sports tree API; must be high enough for full country listings. */
 const COUNTRY_TREE_GAMES_PER_LEAGUE = 1000;

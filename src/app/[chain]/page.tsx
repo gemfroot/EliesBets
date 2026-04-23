@@ -15,11 +15,12 @@ import { isChainSlug } from "@/lib/sportsChainConstants";
 import { OddsRefreshControls } from "@/components/OddsRefreshControls";
 
 /**
- * Home lists are per-chain prematch/popular data — safe to ISR at 45s.
+ * Home lists are per-chain prematch/popular data — ISR at 20s, matching the
+ * client-side OddsRefreshControls tick so auto-refresh sees fresh data.
  * The hero (live) still refreshes via its own `unstable_cache` at 15s and
  * streams behind its own Suspense boundary so the shell paints immediately.
  */
-export const revalidate = 45;
+export const revalidate = 20;
 
 function HomeHeroFallback() {
   return (

@@ -57,7 +57,7 @@ function RefreshButton() {
  * so we rarely hit the upstream subgraph more than once per window.
  */
 export function OddsRefreshControls({
-  intervalMs = 45_000,
+  intervalMs = 20_000,
   className,
 }: {
   intervalMs?: number;
