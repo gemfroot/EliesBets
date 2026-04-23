@@ -239,7 +239,6 @@ export function GameCard({
     !listOddsRefreshing &&
     refreshedTop == null;
   const needsStaleListInteraction = false;
-  const showStaleHint = isStale && refreshedTop == null && !listOddsRefreshing;
 
   const outcomeCtx = {
     sportSlug: game.sport.slug,
@@ -288,11 +287,12 @@ export function GameCard({
     }
   };
 
-  const staleHint = showStaleHint ? (
-    <p className="text-[10px] leading-snug text-amber-500/85">
-      Odds refresh on hover.
-    </p>
-  ) : listOddsRefreshFailed ? (
+  // The user-facing "Odds refresh on hover" hint used to appear once the SSR
+  // snapshot went stale. The page now ticks router.refresh() every 20s via
+  // OddsRefreshControls, so the hover path is rarely the reason a card is
+  // stale — the hint read as a bug rather than a design choice. Keep only the
+  // refresh-failed fallback so users still have a way out of a dead card.
+  const staleHint = listOddsRefreshFailed ? (
     <p className="text-[10px] leading-snug text-red-400/90">
       Could not refresh odds.{" "}
       <Link href={gameHref} className="underline hover:text-red-300">
