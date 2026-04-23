@@ -148,8 +148,21 @@ export const CASINO_CHAIN_IDS = [
 
 export type CasinoChainId = (typeof CASINO_CHAIN_IDS)[number];
 
+// ---------------------------------------------------------------------------
+// Mainnet fallbacks point ONLY at our own deployed contracts. If we ever fall
+// through to a BetSwirl address, the player bets against BetSwirl's house and
+// our bank never sees the wager — we never want that silently. Env vars can
+// override per-env, and testnet slots still fall back to BetSwirl's testnet
+// deploys for dev ergonomics.
+// Current coverage (mainnet):
+//   Base:      Bank ✓  CoinToss ✓  Wheel ✓  Plinko ✓  (Dice / Roulette / Keno not deployed)
+//   Avalanche: Bank ✓  CoinToss ✓  (nothing else deployed)
+//   Polygon:   nothing deployed
+//   Gnosis:    nothing deployed
+// ---------------------------------------------------------------------------
+
 const BANK_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
-  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_BANK_POLYGON) ?? BETSWIRL_BANK_MAINNET,
+  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_BANK_POLYGON),
   [polygonAmoy.id]: BETSWIRL_BANK_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_BANK_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_BANK_AVALANCHE) ?? OUR_BANK_AVALANCHE,
@@ -158,8 +171,7 @@ const BANK_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
 };
 
 const COIN_TOSS_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
-  [polygon.id]:
-    addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_POLYGON) ?? BETSWIRL_COIN_TOSS_POLYGON,
+  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_POLYGON),
   [polygonAmoy.id]: BETSWIRL_COIN_TOSS_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_COIN_TOSS_AVALANCHE) ?? OUR_COIN_TOSS_AVALANCHE,
@@ -168,7 +180,7 @@ const COIN_TOSS_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
 };
 
 const DICE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
-  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_POLYGON) ?? BETSWIRL_DICE_POLYGON,
+  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_POLYGON),
   [polygonAmoy.id]: BETSWIRL_DICE_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_DICE_AVALANCHE),
@@ -177,8 +189,7 @@ const DICE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
 };
 
 const ROULETTE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
-  [polygon.id]:
-    addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_POLYGON) ?? BETSWIRL_ROULETTE_POLYGON,
+  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_POLYGON),
   [polygonAmoy.id]: BETSWIRL_ROULETTE_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_ROULETTE_AVALANCHE),
@@ -187,7 +198,7 @@ const ROULETTE_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
 };
 
 const KENO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
-  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_POLYGON) ?? BETSWIRL_KENO_POLYGON,
+  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_POLYGON),
   [polygonAmoy.id]: BETSWIRL_KENO_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_KENO_AVALANCHE),
@@ -196,7 +207,7 @@ const KENO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
 };
 
 const WHEEL_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
-  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_POLYGON) ?? BETSWIRL_WHEEL_POLYGON,
+  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_POLYGON),
   [polygonAmoy.id]: BETSWIRL_WHEEL_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_WHEEL_AVALANCHE),
@@ -205,7 +216,7 @@ const WHEEL_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
 };
 
 const PLINKO_BY_CHAIN: Record<CasinoChainId, Address | undefined> = {
-  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_POLYGON) ?? BETSWIRL_PLINKO_POLYGON,
+  [polygon.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_POLYGON),
   [polygonAmoy.id]: BETSWIRL_PLINKO_AMOY,
   [gnosis.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_GNOSIS),
   [avalanche.id]: addressFromEnv(process.env.NEXT_PUBLIC_CASINO_PLINKO_AVALANCHE),

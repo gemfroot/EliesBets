@@ -16,11 +16,16 @@ import {
 } from "@/lib/casino/addresses";
 import {
   GAME_PREFERRED_CHAINS,
-  type GamePreferredChainKey,
   chainName,
 } from "@/lib/chains";
 
-type GameKey = GamePreferredChainKey;
+type GameKey =
+  | "coinToss"
+  | "dice"
+  | "roulette"
+  | "keno"
+  | "wheel"
+  | "plinko";
 
 type GameDef = {
   key: GameKey;
@@ -151,7 +156,17 @@ export function CasinoGameGrid() {
           );
         }
 
-        const preferred = GAME_PREFERRED_CHAINS[game.key]?.[0];
+        const preferredList = (
+          GAME_PREFERRED_CHAINS as unknown as Partial<
+            Record<GameKey, readonly (typeof GAME_PREFERRED_CHAINS)["coinToss"][number][]>
+          >
+        )[game.key];
+        const preferred = preferredList?.[0];
+        // No preferred chain at all → the game isn't deployed anywhere yet.
+        // Show it as "Coming soon" instead of nudging the user to a chain
+        // where it would also be unavailable (or, worse, land against an
+        // upstream house we don't control).
+        const comingSoon = !preferred;
         return (
           <li key={game.title} className="min-h-[11rem]">
             <div
@@ -165,7 +180,7 @@ export function CasinoGameGrid() {
                 {game.icon}
               </span>
               <span className="mt-3 inline-flex w-fit rounded-full border border-zinc-700 bg-zinc-900/80 px-2.5 py-0.5 type-overline text-zinc-400">
-                Not on {chainName(chainId)}
+                {comingSoon ? "Coming soon" : `Not on ${chainName(chainId)}`}
               </span>
               <h2 className="type-title mt-2 text-zinc-600">{game.title}</h2>
               <p className="type-muted mt-2 flex-1 text-pretty text-zinc-600">

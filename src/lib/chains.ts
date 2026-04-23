@@ -32,15 +32,17 @@ export const SUPPORTED_CHAIN_IDS = [
 /**
  * Preferred chain to suggest for each game when the user is on an unsupported
  * network. First entry is the default; additional entries are alternatives.
+ * Lists ONLY chains where we have our own deployed contracts — suggesting a
+ * chain where the game would actually route to BetSwirl's house would send
+ * revenue to the wrong bank. Games with no entry have no deployment anywhere
+ * yet and render as "Coming soon" in the casino grid.
  * `as const` keeps literal chain IDs so wagmi `switchChain({ chainId })` type-checks.
  */
 export const GAME_PREFERRED_CHAINS = {
-  coinToss: [base.id, avalanche.id, polygon.id],
-  dice: [polygon.id],
-  roulette: [polygon.id],
-  keno: [polygon.id],
-  wheel: [base.id, polygon.id],
-  plinko: [base.id, polygon.id],
+  coinToss: [base.id, avalanche.id],
+  wheel: [base.id],
+  plinko: [base.id],
+  // dice / roulette / keno: no deploy yet → not listed here.
 } as const;
 
 export type GamePreferredChainKey = keyof typeof GAME_PREFERRED_CHAINS;
