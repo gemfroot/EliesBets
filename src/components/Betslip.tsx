@@ -1617,10 +1617,12 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
           <button
             type="button"
             disabled={chainGuard.switchPending}
-            onClick={() => {
-              void chainGuard.switchToAppChain().catch(() => {
-                /* wagmi surfaces the error on next render via switchError in Header; here we just stay blocked */
-              });
+            onClick={async () => {
+              try {
+                await chainGuard.switchToAppChain();
+              } catch (e) {
+                showToast(formatWalletTxError(e), "error");
+              }
             }}
             className="min-h-11 rounded-md bg-amber-600 px-3 py-2.5 text-sm font-semibold text-zinc-950 transition-[background-color,transform,opacity] duration-200 ease-out hover:scale-[1.02] hover:bg-amber-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:min-h-0 md:py-2"
           >

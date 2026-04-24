@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConnection, usePublicClient } from "wagmi";
 import { useWalletChainId } from "@/lib/useWalletChainId";
-import type { PublicClient } from "viem";
+import type { Abi, PublicClient } from "viem";
 import { getBlockNumber, getContractEvents } from "viem/actions";
 import { coinTossAbi } from "@/lib/casino/abis/CoinToss";
 import { diceAbi } from "@/lib/casino/abis/Dice";
@@ -20,13 +20,22 @@ const STORAGE_PREFIX = "eliesbets.pendingBets.v1";
 const POLL_INTERVAL_MS = 5_000;
 const STALL_AFTER_MS = 90_000;
 
-const ABI_BY_GAME: Record<PendingGameType, typeof coinTossAbi> = {
+// Each ABI keeps its narrow shape at the import site so individual hooks
+// (useReadContract / writeContract) stay type-safe. We widen to `Abi` here
+// because the cross-game polling reads only the shared `Roll` event.
+const ABI_BY_GAME: Record<PendingGameType, Abi> = {
   coinToss: coinTossAbi,
-  dice: diceAbi as unknown as typeof coinTossAbi,
-  roulette: rouletteAbi as unknown as typeof coinTossAbi,
-  keno: kenoAbi as unknown as typeof coinTossAbi,
-  wheel: wheelAbi as unknown as typeof coinTossAbi,
-  plinko: wheelAbi as unknown as typeof coinTossAbi,
+  dice: diceAbi,
+  roulette: rouletteAbi,
+  keno: kenoAbi,
+  wheel: wheelAbi,
+  plinko: wheelAbi,
+};
+
+type RollEventArgs = {
+  id?: bigint;
+  payout?: bigint;
+  totalBetAmount?: bigint;
 };
 
 function storageKey(wallet: `0x${string}`) {
@@ -242,8 +251,7 @@ export function PendingBetsProvider({ children }: { children: React.ReactNode })
           }
           const baseline = bet.baselineRollId ? BigInt(bet.baselineRollId) : null;
           const latest = logs[logs.length - 1];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const args = (latest as any).args as { id?: bigint; payout?: bigint; totalBetAmount?: bigint };
+          const args = (latest as { args?: RollEventArgs }).args ?? {};
           if (args?.id == null) {
             setPending((prev) =>
               prev.map((b) =>

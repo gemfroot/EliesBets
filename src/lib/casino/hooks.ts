@@ -1565,7 +1565,10 @@ export function useRoulette(betToken?: BetToken) {
         address: roulette,
         abi: rouletteAbi,
         functionName: "wager",
-        args: [encodedNumbers, receiver, affiliate, betData],
+        // Contract signature is `uint40 numbers`; viem types that as `number`.
+        // The caller hands us a bigint (matches BetSwirl SDK conventions), and a
+        // 40-bit value always fits in Number.MAX_SAFE_INTEGER.
+        args: [Number(encodedNumbers), receiver, affiliate, betData],
         value: msgValue,
       });
     },
@@ -1892,7 +1895,9 @@ export function useKeno(betToken?: BetToken) {
         address: keno,
         abi: kenoAbi,
         functionName: "wager",
-        args: [encodedNumbers, receiver, affiliate, betData],
+        // Contract signature is `uint40 numbers`; viem types that as `number`.
+        // 40 bits always fits in Number.MAX_SAFE_INTEGER.
+        args: [Number(encodedNumbers), receiver, affiliate, betData],
         value: msgValue,
       });
     },
@@ -2090,17 +2095,20 @@ function useWeightedWheelLikeGame(
         for (let i = 0; i < results.length; i++) {
           const row = results[i];
           if (row.status !== "success" || row.result == null) continue;
-          const tuple = row.result as readonly [
-            readonly bigint[],
-            readonly bigint[],
-            bigint,
-            number,
-          ];
+          // gameConfigs returns a named struct, not a tuple — viem decodes it
+          // as an object keyed by member name, which is what
+          // parseRawWeightedGameConfiguration expects.
+          const struct = row.result as {
+            weightRanges: readonly bigint[];
+            multipliers: readonly bigint[];
+            maxMultiplier: bigint;
+            gameId: number;
+          };
           const raw = {
-            weightRanges: [...tuple[0]],
-            multipliers: [...tuple[1]],
-            maxMultiplier: tuple[2],
-            gameId: tuple[3],
+            weightRanges: [...struct.weightRanges],
+            multipliers: [...struct.multipliers],
+            maxMultiplier: struct.maxMultiplier,
+            gameId: struct.gameId,
           };
           try {
             parsed.push(parseRawWeightedGameConfiguration(raw, i, casinoChainId));

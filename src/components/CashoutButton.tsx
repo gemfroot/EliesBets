@@ -235,7 +235,13 @@ export function CashoutButton({ bet }: CashoutButtonProps) {
               appChainName={azuroChain.appChainName}
               walletChainName={azuroChain.walletChainName}
               switchPending={azuroChain.switchPending}
-              onSwitch={() => void azuroChain.switchToAppChain().catch(() => {})}
+              onSwitch={async () => {
+                try {
+                  await azuroChain.switchToAppChain();
+                } catch (e) {
+                  showToast(formatWalletTxError(e), "error");
+                }
+              }}
             />
           </div>
         ) : null}

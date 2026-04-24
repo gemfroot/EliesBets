@@ -186,9 +186,9 @@ export function CoinTossGame() {
             topics: log.topics,
           });
           if (d.eventName === "PlaceBet") {
-            const args = d.args as unknown as { id?: bigint };
-            if (typeof args?.id === "bigint") {
-              setOnChainBetId(pendingIdRef.current, args.id);
+            const { id } = d.args;
+            if (typeof id === "bigint") {
+              setOnChainBetId(pendingIdRef.current, id);
               break;
             }
           }

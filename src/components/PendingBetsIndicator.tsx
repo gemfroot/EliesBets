@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { formatUnits } from "viem";
+import { type Abi, formatUnits } from "viem";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { usePendingBets } from "@/lib/casino/pendingBets";
 import { explorerTxUrl } from "@/lib/chains";
@@ -18,9 +18,9 @@ import { formatWalletTxError } from "@/lib/userFacingTxError";
 const REFUND_AFTER_MS = 24 * 60 * 60 * 1000;
 
 /** Dispatch game type → ABI for the `refundBet(uint256)` call. All BetSwirl
- *  games share the same function signature on Game.sol, so any game-specific
- *  ABI works; we keep a map for type safety. */
-const GAME_ABI: Record<string, unknown> = {
+ *  games share the same function signature on Game.sol; we widen to `Abi`
+ *  because writeContract only needs the function selector to match. */
+const GAME_ABI: Record<string, Abi> = {
   coinToss: coinTossAbi,
   dice: diceAbi,
   roulette: rouletteAbi,
@@ -107,8 +107,7 @@ export function PendingBetsIndicator() {
       if (!abi) throw new Error("Unknown game for refund");
       const hash = await writeContractAsync({
         address: bet.contract,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        abi: abi as any,
+        abi,
         functionName: "refundBet",
         args: [BigInt(bet.onChainBetId)],
       });
