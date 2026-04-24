@@ -52,6 +52,10 @@ function getServerSnapshot() {
 export function useGlobalSeconds(): number {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    // Intentional: one-shot post-mount flag so SSR (0) and the first client
+    // paint (also 0, via the ternary below) are byte-identical. Without this,
+    // callers hydrating against Date.now() trip React error #418.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
   const live = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);

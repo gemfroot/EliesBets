@@ -279,11 +279,13 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = readPersistedBetslipMeta();
     if (Object.keys(stored).length > 0) {
+      // Intentional: one-shot hydration from localStorage after mount so SSR
+      // output (empty) and the first client paint are byte-identical.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMetaById((prev) =>
         Object.keys(prev).length === 0 ? stored : { ...stored, ...prev },
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot hydration
   }, []);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const openDrawer = useCallback(() => setMobileDrawerOpen(true), []);
@@ -656,7 +658,6 @@ function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }
   const {
     data: tokenBalanceRaw,
     refetch: refetchTokenBalance,
-    isFetching: isFetchingTokenBalance,
   } = useReadContract({
     address: betToken.address,
     abi: erc20Abi,

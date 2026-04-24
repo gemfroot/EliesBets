@@ -30,59 +30,57 @@ const STOPPED_STABILIZE_MS = 800;
 function useStableStoppedConditions(
   states: Record<string, ConditionState>,
 ): ReadonlySet<string> {
-  const [stable, setStable] = useState<ReadonlySet<string>>(() => new Set());
+  const [promoted, setPromoted] = useState<ReadonlySet<string>>(() => new Set());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
-    // Returning to Active → cancel pending timer, remove from stable set.
-    const toRemove: string[] = [];
-    for (const id of Array.from(timersRef.current.keys())) {
+    const timers = timersRef.current;
+    // Returning to Active → cancel any pending timer for that id.
+    for (const id of Array.from(timers.keys())) {
       if (states[id] === ConditionState.Active) {
-        clearTimeout(timersRef.current.get(id)!);
-        timersRef.current.delete(id);
+        clearTimeout(timers.get(id)!);
+        timers.delete(id);
       }
     }
-    setStable((prev) => {
-      let changed = false;
-      const next = new Set(prev);
-      for (const id of next) {
-        if (states[id] === ConditionState.Active) {
-          next.delete(id);
-          changed = true;
-        }
-      }
-      for (const id of toRemove) {
-        if (next.delete(id)) changed = true;
-      }
-      return changed ? next : prev;
-    });
 
-    // Non-Active → start a timer if not already running; on fire, promote
-    // the id to the stable set. Active ids were already cleared above.
+    // Non-Active without a timer → start one; on fire, promote the id.
     for (const [id, s] of Object.entries(states)) {
       if (s === ConditionState.Active) continue;
-      if (timersRef.current.has(id)) continue;
+      if (timers.has(id)) continue;
       const t = setTimeout(() => {
-        setStable((prev) => {
+        setPromoted((prev) => {
           if (prev.has(id)) return prev;
           const next = new Set(prev);
           next.add(id);
           return next;
         });
-        timersRef.current.delete(id);
+        timers.delete(id);
       }, STOPPED_STABILIZE_MS);
-      timersRef.current.set(id, t);
+      timers.set(id, t);
     }
   }, [states]);
 
   useEffect(() => {
+    const timers = timersRef.current;
     return () => {
-      for (const t of timersRef.current.values()) clearTimeout(t);
-      timersRef.current.clear();
+      for (const t of timers.values()) clearTimeout(t);
+      timers.clear();
     };
   }, []);
 
-  return stable;
+  // Derive the visible stable set: a promoted id only counts while its
+  // condition is still non-Active. Doing this on read (vs. setState on every
+  // states change) avoids cascading renders inside the effect.
+  return useMemo(() => {
+    if (promoted.size === 0) return promoted;
+    const visible = new Set<string>();
+    for (const id of promoted) {
+      if (states[id] !== undefined && states[id] !== ConditionState.Active) {
+        visible.add(id);
+      }
+    }
+    return visible.size === promoted.size ? promoted : visible;
+  }, [promoted, states]);
 }
 
 function PrematchCountdown({

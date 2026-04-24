@@ -14,7 +14,25 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Node deploy scripts (CommonJS require)
     "contracts/**",
+    // Throwaway local scripts — gitignored, don't deserve the same rules as app source
+    "_claude_local/**",
   ]),
+  {
+    rules: {
+      // Honor the leading-underscore "intentionally discarded" convention so
+      // destructure-and-drop patterns (e.g. `data: _writeData` to remove a
+      // field from a spread) don't fight the linter.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -10,7 +10,9 @@
     "lint": "eslint",
     "test": "vitest run",
     "smoke:prod": "node scripts/smoke-production.mjs",
-    "check:static": "node scripts/check-static-sources.mjs"
+    "check:static": "node scripts/check-static-sources.mjs",
+    "check:secrets": "node scripts/check-no-secrets.mjs",
+    "check:secrets:staged": "node scripts/check-no-secrets.mjs --staged"
   },
   "dependencies": {
     "@apollo/client": "^4.1.7",
