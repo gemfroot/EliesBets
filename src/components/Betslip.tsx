@@ -21,6 +21,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   useSyncExternalStore,
@@ -41,15 +42,33 @@ import { useOddsFormat } from "@/components/OddsFormatProvider";
 import { useToast } from "@/components/Toast";
 import {
   encodeSlipDecimalOdds,
-  formatDriftDecimalPair,
   formatOddsValue,
   formatStoredOddsString,
-  oddsDriftedFromStored,
   parseStoredDecimalOdds,
 } from "@/lib/oddsFormat";
 import { formatWalletTxError } from "@/lib/userFacingTxError";
 import { useAzuroActionChain } from "@/lib/useAzuroActionChain";
 import { formatUsdFromDecimalString, useTokenUsdPrice } from "@/lib/price";
+import {
+  computeOddsDrift,
+  initialMetaById,
+  messageForBetslipDisableReason,
+  metaByIdReducer,
+  pruneMetaById,
+  readPersistedBetslipMeta,
+  selectionId,
+  stakePresetsFor,
+  usdToTokenString,
+  USD_STAKE_PRESETS,
+  writePersistedBetslipMeta,
+  type BetslipMode,
+  type BetslipSelection,
+} from "@/components/betslipState";
+
+// Re-exports preserved for the existing consumers
+// (BetReceipt, OddsButton, GameCard, etc.).
+export type { BetslipSelection };
+export { selectionId };
 
 const BetReceipt = dynamic(
   () =>
@@ -72,19 +91,6 @@ function BetslipMobileDrawerSlot() {
   }
   return <MobileBetslipDrawer />;
 }
-
-export type BetslipSelection = {
-  id: string;
-  gameId: string;
-  /** Match / event title shown on the receipt (e.g. Team A vs Team B). */
-  gameTitle: string;
-  outcomeName: string;
-  odds: string;
-  conditionId: string;
-  outcomeId: string;
-  /** Condition state when the pick was added from a list card (dev diagnostics). */
-  listConditionStateAtAdd?: ConditionState;
-};
 
 type BetslipActionsValue = {
   addSelection: (item: {
@@ -197,94 +203,18 @@ export function useBetslipMobileDrawer() {
   return ctx;
 }
 
-export function selectionId(
-  gameId: string,
-  outcomeName: string,
-  outcomeId?: string,
-): string {
-  if (outcomeId) {
-    return `${gameId}::${outcomeId}`;
-  }
-  return `${gameId}::${outcomeName}`;
-}
-
-/**
- * Azuro's `useBaseBetslip` persists the minimal bet tuple (gameId, conditionId,
- * outcomeId) across refreshes, but our display metadata — match title, outcome
- * label, locked odds — lives only in React state. On reload the item comes
- * back from SDK storage while `metaById` starts empty, so the slip flashes
- * "—" placeholders for everything.
- *
- * Mirror the metadata to localStorage so the slip survives reloads with real
- * info. Key is versioned so future shape changes don't break existing users.
- */
-const BETSLIP_META_STORAGE_KEY = "elies:betslip:meta:v1";
-
-function readPersistedBetslipMeta(): Record<string, BetslipSelection> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(BETSLIP_META_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    const out: Record<string, BetslipSelection> = {};
-    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
-      if (!v || typeof v !== "object") continue;
-      const r = v as Partial<BetslipSelection>;
-      if (
-        typeof r.id === "string" &&
-        typeof r.gameId === "string" &&
-        typeof r.gameTitle === "string" &&
-        typeof r.outcomeName === "string" &&
-        typeof r.odds === "string" &&
-        typeof r.conditionId === "string" &&
-        typeof r.outcomeId === "string"
-      ) {
-        out[k] = {
-          id: r.id,
-          gameId: r.gameId,
-          gameTitle: r.gameTitle,
-          outcomeName: r.outcomeName,
-          odds: r.odds,
-          conditionId: r.conditionId,
-          outcomeId: r.outcomeId,
-          listConditionStateAtAdd: r.listConditionStateAtAdd,
-        };
-      }
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-function writePersistedBetslipMeta(meta: Record<string, BetslipSelection>) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(
-      BETSLIP_META_STORAGE_KEY,
-      JSON.stringify(meta),
-    );
-  } catch {
-    /* ignore quota / private mode */
-  }
-}
-
 export function BetslipProvider({ children }: { children: ReactNode }) {
   const { items, addItem, removeItem, clear } = useBaseBetslip();
   // Start empty on the server to keep SSR deterministic, then hydrate from
   // localStorage on mount. A bet placed right after load still works because
   // addSelection writes both React state and storage.
-  const [metaById, setMetaById] = useState<Record<string, BetslipSelection>>({});
+  const [metaById, dispatchMeta] = useReducer(metaByIdReducer, initialMetaById);
   useEffect(() => {
     const stored = readPersistedBetslipMeta();
     if (Object.keys(stored).length > 0) {
-      // Intentional: one-shot hydration from localStorage after mount so SSR
-      // output (empty) and the first client paint are byte-identical.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMetaById((prev) =>
-        Object.keys(prev).length === 0 ? stored : { ...stored, ...prev },
-      );
+      // One-shot hydration after mount keeps SSR output (empty) and the first
+      // client paint byte-identical, then back-fills from localStorage.
+      dispatchMeta({ kind: "hydrate", stored });
     }
   }, []);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
@@ -302,15 +232,10 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
   // Keep module store in sync before descendants render (for `useBetslipSelectionSelected`).
   setBetslipSelectionIdSnapshot(validSelectionIds);
 
-  const metaByIdSynced = useMemo(() => {
-    const next: Record<string, BetslipSelection> = {};
-    for (const key of Object.keys(metaById)) {
-      if (validSelectionIds.has(key)) {
-        next[key] = metaById[key]!;
-      }
-    }
-    return next;
-  }, [metaById, validSelectionIds]);
+  const metaByIdSynced = useMemo(
+    () => pruneMetaById(metaById, validSelectionIds),
+    [metaById, validSelectionIds],
+  );
 
   // Persist on every change so the slip survives refresh with real info
   // instead of "—" placeholders. The pruned map mirrors exactly what the
@@ -392,12 +317,7 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
           conditionId: existing.conditionId,
           outcomeId: existing.outcomeId,
         });
-        setMetaById((prev) => {
-          if (!(id in prev)) return prev;
-          const next = { ...prev };
-          delete next[id];
-          return next;
-        });
+        dispatchMeta({ kind: "remove", id });
         return;
       }
       const row: BetslipSelection = {
@@ -410,7 +330,7 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
         outcomeId: item.outcomeId,
         listConditionStateAtAdd: item.listConditionStateAtAdd,
       };
-      setMetaById((prev) => ({ ...prev, [id]: row }));
+      dispatchMeta({ kind: "add", row });
       addItem({
         gameId: item.gameId,
         conditionId: item.conditionId,
@@ -430,11 +350,7 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
         );
       if (row) {
         removeItem({ conditionId: row.conditionId, outcomeId: row.outcomeId });
-        setMetaById((prev) => {
-          const next = { ...prev };
-          delete next[id];
-          return next;
-        });
+        dispatchMeta({ kind: "remove", id });
       }
     },
     [metaByIdSynced, items, removeItem],
@@ -442,23 +358,12 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
 
   const clearSelections = useCallback(() => {
     clear();
-    setMetaById({});
+    dispatchMeta({ kind: "clear" });
   }, [clear]);
 
-  const acceptOdds = useCallback(
-    (updates: Record<string, string>) => {
-      setMetaById((prev) => {
-        const next = { ...prev };
-        for (const [id, odds] of Object.entries(updates)) {
-          if (next[id]) {
-            next[id] = { ...next[id]!, odds };
-          }
-        }
-        return next;
-      });
-    },
-    [],
-  );
+  const acceptOdds = useCallback((updates: Record<string, string>) => {
+    dispatchMeta({ kind: "acceptOdds", updates });
+  }, []);
 
   const actionsValue = useMemo(
     () => ({ addSelection, removeSelection, clearSelections, acceptOdds }),
@@ -489,146 +394,6 @@ export function BetslipProvider({ children }: { children: ReactNode }) {
 }
 
 const SLIPPAGE_PERCENT = 5;
-
-/** Token-native quick-stake presets, keyed by token symbol. Falls back to
- * `TOKEN_PRESETS_FALLBACK` when the bet token isn't in the map. Kept in the
- * token's own units (ETH: 0.001–0.05, stablecoins: 5–50, etc.) so presets
- * are sensible regardless of USD price. */
-const TOKEN_PRESETS_BY_SYMBOL: Record<string, readonly string[]> = {
-  ETH: ["0.001", "0.005", "0.01", "0.05"],
-  WETH: ["0.001", "0.005", "0.01", "0.05"],
-  AVAX: ["0.1", "0.5", "1", "5"],
-  WAVAX: ["0.1", "0.5", "1", "5"],
-  POL: ["1", "5", "10", "50"],
-  WPOL: ["1", "5", "10", "50"],
-  MATIC: ["1", "5", "10", "50"],
-  WMATIC: ["1", "5", "10", "50"],
-  xDAI: ["1", "5", "10", "50"],
-  WXDAI: ["1", "5", "10", "50"],
-  USDC: ["5", "10", "25", "50"],
-  "USDC.E": ["5", "10", "25", "50"],
-  USDT: ["5", "10", "25", "50"],
-  USDt: ["5", "10", "25", "50"],
-  "USDT.E": ["5", "10", "25", "50"],
-  DAI: ["5", "10", "25", "50"],
-  LINK: ["0.5", "1", "5", "10"],
-};
-const TOKEN_PRESETS_FALLBACK = ["5", "10", "25", "50"] as const;
-
-/** USD-denominated presets used when the user toggles the stake input to $. */
-const USD_STAKE_PRESETS = ["5", "10", "25", "50"] as const;
-
-function stakePresetsFor(symbol: string): readonly string[] {
-  return TOKEN_PRESETS_BY_SYMBOL[symbol] ?? TOKEN_PRESETS_FALLBACK;
-}
-
-/** Convert a USD string like "10" or "$10.50" to a token-decimal string. */
-function usdToTokenString(
-  usdStr: string,
-  usdPerUnit: number,
-  decimals: number,
-): string {
-  const clean = usdStr.replace(/^\$/, "").trim();
-  if (!clean) return "";
-  const n = Number(clean);
-  if (!Number.isFinite(n) || n < 0 || usdPerUnit <= 0) return "";
-  const tokens = n / usdPerUnit;
-  // Cap decimals at the token's max to avoid parseUnits rounding errors later.
-  const max = Math.min(Math.max(decimals, 2), 8);
-  return tokens.toFixed(max).replace(/\.?0+$/, "");
-}
-
-type BetslipMode = "single" | "combo";
-
-type OddsDriftInfo = { hasDrift: boolean; summary: string };
-
-function computeOddsDrift(
-  activeSelections: BetslipSelection[],
-  sdkOdds: Record<string, number>,
-  sdkTotalOdds: number,
-  mode: BetslipMode,
-  multiPick: boolean,
-): OddsDriftInfo {
-  const parts: string[] = [];
-  for (const s of activeSelections) {
-    const key = `${s.conditionId}-${s.outcomeId}`;
-    const live = sdkOdds[key];
-    const locked = parseStoredDecimalOdds(s.odds);
-    if (
-      locked == null ||
-      typeof live !== "number" ||
-      !Number.isFinite(live) ||
-      live <= 0
-    ) {
-      continue;
-    }
-    if (oddsDriftedFromStored(locked, live)) {
-      parts.push(
-        `• ${s.outcomeName}: ${formatDriftDecimalPair(locked, live)} (decimal)`,
-      );
-    }
-  }
-  if (
-    multiPick &&
-    mode === "combo" &&
-    activeSelections.length > 1 &&
-    Number.isFinite(sdkTotalOdds) &&
-    sdkTotalOdds > 0
-  ) {
-    let prod = 1;
-    for (const s of activeSelections) {
-      const d = parseStoredDecimalOdds(s.odds);
-      if (d == null) {
-        prod = NaN;
-        break;
-      }
-      prod *= d;
-    }
-    if (
-      Number.isFinite(prod) &&
-      prod > 0 &&
-      oddsDriftedFromStored(prod, sdkTotalOdds)
-    ) {
-      parts.push(
-        `• Combined price: ${formatDriftDecimalPair(prod, sdkTotalOdds)} (decimal)`,
-      );
-    }
-  }
-  return {
-    hasDrift: parts.length > 0,
-    summary: parts.join("\n"),
-  };
-}
-
-function messageForBetslipDisableReason(
-  reason: BetslipDisableReason | undefined,
-): string | null {
-  if (reason == null) {
-    return null;
-  }
-  switch (reason) {
-    case BetslipDisableReason.ConditionState:
-      return "This market is paused — it will auto-unlock when it reopens.";
-    case BetslipDisableReason.BetAmountGreaterThanMaxBet:
-      return "Stake is above the maximum allowed for this bet.";
-    case BetslipDisableReason.BetAmountLowerThanMinBet:
-      return "Stake is below the minimum for this bet.";
-    case BetslipDisableReason.ComboWithForbiddenItem:
-      return "This combo includes a selection that cannot be combined. Remove a leg or bet singles.";
-    case BetslipDisableReason.ComboWithSameGame:
-      return "Combo cannot include more than one outcome from the same game.";
-    case BetslipDisableReason.SelectedOutcomesTemporarySuspended:
-      return "One or more selections are temporarily unavailable, or the contract has not returned a max stake yet.";
-    case BetslipDisableReason.TotalOddsTooLow:
-      return "Total odds are too low for this bet.";
-    case BetslipDisableReason.FreeBetExpired:
-      return "The selected free bet has expired.";
-    case BetslipDisableReason.PrematchConditionInStartedGame:
-      return "A prematch selection is invalid for a game that has already started.";
-    default:
-      return "This bet cannot be placed right now.";
-  }
-}
 
 function BetslipStakeAndPlace({ selections }: { selections: BetslipSelection[] }) {
   const { format: oddsFormat } = useOddsFormat();
