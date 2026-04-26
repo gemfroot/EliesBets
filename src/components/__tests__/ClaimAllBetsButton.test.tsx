@@ -161,8 +161,8 @@ describe("ClaimAllBetsButton", () => {
       expect(submit).toHaveBeenCalledTimes(1);
     });
     // First call — both bets in one batch (under CLAIM_BATCH_SIZE=6).
-    const arg = submit.mock.calls[0]?.[0] as { bets: unknown[] };
-    expect(arg.bets).toHaveLength(2);
+    const calls = submit.mock.calls as unknown as Array<[{ bets: unknown[] }]>;
+    expect(calls[0]?.[0]?.bets).toHaveLength(2);
   });
 
   it("emits an info toast when no bets are claimable and there's nothing to fetch", async () => {

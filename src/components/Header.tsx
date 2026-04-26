@@ -15,10 +15,10 @@ import {
 } from "@/lib/chains";
 import { useWalletChainId } from "@/lib/useWalletChainId";
 import {
-  CHAIN_SLUG_BY_ID,
   CHAIN_SLUGS,
   type SportsChainId,
 } from "@/lib/sportsChainConstants";
+import { rewriteChainInPath } from "@/lib/chainRoute";
 
 const ConnectModal = dynamic(
   () =>
@@ -73,18 +73,7 @@ export function Header() {
   const chainMenuRef = useRef<HTMLDivElement | null>(null);
   const [switchErrorMsg, setSwitchErrorMsg] = useState<string | null>(null);
 
-  const rewriteChainInPath = (target: SportsChainId): string | null => {
-    const nextSlug = CHAIN_SLUG_BY_ID[target];
-    if (!nextSlug) return null;
-    const segments = pathname.split("/").filter(Boolean);
-    const first = segments[0];
-    if (first && (CHAIN_SLUGS as readonly string[]).includes(first)) {
-      segments[0] = nextSlug;
-      return `/${segments.join("/")}`;
-    }
-    // Non-chain route (e.g. /bets): don't move the user, just update chain state.
-    return null;
-  };
+  // See `src/lib/chainRoute.ts` for the routing decisions per-page.
 
   useEffect(() => {
     if (!chainMenuOpen) return;
@@ -210,7 +199,7 @@ export function Header() {
                     // immediately via ChainParamBinder, even if the wallet
                     // switch is denied or hangs. Skip the redundant
                     // setAppChainId — URL is the single source of truth now.
-                    const nextPath = rewriteChainInPath(id);
+                    const nextPath = rewriteChainInPath(pathname, id);
                     if (nextPath) {
                       router.push(nextPath);
                     }
